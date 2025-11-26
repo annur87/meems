@@ -11,6 +11,7 @@ export default function Header() {
                     <Link href="/" style={{ fontSize: '0.9rem', opacity: 0.8 }}>List</Link>
                     <Link href="/practice" style={{ fontSize: '0.9rem', opacity: 0.8 }}>Practice</Link>
                     <Link href="/digits" style={{ fontSize: '0.9rem', opacity: 0.8 }}>Digits</Link>
+                    <Link href="/words" style={{ fontSize: '0.9rem', opacity: 0.8 }}>Words</Link>
                 </nav>
             </div>
         </header>

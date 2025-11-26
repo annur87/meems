@@ -38,45 +38,65 @@ export default function Practice() {
                         <p>Add some words to your vault first!</p>
                     </div>
                 ) : (
-                    <div style={{ width: '100%', maxWidth: '400px', margin: '0 auto' }}>
+                    <div style={{ width: '100%', maxWidth: '400px', margin: '0 auto', perspective: '1000px' }}>
                         <div
-                            className="glass"
                             style={{
-                                minHeight: '300px',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                cursor: 'pointer',
-                                padding: '2rem',
-                                borderRadius: '1.5rem',
+                                position: 'relative',
+                                width: '100%',
+                                height: '300px',
                                 textAlign: 'center',
                                 transition: 'transform 0.6s',
                                 transformStyle: 'preserve-3d',
-                                position: 'relative',
+                                transform: isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)',
+                                cursor: 'pointer',
                                 marginBottom: '2rem'
                             }}
                             onClick={() => setIsFlipped(!isFlipped)}
                         >
-                            {!isFlipped ? (
-                                <div>
-                                    <p style={{ fontSize: '0.9rem', textTransform: 'uppercase', letterSpacing: '2px', color: '#94a3b8', marginBottom: '1rem' }}>Word</p>
-                                    <h2 style={{ fontSize: '2.5rem', fontWeight: 'bold', color: 'var(--primary)' }}>{currentWord?.term}</h2>
-                                    <p style={{ marginTop: '2rem', fontSize: '0.8rem', opacity: 0.5 }}>(Tap to reveal definition)</p>
-                                </div>
-                            ) : (
-                                <div className="animate-fade-in">
-                                    <p style={{ fontSize: '0.9rem', textTransform: 'uppercase', letterSpacing: '2px', color: '#94a3b8', marginBottom: '1rem' }}>Definition</p>
-                                    <p style={{ fontSize: '1.25rem', lineHeight: '1.6' }}>{currentWord?.definition}</p>
-                                    {currentWord?.example && (
-                                        <p style={{ marginTop: '1.5rem', fontStyle: 'italic', color: '#cbd5e1' }}>"{currentWord.example}"</p>
-                                    )}
-                                </div>
-                            )}
+                            {/* Front */}
+                            <div className="glass" style={{
+                                position: 'absolute',
+                                width: '100%',
+                                height: '100%',
+                                backfaceVisibility: 'hidden',
+                                WebkitBackfaceVisibility: 'hidden',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                borderRadius: '1.5rem',
+                                padding: '2rem'
+                            }}>
+                                <p style={{ fontSize: '0.9rem', textTransform: 'uppercase', letterSpacing: '2px', color: '#94a3b8', marginBottom: '1rem' }}>Word</p>
+                                <h2 style={{ fontSize: '2.5rem', fontWeight: 'bold', color: 'var(--primary)' }}>{currentWord?.term}</h2>
+                                <p style={{ marginTop: '2rem', fontSize: '0.8rem', opacity: 0.5 }}>(Tap to reveal)</p>
+                            </div>
+
+                            {/* Back */}
+                            <div className="glass" style={{
+                                position: 'absolute',
+                                width: '100%',
+                                height: '100%',
+                                backfaceVisibility: 'hidden',
+                                WebkitBackfaceVisibility: 'hidden',
+                                transform: 'rotateY(180deg)',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                borderRadius: '1.5rem',
+                                padding: '2rem'
+                            }}>
+                                <p style={{ fontSize: '0.9rem', textTransform: 'uppercase', letterSpacing: '2px', color: '#94a3b8', marginBottom: '1rem' }}>Definition</p>
+                                <p style={{ fontSize: '1.25rem', lineHeight: '1.6' }}>{currentWord?.definition}</p>
+                                {currentWord?.example && (
+                                    <p style={{ marginTop: '1.5rem', fontStyle: 'italic', color: '#cbd5e1' }}>"{currentWord.example}"</p>
+                                )}
+                            </div>
                         </div>
 
                         <div style={{ display: 'flex', justifyContent: 'center' }}>
-                            <button onClick={handleNext} className="btn btn-primary" style={{ width: '100%' }}>
+                            <button onClick={(e) => { e.stopPropagation(); handleNext(); }} className="btn btn-primary" style={{ width: '100%' }}>
                                 Next Word
                             </button>
                         </div>

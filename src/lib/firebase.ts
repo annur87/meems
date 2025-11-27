@@ -1,5 +1,5 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
-import { getFirestore, collection, addDoc, query, orderBy, getDocs } from "firebase/firestore";
+import { getFirestore, collection, addDoc, query, orderBy, getDocs, doc, setDoc, getDoc, deleteDoc } from "firebase/firestore";
 
 const firebaseConfig = {
     apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -15,7 +15,7 @@ const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 const db = getFirestore(app);
 
 export interface GameResult {
-    type: 'digit' | 'word' | 'number-wall' | 'card-blitz' | 'binary-surge' | 'spoken-numbers' | 'names-gauntlet' | 'word-palace' | 'decathlon' | 'abstract-matrix' | 'multilingual-list';
+    type: 'digit' | 'word' | 'number-wall' | 'card-blitz' | 'binary-surge' | 'spoken-numbers' | 'names-gauntlet' | 'word-palace' | 'decathlon' | 'abstract-matrix' | 'multilingual-list' | 'instant-visualization' | 'sensory-walkthrough' | 'system-checker';
     count: number;
     correct: number;
     total: number;
@@ -26,9 +26,37 @@ export interface GameResult {
     date: string;
 }
 
+// Image Vault Data Structures
+export interface MajorEntry {
+    id: string;
+    number: string;
+    images: string[];
+}
+
+export interface PaoEntry {
+    id: string;
+    card: string;
+    person: string;
+    action: string;
+    object: string;
+}
+
+export interface Palace {
+    id: string;
+    name: string;
+    locations: string[];
+}
+
+export interface ImageVaultData {
+    majorSystem: MajorEntry[];
+    paoSystem: PaoEntry[];
+    palaces: Palace[];
+    lastUpdated: number;
+}
+
+// Game Results Functions
 export const saveGameResult = async (result: Omit<GameResult, 'timestamp' | 'date'>) => {
     try {
-        // Check if config is present, otherwise warn and skip
         if (!firebaseConfig.apiKey) {
             console.warn("Firebase config missing. Results not saved.");
             return false;
@@ -59,5 +87,54 @@ export const getGameResults = async () => {
     } catch (e) {
         console.error("Error getting documents: ", e);
         return [];
+    }
+};
+
+// Image Vault Functions
+const USER_ID = 'default_user'; // In a real app, this would be the authenticated user's ID
+
+export const saveImageVaultData = async (data: Partial<ImageVaultData>) => {
+    try {
+        if (!firebaseConfig.apiKey) {
+            console.warn("Firebase config missing. Data not saved.");
+            return false;
+        }
+
+        const docRef = doc(db, "image_vault", USER_ID);
+        const existingDoc = await getDoc(docRef);
+
+        const updatedData: ImageVaultData = {
+            majorSystem: data.majorSystem || [],
+            paoSystem: data.paoSystem || [],
+            palaces: data.palaces || [],
+            lastUpdated: Date.now(),
+            ...(existingDoc.exists() ? existingDoc.data() : {}),
+            ...data
+        };
+
+        await setDoc(docRef, updatedData);
+        return true;
+    } catch (e) {
+        console.error("Error saving Image Vault data: ", e);
+        return false;
+    }
+};
+
+export const getImageVaultData = async (): Promise<ImageVaultData | null> => {
+    try {
+        if (!firebaseConfig.apiKey) {
+            return null;
+        }
+
+        const docRef = doc(db, "image_vault", USER_ID);
+        const docSnap = await getDoc(docRef);
+
+        if (docSnap.exists()) {
+            return docSnap.data() as ImageVaultData;
+        }
+        return null;
+    } catch (e) {
+        console.error("Error getting Image Vault data: ", e);
+        return null;
     }
 };

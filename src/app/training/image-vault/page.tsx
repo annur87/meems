@@ -1,114 +1,315 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Header from '@/components/Header';
 import Link from 'next/link';
+import {
+    MajorEntry,
+    PaoEntry,
+    Palace,
+    saveImageVaultData,
+    getImageVaultData
+} from '@/lib/firebase';
 
 type SystemType = 'major' | 'pao' | 'palace';
-type DrillMode = 'number-to-image' | 'image-to-number' | 'card-to-pao' | 'pao-to-card';
 
 export default function ImageVault() {
     const [activeTab, setActiveTab] = useState<SystemType>('major');
-    const [drillMode, setDrillMode] = useState<DrillMode>('number-to-image');
+    const [searchQuery, setSearchQuery] = useState('');
+    const [syncing, setSyncing] = useState(false);
+    const [lastSynced, setLastSynced] = useState<Date | null>(null);
 
-    // Drill State
-    const [drillActive, setDrillActive] = useState(false);
-    const [currentPrompt, setCurrentPrompt] = useState('');
-    const [userAnswer, setUserAnswer] = useState('');
-    const [feedback, setFeedback] = useState<{ correct: boolean; message: string } | null>(null);
-    const [score, setScore] = useState({ correct: 0, total: 0 });
+    // Major System
+    const [majorSystem, setMajorSystem] = useState<MajorEntry[]>([]);
+    const [editingMajor, setEditingMajor] = useState<string | null>(null);
+    const [newMajorNumber, setNewMajorNumber] = useState('');
+    const [newMajorImage, setNewMajorImage] = useState('');
 
-    // Sample data - in a real app, this would be stored in localStorage or Firebase
-    const [majorSystem, setMajorSystem] = useState<{ [key: string]: string }>({
-        '00': 'Sauce', '01': 'Suit', '02': 'Sun', '03': 'Sum',
-        '10': 'Toes', '11': 'Toad', '12': 'Tin', '13': 'Tomb',
-        '20': 'Nose', '21': 'Net', '22': 'Nun', '23': 'Name',
-        // Add more as needed
-    });
+    // PAO System
+    const [paoSystem, setPaoSystem] = useState<PaoEntry[]>([]);
+    const [editingPao, setEditingPao] = useState<string | null>(null);
+    const [newPaoCard, setNewPaoCard] = useState('');
+    const [newPaoPerson, setNewPaoPerson] = useState('');
+    const [newPaoAction, setNewPaoAction] = useState('');
+    const [newPaoObject, setNewPaoObject] = useState('');
 
-    const [paoSystem, setPaoSystem] = useState<{ [key: string]: { person: string; action: string; object: string } }>({
-        'AS': { person: 'Albert Einstein', action: 'Calculating', object: 'Chalkboard' },
-        '2H': { person: 'Harry Potter', action: 'Casting', object: 'Wand' },
-        'KC': { person: 'King Kong', action: 'Climbing', object: 'Building' },
-        // Add more as needed
-    });
+    // Memory Palaces
+    const [palaces, setPalaces] = useState<Palace[]>([]);
+    const [editingPalace, setEditingPalace] = useState<string | null>(null);
+    const [newPalaceName, setNewPalaceName] = useState('');
+    const [newLocation, setNewLocation] = useState('');
 
-    const [palaces, setPalaces] = useState<{ name: string; locations: string[] }[]>([
-        { name: 'Home Journey', locations: ['Front Door', 'Hallway', 'Living Room', 'Kitchen', 'Bedroom'] },
-        { name: 'Office Route', locations: ['Parking Lot', 'Elevator', 'Reception', 'Desk', 'Conference Room'] },
-    ]);
+    // Load from Firebase on mount
+    useEffect(() => {
+        const loadData = async () => {
+            const data = await getImageVaultData();
 
-    const startDrill = () => {
-        setDrillActive(true);
-        setScore({ correct: 0, total: 0 });
-        setFeedback(null);
-        generateNewPrompt();
-    };
+            if (data) {
+                setMajorSystem(data.majorSystem || []);
+                setPaoSystem(data.paoSystem || []);
+                setPalaces(data.palaces || []);
+                if (data.lastUpdated) {
+                    setLastSynced(new Date(data.lastUpdated));
+                }
+            } else {
+                // Initialize with sample data
+                const sampleMajor: MajorEntry[] = [
+                    { id: '1', number: '00', images: ['Sauce', 'Seas'] },
+                    { id: '2', number: '01', images: ['Suit', 'Seed'] },
+                    { id: '3', number: '02', images: ['Sun', 'Sane'] },
+                    { id: '4', number: '10', images: ['Toes', 'Dice'] },
+                    { id: '5', number: '11', images: ['Toad', 'Dad'] },
+                    { id: '6', number: '20', images: ['Nose', 'Noose'] },
+                ];
+                setMajorSystem(sampleMajor);
 
-    const generateNewPrompt = () => {
-        setUserAnswer('');
-        setFeedback(null);
+                const samplePao: PaoEntry[] = [
+                    { id: '1', card: 'AS', person: 'Albert Einstein', action: 'Calculating', object: 'Chalkboard' },
+                    { id: '2', card: '2H', person: 'Harry Potter', action: 'Casting', object: 'Wand' },
+                    { id: '3', card: 'KC', person: 'King Kong', action: 'Climbing', object: 'Building' },
+                ];
+                setPaoSystem(samplePao);
 
-        if (drillMode === 'number-to-image') {
-            const numbers = Object.keys(majorSystem);
-            const randomNum = numbers[Math.floor(Math.random() * numbers.length)];
-            setCurrentPrompt(randomNum);
-        } else if (drillMode === 'card-to-pao') {
-            const cards = Object.keys(paoSystem);
-            const randomCard = cards[Math.floor(Math.random() * cards.length)];
-            setCurrentPrompt(randomCard);
+                const samplePalaces: Palace[] = [
+                    { id: '1', name: 'Home Journey', locations: ['Front Door', 'Hallway', 'Living Room', 'Kitchen', 'Bedroom'] },
+                    { id: '2', name: 'Office Route', locations: ['Parking Lot', 'Elevator', 'Reception', 'Desk', 'Conference Room'] },
+                ];
+                setPalaces(samplePalaces);
+            }
+        };
+
+        loadData();
+    }, []);
+
+    // Save to Firebase with debounce
+    const syncToFirebase = async (data: { majorSystem?: MajorEntry[], paoSystem?: PaoEntry[], palaces?: Palace[] }) => {
+        setSyncing(true);
+        const success = await saveImageVaultData(data);
+        if (success) {
+            setLastSynced(new Date());
         }
+        setSyncing(false);
     };
 
-    const checkAnswer = () => {
-        let correct = false;
-        let message = '';
+    // Save to Firebase whenever data changes
+    useEffect(() => {
+        // Only sync if majorSystem has been initialized (e.g., not an empty array from initial state)
+        // and if it's not the very first render before data is loaded.
+        if (majorSystem.length > 0 || (majorSystem.length === 0 && lastSynced !== null)) {
+            syncToFirebase({ majorSystem });
+        }
+    }, [majorSystem]);
 
-        if (drillMode === 'number-to-image') {
-            const expected = majorSystem[currentPrompt]?.toLowerCase();
-            const answer = userAnswer.trim().toLowerCase();
-            correct = expected === answer;
-            message = correct ? '✓ Correct!' : `✗ Expected: ${majorSystem[currentPrompt]}`;
-        } else if (drillMode === 'card-to-pao') {
-            const expected = paoSystem[currentPrompt];
-            const answer = userAnswer.trim().toLowerCase();
-            const combinedExpected = `${expected.person} ${expected.action} ${expected.object}`.toLowerCase();
-            correct = combinedExpected.includes(answer) || answer.includes(expected.person.toLowerCase());
-            message = correct ? '✓ Correct!' : `✗ Expected: ${expected.person} - ${expected.action} - ${expected.object}`;
+    useEffect(() => {
+        if (paoSystem.length > 0 || (paoSystem.length === 0 && lastSynced !== null)) {
+            syncToFirebase({ paoSystem });
+        }
+    }, [paoSystem]);
+
+    useEffect(() => {
+        if (palaces.length > 0 || (palaces.length === 0 && lastSynced !== null)) {
+            syncToFirebase({ palaces });
+        }
+    }, [palaces]);
+
+    // Major System Functions
+    const addMajorEntry = () => {
+        if (!newMajorNumber || !newMajorImage) return;
+
+        const existing = majorSystem.find(e => e.number === newMajorNumber);
+        if (existing) {
+            // Add to existing number
+            setMajorSystem(majorSystem.map(e =>
+                e.number === newMajorNumber
+                    ? { ...e, images: [...e.images, newMajorImage] }
+                    : e
+            ));
+        } else {
+            // Create new entry
+            const newEntry: MajorEntry = {
+                id: Date.now().toString(),
+                number: newMajorNumber,
+                images: [newMajorImage]
+            };
+            setMajorSystem([...majorSystem, newEntry].sort((a, b) => parseInt(a.number) - parseInt(b.number)));
         }
 
-        setFeedback({ correct, message });
-        setScore(prev => ({ correct: prev.correct + (correct ? 1 : 0), total: prev.total + 1 }));
-
-        // Auto-advance after 1.5s
-        setTimeout(() => {
-            generateNewPrompt();
-        }, 1500);
+        setNewMajorNumber('');
+        setNewMajorImage('');
     };
 
-    const handleKeyPress = (e: React.KeyboardEvent) => {
-        if (e.key === 'Enter' && userAnswer.trim()) {
-            checkAnswer();
-        }
+    const deleteMajorImage = (number: string, image: string) => {
+        setMajorSystem(majorSystem.map(e => {
+            if (e.number === number) {
+                const newImages = e.images.filter(img => img !== image);
+                return newImages.length > 0 ? { ...e, images: newImages } : null;
+            }
+            return e;
+        }).filter(Boolean) as MajorEntry[]);
     };
+
+    const deleteMajorEntry = (id: string) => {
+        setMajorSystem(majorSystem.filter(e => e.id !== id));
+    };
+
+    // PAO System Functions
+    const addPaoEntry = () => {
+        if (!newPaoCard || !newPaoPerson) return;
+
+        const newEntry: PaoEntry = {
+            id: Date.now().toString(),
+            card: newPaoCard.toUpperCase(),
+            person: newPaoPerson,
+            action: newPaoAction,
+            object: newPaoObject
+        };
+
+        setPaoSystem([...paoSystem, newEntry].sort((a, b) => a.card.localeCompare(b.card)));
+
+        setNewPaoCard('');
+        setNewPaoPerson('');
+        setNewPaoAction('');
+        setNewPaoObject('');
+    };
+
+    const updatePaoEntry = (id: string, field: keyof PaoEntry, value: string) => {
+        setPaoSystem(paoSystem.map(e =>
+            e.id === id ? { ...e, [field]: value } : e
+        ));
+    };
+
+    const deletePaoEntry = (id: string) => {
+        setPaoSystem(paoSystem.filter(e => e.id !== id));
+    };
+
+    // Palace Functions
+    const addPalace = () => {
+        if (!newPalaceName) return;
+
+        const newPalace: Palace = {
+            id: Date.now().toString(),
+            name: newPalaceName,
+            locations: []
+        };
+
+        setPalaces([...palaces, newPalace]);
+        setNewPalaceName('');
+        setEditingPalace(newPalace.id);
+    };
+
+    const addLocation = (palaceId: string) => {
+        if (!newLocation) return;
+
+        setPalaces(palaces.map(p =>
+            p.id === palaceId
+                ? { ...p, locations: [...p.locations, newLocation] }
+                : p
+        ));
+
+        setNewLocation('');
+    };
+
+    const deleteLocation = (palaceId: string, location: string) => {
+        setPalaces(palaces.map(p =>
+            p.id === palaceId
+                ? { ...p, locations: p.locations.filter(l => l !== location) }
+                : p
+        ));
+    };
+
+    const moveLocation = (palaceId: string, index: number, direction: 'up' | 'down') => {
+        setPalaces(palaces.map(p => {
+            if (p.id === palaceId) {
+                const newLocations = [...p.locations];
+                const newIndex = direction === 'up' ? index - 1 : index + 1;
+
+                if (newIndex >= 0 && newIndex < newLocations.length) {
+                    [newLocations[index], newLocations[newIndex]] = [newLocations[newIndex], newLocations[index]];
+                }
+
+                return { ...p, locations: newLocations };
+            }
+            return p;
+        }));
+    };
+
+    const deletePalace = (id: string) => {
+        setPalaces(palaces.filter(p => p.id !== id));
+        if (editingPalace === id) setEditingPalace(null);
+    };
+
+    const updatePalaceName = (id: string, name: string) => {
+        setPalaces(palaces.map(p => p.id === id ? { ...p, name } : p));
+    };
+
+    // Search/Filter Functions
+    const filteredMajor = majorSystem.filter(e =>
+        e.number.includes(searchQuery) ||
+        e.images.some(img => img.toLowerCase().includes(searchQuery.toLowerCase()))
+    );
+
+    const filteredPao = paoSystem.filter(e =>
+        e.card.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        e.person.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        e.action.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        e.object.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+
+    const filteredPalaces = palaces.filter(p =>
+        p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        p.locations.some(l => l.toLowerCase().includes(searchQuery.toLowerCase()))
+    );
 
     return (
         <>
             <Header />
-            <main className="container" style={{ maxWidth: '1000px' }}>
+            <main className="container" style={{ maxWidth: '1200px' }}>
 
                 <div style={{ marginBottom: '2rem' }}>
                     <Link href="/training" style={{ fontSize: '0.9rem', opacity: 0.7, marginBottom: '0.5rem', display: 'inline-block' }}>
                         ← Back to Training
                     </Link>
-                    <h1 style={{ fontSize: '2rem', fontWeight: 'bold' }}>The Image Vault</h1>
-                    <p style={{ opacity: 0.7, marginTop: '0.5rem' }}>Manage and drill your mnemonic systems</p>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+                        <div>
+                            <h1 style={{ fontSize: '2rem', fontWeight: 'bold' }}>The Image Vault</h1>
+                            <p style={{ opacity: 0.7, marginTop: '0.5rem' }}>Manage and organize your mnemonic systems</p>
+                        </div>
+                        <div style={{ textAlign: 'right', fontSize: '0.85rem', opacity: 0.7 }}>
+                            {syncing ? (
+                                <div style={{ color: 'var(--accent)' }}>
+                                    <span style={{ marginRight: '0.5rem' }}>●</span>
+                                    Syncing...
+                                </div>
+                            ) : lastSynced ? (
+                                <div style={{ color: 'var(--success)' }}>
+                                    <span style={{ marginRight: '0.5rem' }}>✓</span>
+                                    Synced {lastSynced.toLocaleTimeString()}
+                                </div>
+                            ) : (
+                                <div style={{ opacity: 0.5 }}>
+                                    Not synced
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+
+                {/* Search Bar */}
+                <div style={{ marginBottom: '2rem' }}>
+                    <input
+                        type="text"
+                        className="input-field"
+                        placeholder="Search..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        style={{ width: '100%', maxWidth: '400px' }}
+                    />
                 </div>
 
                 {/* Tabs */}
-                <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem', borderBottom: '1px solid var(--glass-border)' }}>
+                <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem', borderBottom: '1px solid var(--glass-border)', flexWrap: 'wrap' }}>
                     <button
-                        onClick={() => setActiveTab('major')}
+                        onClick={() => { setActiveTab('major'); setSearchQuery(''); }}
                         style={{
                             padding: '1rem 1.5rem',
                             background: 'none',
@@ -120,10 +321,10 @@ export default function ImageVault() {
                             fontWeight: activeTab === 'major' ? 'bold' : 'normal'
                         }}
                     >
-                        Major System
+                        Major System ({majorSystem.length})
                     </button>
                     <button
-                        onClick={() => setActiveTab('pao')}
+                        onClick={() => { setActiveTab('pao'); setSearchQuery(''); }}
                         style={{
                             padding: '1rem 1.5rem',
                             background: 'none',
@@ -135,10 +336,10 @@ export default function ImageVault() {
                             fontWeight: activeTab === 'pao' ? 'bold' : 'normal'
                         }}
                     >
-                        PAO System
+                        PAO System ({paoSystem.length})
                     </button>
                     <button
-                        onClick={() => setActiveTab('palace')}
+                        onClick={() => { setActiveTab('palace'); setSearchQuery(''); }}
                         style={{
                             padding: '1rem 1.5rem',
                             background: 'none',
@@ -150,133 +351,191 @@ export default function ImageVault() {
                             fontWeight: activeTab === 'palace' ? 'bold' : 'normal'
                         }}
                     >
-                        Memory Palaces
+                        Memory Palaces ({palaces.length})
                     </button>
                 </div>
 
                 {/* Major System Tab */}
                 {activeTab === 'major' && (
                     <div className="animate-fade-in">
-                        {!drillActive ? (
-                            <div className="glass card">
-                                <h2 style={{ marginBottom: '1.5rem', fontSize: '1.2rem' }}>Major System</h2>
-                                <p style={{ opacity: 0.8, marginBottom: '2rem' }}>
-                                    The Major System converts numbers into consonant sounds, which you then turn into memorable words.
-                                </p>
-
-                                <div style={{ marginBottom: '2rem' }}>
-                                    <h3 style={{ fontSize: '1rem', marginBottom: '1rem' }}>Your System ({Object.keys(majorSystem).length} entries)</h3>
-                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '0.75rem', maxHeight: '300px', overflowY: 'auto', padding: '0.5rem' }}>
-                                        {Object.entries(majorSystem).map(([num, word]) => (
-                                            <div key={num} className="glass-panel" style={{ padding: '0.75rem', textAlign: 'center' }}>
-                                                <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: 'var(--primary)' }}>{num}</div>
-                                                <div style={{ fontSize: '0.9rem', opacity: 0.8 }}>{word}</div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                <button className="btn btn-primary" onClick={startDrill}>
-                                    Start Drill
-                                </button>
-                            </div>
-                        ) : (
-                            <div className="glass card">
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-                                    <h2 style={{ fontSize: '1.2rem' }}>Major System Drill</h2>
-                                    <div style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>
-                                        Score: {score.correct} / {score.total}
-                                        {score.total > 0 && (
-                                            <span style={{ marginLeft: '0.5rem', fontSize: '0.9rem', opacity: 0.7 }}>
-                                                ({Math.round((score.correct / score.total) * 100)}%)
-                                            </span>
-                                        )}
-                                    </div>
-                                </div>
-
-                                <div style={{ textAlign: 'center', padding: '3rem 0' }}>
-                                    <div style={{ fontSize: '0.9rem', opacity: 0.6, marginBottom: '1rem' }}>What image do you use for:</div>
-                                    <div style={{ fontSize: '4rem', fontWeight: 'bold', marginBottom: '2rem', color: 'var(--primary)' }}>
-                                        {currentPrompt}
-                                    </div>
-
+                        {/* Add New Entry */}
+                        <div className="glass card" style={{ marginBottom: '2rem' }}>
+                            <h3 style={{ fontSize: '1.1rem', marginBottom: '1rem' }}>Add Entry</h3>
+                            <div style={{ display: 'grid', gridTemplateColumns: '100px 1fr auto', gap: '1rem', alignItems: 'end' }}>
+                                <div>
+                                    <label style={{ display: 'block', fontSize: '0.8rem', marginBottom: '0.5rem', opacity: 0.7 }}>Number</label>
                                     <input
                                         type="text"
                                         className="input-field"
-                                        style={{ maxWidth: '400px', margin: '0 auto', textAlign: 'center', fontSize: '1.2rem' }}
-                                        value={userAnswer}
-                                        onChange={(e) => setUserAnswer(e.target.value)}
-                                        onKeyPress={handleKeyPress}
-                                        placeholder="Type your answer..."
-                                        autoFocus
+                                        placeholder="00"
+                                        value={newMajorNumber}
+                                        onChange={(e) => setNewMajorNumber(e.target.value.replace(/\D/g, '').slice(0, 2))}
+                                        maxLength={2}
                                     />
-
-                                    {feedback && (
-                                        <div style={{
-                                            marginTop: '1.5rem',
-                                            padding: '1rem',
-                                            borderRadius: '0.5rem',
-                                            background: feedback.correct ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)',
-                                            color: feedback.correct ? 'var(--success)' : 'var(--error)',
-                                            fontSize: '1.1rem'
-                                        }}>
-                                            {feedback.message}
-                                        </div>
-                                    )}
                                 </div>
-
-                                <div style={{ display: 'flex', gap: '1rem' }}>
-                                    <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setDrillActive(false)}>
-                                        Stop Drill
-                                    </button>
-                                    <button className="btn btn-primary" style={{ flex: 1 }} onClick={checkAnswer} disabled={!userAnswer.trim()}>
-                                        Check Answer
-                                    </button>
+                                <div>
+                                    <label style={{ display: 'block', fontSize: '0.8rem', marginBottom: '0.5rem', opacity: 0.7 }}>Image</label>
+                                    <input
+                                        type="text"
+                                        className="input-field"
+                                        placeholder="Sauce"
+                                        value={newMajorImage}
+                                        onChange={(e) => setNewMajorImage(e.target.value)}
+                                        onKeyPress={(e) => e.key === 'Enter' && addMajorEntry()}
+                                    />
                                 </div>
+                                <button className="btn btn-primary" onClick={addMajorEntry}>
+                                    Add
+                                </button>
                             </div>
-                        )}
+                        </div>
+
+                        {/* Entries List */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                            {filteredMajor.length === 0 ? (
+                                <div className="glass-panel" style={{ padding: '2rem', textAlign: 'center', opacity: 0.5 }}>
+                                    {searchQuery ? 'No results found' : 'No entries yet. Add your first one above!'}
+                                </div>
+                            ) : (
+                                filteredMajor.map((entry) => (
+                                    <div key={entry.id} className="glass-panel" style={{ padding: '1rem' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
+                                            <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--primary)' }}>
+                                                {entry.number}
+                                            </div>
+                                            <button
+                                                onClick={() => deleteMajorEntry(entry.id)}
+                                                style={{ background: 'none', border: 'none', color: 'var(--error)', cursor: 'pointer', fontSize: '0.9rem' }}
+                                            >
+                                                Delete All
+                                            </button>
+                                        </div>
+                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                                            {entry.images.map((image, idx) => (
+                                                <div key={idx} style={{
+                                                    background: 'rgba(99, 102, 241, 0.2)',
+                                                    padding: '0.5rem 1rem',
+                                                    borderRadius: '0.5rem',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '0.5rem'
+                                                }}>
+                                                    <span>{image}</span>
+                                                    <button
+                                                        onClick={() => deleteMajorImage(entry.number, image)}
+                                                        style={{ background: 'none', border: 'none', color: 'var(--error)', cursor: 'pointer', fontSize: '1.2rem', lineHeight: '1' }}
+                                                    >
+                                                        ×
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                ))
+                            )}
+                        </div>
                     </div>
                 )}
 
                 {/* PAO System Tab */}
                 {activeTab === 'pao' && (
                     <div className="animate-fade-in">
-                        <div className="glass card">
-                            <h2 style={{ marginBottom: '1.5rem', fontSize: '1.2rem' }}>PAO System</h2>
-                            <p style={{ opacity: 0.8, marginBottom: '2rem' }}>
-                                Person-Action-Object system for playing cards. Each card maps to a unique PAO combination.
-                            </p>
+                        {/* Add New Entry */}
+                        <div className="glass card" style={{ marginBottom: '2rem' }}>
+                            <h3 style={{ fontSize: '1.1rem', marginBottom: '1rem' }}>Add PAO Entry</h3>
+                            <div style={{ display: 'grid', gridTemplateColumns: '80px 1fr 1fr 1fr auto', gap: '1rem', alignItems: 'end' }}>
+                                <div>
+                                    <label style={{ display: 'block', fontSize: '0.8rem', marginBottom: '0.5rem', opacity: 0.7 }}>Card</label>
+                                    <input
+                                        type="text"
+                                        className="input-field"
+                                        placeholder="AS"
+                                        value={newPaoCard}
+                                        onChange={(e) => setNewPaoCard(e.target.value.toUpperCase().slice(0, 2))}
+                                        maxLength={2}
+                                    />
+                                </div>
+                                <div>
+                                    <label style={{ display: 'block', fontSize: '0.8rem', marginBottom: '0.5rem', opacity: 0.7 }}>Person</label>
+                                    <input
+                                        type="text"
+                                        className="input-field"
+                                        placeholder="Albert Einstein"
+                                        value={newPaoPerson}
+                                        onChange={(e) => setNewPaoPerson(e.target.value)}
+                                    />
+                                </div>
+                                <div>
+                                    <label style={{ display: 'block', fontSize: '0.8rem', marginBottom: '0.5rem', opacity: 0.7 }}>Action</label>
+                                    <input
+                                        type="text"
+                                        className="input-field"
+                                        placeholder="Calculating"
+                                        value={newPaoAction}
+                                        onChange={(e) => setNewPaoAction(e.target.value)}
+                                    />
+                                </div>
+                                <div>
+                                    <label style={{ display: 'block', fontSize: '0.8rem', marginBottom: '0.5rem', opacity: 0.7 }}>Object</label>
+                                    <input
+                                        type="text"
+                                        className="input-field"
+                                        placeholder="Chalkboard"
+                                        value={newPaoObject}
+                                        onChange={(e) => setNewPaoObject(e.target.value)}
+                                        onKeyPress={(e) => e.key === 'Enter' && addPaoEntry()}
+                                    />
+                                </div>
+                                <button className="btn btn-primary" onClick={addPaoEntry}>
+                                    Add
+                                </button>
+                            </div>
+                        </div>
 
-                            <div style={{ marginBottom: '2rem' }}>
-                                <h3 style={{ fontSize: '1rem', marginBottom: '1rem' }}>Your System ({Object.keys(paoSystem).length} cards)</h3>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', maxHeight: '400px', overflowY: 'auto', padding: '0.5rem' }}>
-                                    {Object.entries(paoSystem).map(([card, pao]) => (
-                                        <div key={card} className="glass-panel" style={{ padding: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                            <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: 'var(--accent)', minWidth: '50px' }}>{card}</div>
-                                            <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', fontSize: '0.9rem' }}>
-                                                <div>
-                                                    <div style={{ fontSize: '0.7rem', opacity: 0.5 }}>Person</div>
-                                                    <div>{pao.person}</div>
-                                                </div>
-                                                <div>
-                                                    <div style={{ fontSize: '0.7rem', opacity: 0.5 }}>Action</div>
-                                                    <div>{pao.action}</div>
-                                                </div>
-                                                <div>
-                                                    <div style={{ fontSize: '0.7rem', opacity: 0.5 }}>Object</div>
-                                                    <div>{pao.object}</div>
-                                                </div>
+                        {/* Entries List */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                            {filteredPao.length === 0 ? (
+                                <div className="glass-panel" style={{ padding: '2rem', textAlign: 'center', opacity: 0.5 }}>
+                                    {searchQuery ? 'No results found' : 'No PAO entries yet. Add your first one above!'}
+                                </div>
+                            ) : (
+                                filteredPao.map((entry) => (
+                                    <div key={entry.id} className="glass-panel" style={{ padding: '1rem' }}>
+                                        <div style={{ display: 'grid', gridTemplateColumns: '60px 1fr 1fr 1fr auto', gap: '1rem', alignItems: 'center' }}>
+                                            <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: 'var(--accent)' }}>
+                                                {entry.card}
                                             </div>
+                                            <input
+                                                type="text"
+                                                className="input-field"
+                                                value={entry.person}
+                                                onChange={(e) => updatePaoEntry(entry.id, 'person', e.target.value)}
+                                                style={{ padding: '0.5rem' }}
+                                            />
+                                            <input
+                                                type="text"
+                                                className="input-field"
+                                                value={entry.action}
+                                                onChange={(e) => updatePaoEntry(entry.id, 'action', e.target.value)}
+                                                style={{ padding: '0.5rem' }}
+                                            />
+                                            <input
+                                                type="text"
+                                                className="input-field"
+                                                value={entry.object}
+                                                onChange={(e) => updatePaoEntry(entry.id, 'object', e.target.value)}
+                                                style={{ padding: '0.5rem' }}
+                                            />
+                                            <button
+                                                onClick={() => deletePaoEntry(entry.id)}
+                                                style={{ background: 'none', border: 'none', color: 'var(--error)', cursor: 'pointer', fontSize: '1.5rem' }}
+                                            >
+                                                ×
+                                            </button>
                                         </div>
-                                    ))}
-                                </div>
-                            </div>
-
-                            <div style={{ background: 'rgba(255, 193, 7, 0.1)', border: '1px solid rgba(255, 193, 7, 0.3)', padding: '1rem', borderRadius: '0.5rem' }}>
-                                <div style={{ fontSize: '0.9rem', opacity: 0.9 }}>
-                                    💡 <strong>Tip:</strong> Build your full 52-card PAO system outside this app, then use the Card Blitz game to drill your conversions.
-                                </div>
-                            </div>
+                                    </div>
+                                ))
+                            )}
                         </div>
                     </div>
                 )}
@@ -284,41 +543,144 @@ export default function ImageVault() {
                 {/* Memory Palaces Tab */}
                 {activeTab === 'palace' && (
                     <div className="animate-fade-in">
-                        <div className="glass card">
-                            <h2 style={{ marginBottom: '1.5rem', fontSize: '1.2rem' }}>Memory Palaces</h2>
-                            <p style={{ opacity: 0.8, marginBottom: '2rem' }}>
-                                Organize your mental journeys and locations for the Method of Loci.
-                            </p>
+                        {/* Add New Palace */}
+                        <div className="glass card" style={{ marginBottom: '2rem' }}>
+                            <h3 style={{ fontSize: '1.1rem', marginBottom: '1rem' }}>Add New Palace</h3>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '1rem', alignItems: 'end' }}>
+                                <div>
+                                    <label style={{ display: 'block', fontSize: '0.8rem', marginBottom: '0.5rem', opacity: 0.7 }}>Palace Name</label>
+                                    <input
+                                        type="text"
+                                        className="input-field"
+                                        placeholder="My Memory Palace"
+                                        value={newPalaceName}
+                                        onChange={(e) => setNewPalaceName(e.target.value)}
+                                        onKeyPress={(e) => e.key === 'Enter' && addPalace()}
+                                    />
+                                </div>
+                                <button className="btn btn-primary" onClick={addPalace}>
+                                    Create Palace
+                                </button>
+                            </div>
+                        </div>
 
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-                                {palaces.map((palace, idx) => (
-                                    <div key={idx} className="glass-panel" style={{ padding: '1.5rem' }}>
-                                        <h3 style={{ fontSize: '1.1rem', marginBottom: '1rem', color: 'var(--accent)' }}>
-                                            {palace.name}
-                                        </h3>
-                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: '0.5rem' }}>
-                                            {palace.locations.map((location, locIdx) => (
-                                                <div key={locIdx} style={{
-                                                    padding: '0.5rem',
+                        {/* Palaces List */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                            {filteredPalaces.length === 0 ? (
+                                <div className="glass-panel" style={{ padding: '2rem', textAlign: 'center', opacity: 0.5 }}>
+                                    {searchQuery ? 'No results found' : 'No palaces yet. Create your first one above!'}
+                                </div>
+                            ) : (
+                                filteredPalaces.map((palace) => (
+                                    <div key={palace.id} className="glass-panel" style={{ padding: '1.5rem' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                                            {editingPalace === palace.id ? (
+                                                <input
+                                                    type="text"
+                                                    className="input-field"
+                                                    value={palace.name}
+                                                    onChange={(e) => updatePalaceName(palace.id, e.target.value)}
+                                                    onBlur={() => setEditingPalace(null)}
+                                                    autoFocus
+                                                    style={{ fontSize: '1.1rem', fontWeight: 'bold', maxWidth: '300px' }}
+                                                />
+                                            ) : (
+                                                <h3
+                                                    style={{ fontSize: '1.1rem', color: 'var(--accent)', cursor: 'pointer' }}
+                                                    onClick={() => setEditingPalace(palace.id)}
+                                                >
+                                                    {palace.name} ({palace.locations.length} locations)
+                                                </h3>
+                                            )}
+                                            <button
+                                                onClick={() => deletePalace(palace.id)}
+                                                style={{ background: 'none', border: 'none', color: 'var(--error)', cursor: 'pointer', fontSize: '0.9rem' }}
+                                            >
+                                                Delete Palace
+                                            </button>
+                                        </div>
+
+                                        {/* Add Location */}
+                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '0.5rem', marginBottom: '1rem' }}>
+                                            <input
+                                                type="text"
+                                                className="input-field"
+                                                placeholder="Add new location..."
+                                                value={editingPalace === palace.id ? newLocation : ''}
+                                                onChange={(e) => setNewLocation(e.target.value)}
+                                                onKeyPress={(e) => e.key === 'Enter' && addLocation(palace.id)}
+                                                onFocus={() => setEditingPalace(palace.id)}
+                                                style={{ padding: '0.5rem' }}
+                                            />
+                                            <button
+                                                className="btn btn-secondary"
+                                                onClick={() => addLocation(palace.id)}
+                                                style={{ padding: '0.5rem 1rem' }}
+                                            >
+                                                Add
+                                            </button>
+                                        </div>
+
+                                        {/* Locations List */}
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                            {palace.locations.map((location, idx) => (
+                                                <div key={idx} style={{
+                                                    padding: '0.75rem',
                                                     background: 'rgba(0,0,0,0.2)',
-                                                    borderRadius: '0.25rem',
-                                                    fontSize: '0.85rem',
-                                                    textAlign: 'center'
+                                                    borderRadius: '0.5rem',
+                                                    display: 'flex',
+                                                    justifyContent: 'space-between',
+                                                    alignItems: 'center'
                                                 }}>
-                                                    <span style={{ opacity: 0.5, marginRight: '0.25rem' }}>{locIdx + 1}.</span>
-                                                    {location}
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flex: 1 }}>
+                                                        <span style={{ opacity: 0.5, minWidth: '30px' }}>{idx + 1}.</span>
+                                                        <span style={{ flex: 1 }}>{location}</span>
+                                                    </div>
+                                                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                                        <button
+                                                            onClick={() => moveLocation(palace.id, idx, 'up')}
+                                                            disabled={idx === 0}
+                                                            style={{
+                                                                background: 'none',
+                                                                border: 'none',
+                                                                color: idx === 0 ? 'rgba(255,255,255,0.2)' : 'var(--primary)',
+                                                                cursor: idx === 0 ? 'not-allowed' : 'pointer',
+                                                                fontSize: '1.2rem'
+                                                            }}
+                                                        >
+                                                            ↑
+                                                        </button>
+                                                        <button
+                                                            onClick={() => moveLocation(palace.id, idx, 'down')}
+                                                            disabled={idx === palace.locations.length - 1}
+                                                            style={{
+                                                                background: 'none',
+                                                                border: 'none',
+                                                                color: idx === palace.locations.length - 1 ? 'rgba(255,255,255,0.2)' : 'var(--primary)',
+                                                                cursor: idx === palace.locations.length - 1 ? 'not-allowed' : 'pointer',
+                                                                fontSize: '1.2rem'
+                                                            }}
+                                                        >
+                                                            ↓
+                                                        </button>
+                                                        <button
+                                                            onClick={() => deleteLocation(palace.id, location)}
+                                                            style={{ background: 'none', border: 'none', color: 'var(--error)', cursor: 'pointer', fontSize: '1.2rem' }}
+                                                        >
+                                                            ×
+                                                        </button>
+                                                    </div>
                                                 </div>
                                             ))}
+                                            {palace.locations.length === 0 && (
+                                                <div style={{ padding: '1rem', textAlign: 'center', opacity: 0.5, fontSize: '0.9rem' }}>
+                                                    No locations yet. Add your first one above!
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
-                                ))}
-                            </div>
-
-                            <div style={{ marginTop: '2rem', background: 'rgba(99, 102, 241, 0.1)', border: '1px solid var(--primary)', padding: '1rem', borderRadius: '0.5rem' }}>
-                                <div style={{ fontSize: '0.9rem', opacity: 0.9 }}>
-                                    💡 <strong>Tip:</strong> Create your palaces from familiar places. Walk through them mentally to ensure you can recall each location in order.
-                                </div>
-                            </div>
+                                ))
+                            )}
                         </div>
                     </div>
                 )}

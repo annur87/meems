@@ -40,12 +40,29 @@ export default function NumberWall() {
         startGame(150, 600);
     };
 
+    const clampDigitCount = (value: number) => {
+        if (!Number.isFinite(value)) return 5;
+        return Math.max(5, Math.min(1000, Math.floor(value)));
+    };
+
+    const clampTimeLimit = (value: number) => {
+        if (!Number.isFinite(value)) return 60;
+        return Math.max(30, Math.min(3600, Math.floor(value)));
+    };
+
     const startGame = (count = digitCount, time = timeLimit) => {
-        const newDigits = generateDigits(count);
+        const sanitizedCount = clampDigitCount(count);
+        const sanitizedTime = clampTimeLimit(time);
+
+        if (sanitizedCount !== digitCount) setDigitCount(sanitizedCount);
+        if (sanitizedTime !== timeLimit) setTimeLimit(sanitizedTime);
+
+        const newDigits = generateDigits(sanitizedCount);
         setDigits(newDigits);
-        setTimeLeft(time);
+        setTimeLeft(sanitizedTime);
         setGameState('memorize');
         setStartTime(Date.now());
+        setEndTime(0);
         setUserInput("");
     };
 
@@ -56,21 +73,33 @@ export default function NumberWall() {
     };
 
     const submitRecall = async () => {
+        if (!digits.length) {
+            console.warn('Tried to submit recall without generated digits.');
+            setGameState('setup');
+            return;
+        }
+
         const correctCount = calculateScore();
-        const memorizeTimeSeconds = Math.floor((endTime - startTime) / 1000);
+        const memorizeEnd = endTime || Date.now();
+        const memorizeStart = startTime || memorizeEnd;
+        const memorizeTimeSeconds = Math.max(0, Math.floor((memorizeEnd - memorizeStart) / 1000));
+        const percentage = digits.length ? Math.round((correctCount / digits.length) * 100) : 0;
 
-        // Save to Firebase
-        await saveGameResult({
-            type: 'number-wall',
-            count: digitCount,
-            correct: correctCount,
-            total: digits.length,
-            percentage: Math.round((correctCount / digits.length) * 100),
-            memorizeTime: memorizeTimeSeconds,
-            recallTime: 0, // We aren't tracking recall time strictly yet, or we could add it
-        });
-
-        setGameState('result');
+        try {
+            await saveGameResult({
+                type: 'number-wall',
+                count: digitCount,
+                correct: correctCount,
+                total: digits.length,
+                percentage,
+                memorizeTime: memorizeTimeSeconds,
+                recallTime: 0, // We aren't tracking recall time strictly yet, or we could add it
+            });
+        } catch (error) {
+            console.error('Failed to save Number Wall result:', error);
+        } finally {
+            setGameState('result');
+        }
     };
 
     // Timer Logic
@@ -148,7 +177,12 @@ export default function NumberWall() {
                                     type="number"
                                     className="input-field"
                                     value={digitCount}
-                                    onChange={(e) => setDigitCount(parseInt(e.target.value) || 0)}
+                                    min={5}
+                                    max={1000}
+                                    onChange={(e) => {
+                                        const nextValue = parseInt(e.target.value, 10);
+                                        setDigitCount(Number.isNaN(nextValue) ? 0 : nextValue);
+                                    }}
                                 />
                             </div>
 
@@ -158,7 +192,12 @@ export default function NumberWall() {
                                     type="number"
                                     className="input-field"
                                     value={timeLimit}
-                                    onChange={(e) => setTimeLimit(parseInt(e.target.value) || 0)}
+                                    min={30}
+                                    max={3600}
+                                    onChange={(e) => {
+                                        const nextValue = parseInt(e.target.value, 10);
+                                        setTimeLimit(Number.isNaN(nextValue) ? 0 : nextValue);
+                                    }}
                                 />
                                 <div style={{ fontSize: '0.8rem', opacity: 0.6, marginTop: '0.25rem' }}>
                                     {Math.floor(timeLimit / 60)} minutes {timeLimit % 60} seconds

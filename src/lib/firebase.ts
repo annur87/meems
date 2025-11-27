@@ -81,9 +81,12 @@ export const getGameResults = async () => {
         if (!firebaseConfig.apiKey) {
             return [];
         }
-        const q = query(collection(db, "game_results"), orderBy("timestamp", "asc"));
+        // Order by timestamp descending for better performance (most recent first)
+        // We can reverse if needed, but typically we want recent data first
+        const q = query(collection(db, "game_results"), orderBy("timestamp", "desc"));
         const querySnapshot = await getDocs(q);
-        return querySnapshot.docs.map(doc => doc.data() as GameResult);
+        // Reverse to get chronological order (oldest first) for charts
+        return querySnapshot.docs.map(doc => doc.data() as GameResult).reverse();
     } catch (e) {
         console.error("Error getting documents: ", e);
         return [];

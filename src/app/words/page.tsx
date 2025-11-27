@@ -66,22 +66,26 @@ export default function WordMemorization() {
         return { correct, total, percentage: (correct / total) * 100, comparison };
     };
 
-    const finishGame = () => {
+    const finishGame = async () => {
         const now = Date.now();
         const duration = now - recallStartTime;
         setRecallDuration(duration);
         setGameState('result');
 
         const { correct, total, percentage } = calculateScore();
-        saveGameResult({
-            type: 'word',
-            count: total,
-            correct,
-            total,
-            percentage,
-            memorizeTime: memorizeDuration,
-            recallTime: duration
-        });
+        try {
+            await saveGameResult({
+                type: 'word',
+                count: total,
+                correct,
+                total,
+                percentage,
+                memorizeTime: memorizeDuration,
+                recallTime: duration
+            });
+        } catch (error) {
+            console.error('Failed to save game result:', error);
+        }
     };
 
     const resetGame = () => {

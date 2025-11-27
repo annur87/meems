@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Header from '@/components/Header';
 import { getGameResults, GameResult } from '@/lib/firebase';
 import {
@@ -15,9 +15,15 @@ export default function Analytics() {
 
     useEffect(() => {
         const fetchData = async () => {
-            const data = await getGameResults();
-            setResults(data);
-            setLoading(false);
+            setLoading(true);
+            try {
+                const data = await getGameResults();
+                setResults(data);
+            } catch (error) {
+                console.error('Failed to fetch analytics:', error);
+            } finally {
+                setLoading(false);
+            }
         };
         fetchData();
     }, []);
@@ -33,44 +39,42 @@ export default function Analytics() {
         );
     }
 
-    // Process data for charts
+    // Process data for charts with memoization
+    const frequencyData = useMemo(() => {
+        const gamesPerDayMap = new Map<string, { date: string, digit: number, word: number, card: number, names: number }>();
+        results.forEach(r => {
+            const date = r.date;
+            if (!gamesPerDayMap.has(date)) {
+                gamesPerDayMap.set(date, { date, digit: 0, word: 0, card: 0, names: 0 });
+            }
+            const entry = gamesPerDayMap.get(date)!;
+            if (r.type === 'digit' || r.type === 'number-wall' || r.type === 'binary-surge' || r.type === 'spoken-numbers') entry.digit++;
+            else if (r.type === 'card-blitz') entry.card++;
+            else if (r.type === 'names-gauntlet') entry.names++;
+            else entry.word++;
+        });
+        return Array.from(gamesPerDayMap.values()).sort((a, b) => a.date.localeCompare(b.date));
+    }, [results]);
 
-    // 1. Frequency (Games per day)
-    const gamesPerDayMap = new Map<string, { date: string, digit: number, word: number, card: number, names: number }>();
-    results.forEach(r => {
-        const date = r.date;
-        if (!gamesPerDayMap.has(date)) {
-            gamesPerDayMap.set(date, { date, digit: 0, word: 0, card: 0, names: 0 });
-        }
-        const entry = gamesPerDayMap.get(date)!;
-        if (r.type === 'digit' || r.type === 'number-wall' || r.type === 'binary-surge' || r.type === 'spoken-numbers') entry.digit++;
-        else if (r.type === 'card-blitz') entry.card++;
-        else if (r.type === 'names-gauntlet') entry.names++;
-        else entry.word++;
-    });
-    const frequencyData = Array.from(gamesPerDayMap.values()).sort((a, b) => a.date.localeCompare(b.date));
+    const filteredResults = useMemo(() => {
+        return results.filter(r => {
+            if (filterType === 'all') return true;
+            if (filterType === 'digit') return r.type === 'digit' || r.type === 'number-wall' || r.type === 'binary-surge' || r.type === 'spoken-numbers';
+            if (filterType === 'card') return r.type === 'card-blitz';
+            if (filterType === 'names') return r.type === 'names-gauntlet';
+            return r.type === 'word';
+        });
+    }, [results, filterType]);
 
-    // 2. Performance Over Time
-    // Filter by type
-    const filteredResults = results.filter(r => {
-        if (filterType === 'all') return true;
-        if (filterType === 'digit') return r.type === 'digit' || r.type === 'number-wall' || r.type === 'binary-surge' || r.type === 'spoken-numbers';
-        if (filterType === 'card') return r.type === 'card-blitz';
-        if (filterType === 'names') return r.type === 'names-gauntlet';
-        return r.type === 'word';
-    });
-
-    // Group by specific challenge (e.g. "Digit 10", "Word 20") to see improvement on specific tasks?
-    // Or just general score improvement?
-    // Let's show general score improvement for now, maybe color coded by type.
-
-    const performanceData = filteredResults.map(r => ({
-        date: new Date(r.timestamp).toLocaleDateString(),
-        timestamp: r.timestamp,
-        percentage: r.percentage,
-        type: r.type,
-        label: `${(r.type === 'digit' || r.type === 'number-wall' || r.type === 'binary-surge' || r.type === 'spoken-numbers') ? 'Digits' : r.type === 'card-blitz' ? 'Cards' : r.type === 'names-gauntlet' ? 'Names' : 'Words'} (${r.count})`
-    })).sort((a, b) => a.timestamp - b.timestamp);
+    const performanceData = useMemo(() => {
+        return filteredResults.map(r => ({
+            date: new Date(r.timestamp).toLocaleDateString(),
+            timestamp: r.timestamp,
+            percentage: r.percentage,
+            type: r.type,
+            label: `${(r.type === 'digit' || r.type === 'number-wall' || r.type === 'binary-surge' || r.type === 'spoken-numbers') ? 'Digits' : r.type === 'card-blitz' ? 'Cards' : r.type === 'names-gauntlet' ? 'Names' : 'Words'} (${r.count})`
+        })).sort((a, b) => a.timestamp - b.timestamp);
+    }, [filteredResults]);
 
     return (
         <>

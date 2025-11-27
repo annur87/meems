@@ -39,6 +39,10 @@ export default function ImageVault() {
     const [newPalaceName, setNewPalaceName] = useState('');
     const [newLocation, setNewLocation] = useState('');
 
+    // Drag and Drop State
+    const [draggedItem, setDraggedItem] = useState<{ palaceId: string, index: number } | null>(null);
+    const [dragOverItem, setDragOverItem] = useState<{ palaceId: string, index: number } | null>(null);
+
     // Load from Firebase on mount
     useEffect(() => {
         const loadData = async () => {
@@ -242,6 +246,33 @@ export default function ImageVault() {
         setPalaces(palaces.map(p => p.id === id ? { ...p, name } : p));
     };
 
+    // Drag and Drop Handlers
+    const handleDragStart = (palaceId: string, index: number) => {
+        setDraggedItem({ palaceId, index });
+    };
+
+    const handleDragEnter = (palaceId: string, index: number) => {
+        setDragOverItem({ palaceId, index });
+    };
+
+    const handleDragEnd = () => {
+        if (draggedItem && dragOverItem && draggedItem.palaceId === dragOverItem.palaceId) {
+            const palace = palaces.find(p => p.id === draggedItem.palaceId);
+            if (palace) {
+                const newLocations = [...palace.locations];
+                const draggedLocation = newLocations[draggedItem.index];
+                newLocations.splice(draggedItem.index, 1);
+                newLocations.splice(dragOverItem.index, 0, draggedLocation);
+
+                setPalaces(palaces.map(p =>
+                    p.id === draggedItem.palaceId ? { ...p, locations: newLocations } : p
+                ));
+            }
+        }
+        setDraggedItem(null);
+        setDragOverItem(null);
+    };
+
     // Search/Filter Functions
     const filteredMajor = majorSystem.filter(e =>
         e.number.includes(searchQuery) ||
@@ -391,44 +422,123 @@ export default function ImageVault() {
                         </div>
 
                         {/* Entries List */}
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1rem' }}>
                             {filteredMajor.length === 0 ? (
-                                <div className="glass-panel" style={{ padding: '2rem', textAlign: 'center', opacity: 0.5 }}>
+                                <div className="glass-panel" style={{ padding: '2rem', textAlign: 'center', opacity: 0.5, gridColumn: '1 / -1' }}>
                                     {searchQuery ? 'No results found' : 'No entries yet. Add your first one above!'}
                                 </div>
                             ) : (
                                 filteredMajor.map((entry) => (
-                                    <div key={entry.id} className="glass-panel" style={{ padding: '1rem' }}>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
-                                            <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--primary)' }}>
+                                    <div key={entry.id} className="glass-panel" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                            <div style={{
+                                                fontSize: '2.5rem',
+                                                fontWeight: 'bold',
+                                                color: 'var(--primary)',
+                                                background: 'linear-gradient(135deg, var(--primary), var(--accent))',
+                                                WebkitBackgroundClip: 'text',
+                                                WebkitTextFillColor: 'transparent',
+                                                backgroundClip: 'text'
+                                            }}>
                                                 {entry.number}
                                             </div>
                                             <button
                                                 onClick={() => deleteMajorEntry(entry.id)}
-                                                style={{ background: 'none', border: 'none', color: 'var(--error)', cursor: 'pointer', fontSize: '0.9rem' }}
+                                                style={{
+                                                    background: 'rgba(239, 68, 68, 0.1)',
+                                                    border: '1px solid rgba(239, 68, 68, 0.3)',
+                                                    borderRadius: '0.5rem',
+                                                    padding: '0.5rem 1rem',
+                                                    color: 'var(--error)',
+                                                    cursor: 'pointer',
+                                                    fontSize: '0.85rem',
+                                                    fontWeight: '500',
+                                                    transition: 'all 0.2s'
+                                                }}
+                                                onMouseEnter={(e) => {
+                                                    e.currentTarget.style.background = 'rgba(239, 68, 68, 0.2)';
+                                                    e.currentTarget.style.borderColor = 'var(--error)';
+                                                }}
+                                                onMouseLeave={(e) => {
+                                                    e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)';
+                                                    e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.3)';
+                                                }}
                                             >
                                                 Delete All
                                             </button>
                                         </div>
-                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', minHeight: '40px' }}>
                                             {entry.images.map((image, idx) => (
-                                                <div key={idx} style={{
-                                                    background: 'rgba(99, 102, 241, 0.2)',
-                                                    padding: '0.5rem 1rem',
-                                                    borderRadius: '0.5rem',
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    gap: '0.5rem'
-                                                }}>
+                                                <div
+                                                    key={idx}
+                                                    style={{
+                                                        background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.15), rgba(139, 92, 246, 0.15))',
+                                                        border: '1px solid rgba(99, 102, 241, 0.3)',
+                                                        padding: '0.6rem 1rem',
+                                                        borderRadius: '2rem',
+                                                        display: 'inline-flex',
+                                                        alignItems: 'center',
+                                                        gap: '0.75rem',
+                                                        fontSize: '0.95rem',
+                                                        fontWeight: '500',
+                                                        color: 'var(--foreground)',
+                                                        transition: 'all 0.2s',
+                                                        cursor: 'default',
+                                                        boxShadow: '0 2px 8px rgba(99, 102, 241, 0.1)'
+                                                    }}
+                                                    onMouseEnter={(e) => {
+                                                        e.currentTarget.style.transform = 'translateY(-2px)';
+                                                        e.currentTarget.style.boxShadow = '0 4px 12px rgba(99, 102, 241, 0.2)';
+                                                        e.currentTarget.style.borderColor = 'var(--primary)';
+                                                    }}
+                                                    onMouseLeave={(e) => {
+                                                        e.currentTarget.style.transform = 'translateY(0)';
+                                                        e.currentTarget.style.boxShadow = '0 2px 8px rgba(99, 102, 241, 0.1)';
+                                                        e.currentTarget.style.borderColor = 'rgba(99, 102, 241, 0.3)';
+                                                    }}
+                                                >
                                                     <span>{image}</span>
                                                     <button
                                                         onClick={() => deleteMajorImage(entry.number, image)}
-                                                        style={{ background: 'none', border: 'none', color: 'var(--error)', cursor: 'pointer', fontSize: '1.2rem', lineHeight: '1' }}
+                                                        style={{
+                                                            background: 'rgba(239, 68, 68, 0.2)',
+                                                            border: 'none',
+                                                            borderRadius: '50%',
+                                                            width: '20px',
+                                                            height: '20px',
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            justifyContent: 'center',
+                                                            color: 'var(--error)',
+                                                            cursor: 'pointer',
+                                                            fontSize: '1.1rem',
+                                                            lineHeight: '1',
+                                                            padding: 0,
+                                                            transition: 'all 0.2s'
+                                                        }}
+                                                        onMouseEnter={(e) => {
+                                                            e.currentTarget.style.background = 'var(--error)';
+                                                            e.currentTarget.style.color = 'white';
+                                                            e.currentTarget.style.transform = 'scale(1.1)';
+                                                        }}
+                                                        onMouseLeave={(e) => {
+                                                            e.currentTarget.style.background = 'rgba(239, 68, 68, 0.2)';
+                                                            e.currentTarget.style.color = 'var(--error)';
+                                                            e.currentTarget.style.transform = 'scale(1)';
+                                                        }}
                                                     >
                                                         ×
                                                     </button>
                                                 </div>
                                             ))}
+                                        </div>
+                                        <div style={{
+                                            fontSize: '0.75rem',
+                                            opacity: 0.5,
+                                            marginTop: '0.5rem',
+                                            textAlign: 'right'
+                                        }}>
+                                            {entry.images.length} image{entry.images.length !== 1 ? 's' : ''}
                                         </div>
                                     </div>
                                 ))
@@ -623,55 +733,145 @@ export default function ImageVault() {
 
                                         {/* Locations List */}
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                                            {palace.locations.map((location, idx) => (
-                                                <div key={idx} style={{
-                                                    padding: '0.75rem',
-                                                    background: 'rgba(0,0,0,0.2)',
-                                                    borderRadius: '0.5rem',
-                                                    display: 'flex',
-                                                    justifyContent: 'space-between',
-                                                    alignItems: 'center'
-                                                }}>
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flex: 1 }}>
-                                                        <span style={{ opacity: 0.5, minWidth: '30px' }}>{idx + 1}.</span>
-                                                        <span style={{ flex: 1 }}>{location}</span>
+                                            {palace.locations.map((location, idx) => {
+                                                const isDragging = draggedItem?.palaceId === palace.id && draggedItem?.index === idx;
+                                                const isDragOver = dragOverItem?.palaceId === palace.id && dragOverItem?.index === idx;
+
+                                                return (
+                                                    <div
+                                                        key={idx}
+                                                        draggable
+                                                        onDragStart={() => handleDragStart(palace.id, idx)}
+                                                        onDragEnter={() => handleDragEnter(palace.id, idx)}
+                                                        onDragEnd={handleDragEnd}
+                                                        onDragOver={(e) => e.preventDefault()}
+                                                        style={{
+                                                            padding: '0.75rem',
+                                                            background: isDragOver ? 'rgba(99, 102, 241, 0.2)' : 'rgba(0,0,0,0.2)',
+                                                            borderRadius: '0.5rem',
+                                                            display: 'flex',
+                                                            justifyContent: 'space-between',
+                                                            alignItems: 'center',
+                                                            cursor: 'grab',
+                                                            opacity: isDragging ? 0.5 : 1,
+                                                            border: isDragOver ? '2px solid var(--primary)' : '2px solid transparent',
+                                                            transition: 'all 0.2s',
+                                                            transform: isDragging ? 'scale(0.95)' : 'scale(1)'
+                                                        }}
+                                                        onMouseEnter={(e) => {
+                                                            if (!isDragging) {
+                                                                e.currentTarget.style.background = 'rgba(99, 102, 241, 0.1)';
+                                                            }
+                                                        }}
+                                                        onMouseLeave={(e) => {
+                                                            if (!isDragOver) {
+                                                                e.currentTarget.style.background = 'rgba(0,0,0,0.2)';
+                                                            }
+                                                        }}
+                                                    >
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flex: 1 }}>
+                                                            <span style={{
+                                                                opacity: 0.5,
+                                                                minWidth: '30px',
+                                                                fontSize: '0.9rem',
+                                                                fontWeight: 'bold'
+                                                            }}>
+                                                                {idx + 1}.
+                                                            </span>
+                                                            <span style={{
+                                                                fontSize: '1.6rem',
+                                                                opacity: 0.3,
+                                                                cursor: 'grab',
+                                                                userSelect: 'none'
+                                                            }}>
+                                                                ⋮⋮
+                                                            </span>
+                                                            <span style={{ flex: 1, fontSize: '1rem' }}>{location}</span>
+                                                        </div>
+                                                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                                            <button
+                                                                onClick={() => moveLocation(palace.id, idx, 'up')}
+                                                                disabled={idx === 0}
+                                                                style={{
+                                                                    background: idx === 0 ? 'rgba(255,255,255,0.05)' : 'rgba(99, 102, 241, 0.2)',
+                                                                    border: 'none',
+                                                                    borderRadius: '0.25rem',
+                                                                    padding: '0.25rem 0.5rem',
+                                                                    color: idx === 0 ? 'rgba(255,255,255,0.2)' : 'var(--primary)',
+                                                                    cursor: idx === 0 ? 'not-allowed' : 'pointer',
+                                                                    fontSize: '1.2rem',
+                                                                    transition: 'all 0.2s'
+                                                                }}
+                                                                onMouseEnter={(e) => {
+                                                                    if (idx !== 0) {
+                                                                        e.currentTarget.style.background = 'var(--primary)';
+                                                                        e.currentTarget.style.color = 'white';
+                                                                    }
+                                                                }}
+                                                                onMouseLeave={(e) => {
+                                                                    if (idx !== 0) {
+                                                                        e.currentTarget.style.background = 'rgba(99, 102, 241, 0.2)';
+                                                                        e.currentTarget.style.color = 'var(--primary)';
+                                                                    }
+                                                                }}
+                                                            >
+                                                                ↑
+                                                            </button>
+                                                            <button
+                                                                onClick={() => moveLocation(palace.id, idx, 'down')}
+                                                                disabled={idx === palace.locations.length - 1}
+                                                                style={{
+                                                                    background: idx === palace.locations.length - 1 ? 'rgba(255,255,255,0.05)' : 'rgba(99, 102, 241, 0.2)',
+                                                                    border: 'none',
+                                                                    borderRadius: '0.25rem',
+                                                                    padding: '0.25rem 0.5rem',
+                                                                    color: idx === palace.locations.length - 1 ? 'rgba(255,255,255,0.2)' : 'var(--primary)',
+                                                                    cursor: idx === palace.locations.length - 1 ? 'not-allowed' : 'pointer',
+                                                                    fontSize: '1.2rem',
+                                                                    transition: 'all 0.2s'
+                                                                }}
+                                                                onMouseEnter={(e) => {
+                                                                    if (idx !== palace.locations.length - 1) {
+                                                                        e.currentTarget.style.background = 'var(--primary)';
+                                                                        e.currentTarget.style.color = 'white';
+                                                                    }
+                                                                }}
+                                                                onMouseLeave={(e) => {
+                                                                    if (idx !== palace.locations.length - 1) {
+                                                                        e.currentTarget.style.background = 'rgba(99, 102, 241, 0.2)';
+                                                                        e.currentTarget.style.color = 'var(--primary)';
+                                                                    }
+                                                                }}
+                                                            >
+                                                                ↓
+                                                            </button>
+                                                            <button
+                                                                onClick={() => deleteLocation(palace.id, location)}
+                                                                style={{
+                                                                    background: 'rgba(239, 68, 68, 0.2)',
+                                                                    border: 'none',
+                                                                    borderRadius: '0.25rem',
+                                                                    padding: '0.25rem 0.5rem',
+                                                                    color: 'var(--error)',
+                                                                    cursor: 'pointer',
+                                                                    fontSize: '1.2rem',
+                                                                    transition: 'all 0.2s'
+                                                                }}
+                                                                onMouseEnter={(e) => {
+                                                                    e.currentTarget.style.background = 'var(--error)';
+                                                                    e.currentTarget.style.color = 'white';
+                                                                }}
+                                                                onMouseLeave={(e) => {
+                                                                    e.currentTarget.style.background = 'rgba(239, 68, 68, 0.2)';
+                                                                    e.currentTarget.style.color = 'var(--error)';
+                                                                }}
+                                                            >
+                                                                ×
+                                                            </button>
+                                                        </div>
                                                     </div>
-                                                    <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                                        <button
-                                                            onClick={() => moveLocation(palace.id, idx, 'up')}
-                                                            disabled={idx === 0}
-                                                            style={{
-                                                                background: 'none',
-                                                                border: 'none',
-                                                                color: idx === 0 ? 'rgba(255,255,255,0.2)' : 'var(--primary)',
-                                                                cursor: idx === 0 ? 'not-allowed' : 'pointer',
-                                                                fontSize: '1.2rem'
-                                                            }}
-                                                        >
-                                                            ↑
-                                                        </button>
-                                                        <button
-                                                            onClick={() => moveLocation(palace.id, idx, 'down')}
-                                                            disabled={idx === palace.locations.length - 1}
-                                                            style={{
-                                                                background: 'none',
-                                                                border: 'none',
-                                                                color: idx === palace.locations.length - 1 ? 'rgba(255,255,255,0.2)' : 'var(--primary)',
-                                                                cursor: idx === palace.locations.length - 1 ? 'not-allowed' : 'pointer',
-                                                                fontSize: '1.2rem'
-                                                            }}
-                                                        >
-                                                            ↓
-                                                        </button>
-                                                        <button
-                                                            onClick={() => deleteLocation(palace.id, location)}
-                                                            style={{ background: 'none', border: 'none', color: 'var(--error)', cursor: 'pointer', fontSize: '1.2rem' }}
-                                                        >
-                                                            ×
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            ))}
+                                                );
+                                            })}
                                             {palace.locations.length === 0 && (
                                                 <div style={{ padding: '1rem', textAlign: 'center', opacity: 0.5, fontSize: '0.9rem' }}>
                                                     No locations yet. Add your first one above!

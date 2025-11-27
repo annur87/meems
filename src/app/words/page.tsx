@@ -3,12 +3,13 @@
 import { useState, useEffect, useRef } from 'react';
 import Header from '@/components/Header';
 import wordList from '@/data/words.json';
+import { saveGameResult } from '@/lib/firebase';
 
 type GameState = 'config' | 'memorize' | 'recall' | 'result';
 
 export default function WordMemorization() {
     const [gameState, setGameState] = useState<GameState>('config');
-    const [wordCount, setWordCount] = useState(10);
+    const [wordCount, setWordCount] = useState<number | ''>(10);
     const [generatedWords, setGeneratedWords] = useState<string[]>([]);
     const [userInput, setUserInput] = useState('');
 
@@ -20,8 +21,12 @@ export default function WordMemorization() {
     const inputRef = useRef<HTMLTextAreaElement>(null);
 
     const startMemorization = () => {
+        const count = typeof wordCount === 'number' ? wordCount : 10;
+        const finalCount = Math.max(5, Math.min(100, count));
+        setWordCount(finalCount);
+
         const shuffled = [...wordList].sort(() => 0.5 - Math.random());
-        const selected = shuffled.slice(0, wordCount);
+        const selected = shuffled.slice(0, finalCount);
         setGeneratedWords(selected);
         setGameState('memorize');
         setMemorizeStartTime(Date.now());
@@ -34,27 +39,6 @@ export default function WordMemorization() {
         setRecallStartTime(now);
         setUserInput('');
         setTimeout(() => inputRef.current?.focus(), 100);
-    };
-
-    const finishGame = () => {
-        const now = Date.now();
-        setRecallDuration(now - recallStartTime);
-        setGameState('result');
-    };
-
-    const resetGame = () => {
-        setGameState('config');
-        setGeneratedWords([]);
-        setUserInput('');
-        setMemorizeDuration(0);
-        setRecallDuration(0);
-    };
-
-    const formatTime = (ms: number) => {
-        const seconds = Math.floor(ms / 1000);
-        const minutes = Math.floor(seconds / 60);
-        const remainingSeconds = seconds % 60;
-        return `${minutes}m ${remainingSeconds}s`;
     };
 
     const calculateScore = () => {
@@ -82,6 +66,41 @@ export default function WordMemorization() {
         return { correct, total, percentage: (correct / total) * 100, comparison };
     };
 
+    const finishGame = () => {
+        const now = Date.now();
+        const duration = now - recallStartTime;
+        setRecallDuration(duration);
+        setGameState('result');
+
+        const { correct, total, percentage } = calculateScore();
+        saveGameResult({
+            type: 'word',
+            count: total,
+            correct,
+            total,
+            percentage,
+            memorizeTime: memorizeDuration,
+            recallTime: duration
+        });
+    };
+
+    const resetGame = () => {
+        setGameState('config');
+        setGeneratedWords([]);
+        setUserInput('');
+        setMemorizeDuration(0);
+        setRecallDuration(0);
+    };
+
+    const formatTime = (ms: number) => {
+        const seconds = Math.floor(ms / 1000);
+        const minutes = Math.floor(seconds / 60);
+        const remainingSeconds = seconds % 60;
+        return `${minutes}m ${remainingSeconds}s`;
+    };
+
+
+
     return (
         <>
             <Header />
@@ -93,19 +112,45 @@ export default function WordMemorization() {
 
                     {gameState === 'config' && (
                         <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1.5rem' }}>
-                            <div style={{ width: '100%', maxWidth: '400px' }}>
-                                <label style={{ display: 'block', marginBottom: '0.5rem', color: '#cbd5e1' }}>
+                            <div style={{ width: '100%', maxWidth: '500px' }}>
+                                <label style={{ display: 'block', marginBottom: '1rem', color: '#cbd5e1', textAlign: 'center' }}>
                                     Number of Words (5 - 100)
                                 </label>
-                                <input
-                                    type="number"
-                                    min="5"
-                                    max="100"
-                                    value={wordCount}
-                                    onChange={(e) => setWordCount(Math.max(5, Math.min(100, parseInt(e.target.value) || 5)))}
-                                    className="input-field"
-                                    style={{ textAlign: 'center', fontSize: '1.2rem' }}
-                                />
+
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', justifyContent: 'center', marginBottom: '1.5rem' }}>
+                                    {[5, 10, 15, 20, 30, 50, 80, 100].map(num => (
+                                        <button
+                                            key={num}
+                                            onClick={() => setWordCount(num)}
+                                            className="btn"
+                                            style={{
+                                                padding: '0.5rem 1rem',
+                                                fontSize: '0.9rem',
+                                                background: wordCount === num ? 'var(--primary)' : 'rgba(255,255,255,0.1)',
+                                                color: wordCount === num ? 'white' : 'var(--foreground)'
+                                            }}
+                                        >
+                                            {num}
+                                        </button>
+                                    ))}
+                                </div>
+
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '1rem', marginBottom: '1rem' }}>
+                                    <span style={{ fontSize: '0.9rem', opacity: 0.7 }}>Custom:</span>
+                                    <input
+                                        type="number"
+                                        min="5"
+                                        max="100"
+                                        value={wordCount}
+                                        onChange={(e) => {
+                                            const val = e.target.value;
+                                            if (val === '') setWordCount('');
+                                            else setWordCount(parseInt(val));
+                                        }}
+                                        className="input-field"
+                                        style={{ textAlign: 'center', fontSize: '1.2rem', width: '120px' }}
+                                    />
+                                </div>
                             </div>
                             <button onClick={startMemorization} className="btn btn-primary" style={{ width: '100%', maxWidth: '400px' }}>
                                 Start Memorization
@@ -150,6 +195,9 @@ export default function WordMemorization() {
                                 value={userInput}
                                 onChange={(e) => setUserInput(e.target.value)}
                                 className="input-field"
+                                autoCapitalize="none"
+                                autoComplete="off"
+                                spellCheck="false"
                                 style={{
                                     minHeight: '200px',
                                     fontSize: '1.2rem',

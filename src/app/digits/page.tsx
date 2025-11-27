@@ -2,12 +2,13 @@
 
 import { useState, useEffect, useRef } from 'react';
 import Header from '@/components/Header';
+import { saveGameResult } from '@/lib/firebase';
 
 type GameState = 'config' | 'memorize' | 'recall' | 'result';
 
 export default function DigitMemorization() {
     const [gameState, setGameState] = useState<GameState>('config');
-    const [digitCount, setDigitCount] = useState(10);
+    const [digitCount, setDigitCount] = useState<number | ''>(10);
     const [generatedDigits, setGeneratedDigits] = useState('');
     const [userInput, setUserInput] = useState('');
 
@@ -19,8 +20,12 @@ export default function DigitMemorization() {
     const inputRef = useRef<HTMLTextAreaElement>(null);
 
     const startMemorization = () => {
+        const count = typeof digitCount === 'number' ? digitCount : 10;
+        const finalCount = Math.max(5, Math.min(1000, count));
+        setDigitCount(finalCount); // Update UI to show actual used value
+
         let digits = '';
-        for (let i = 0; i < digitCount; i++) {
+        for (let i = 0; i < finalCount; i++) {
             digits += Math.floor(Math.random() * 10).toString();
         }
         setGeneratedDigits(digits);
@@ -36,27 +41,6 @@ export default function DigitMemorization() {
         setUserInput('');
         // Focus input on next render
         setTimeout(() => inputRef.current?.focus(), 100);
-    };
-
-    const finishGame = () => {
-        const now = Date.now();
-        setRecallDuration(now - recallStartTime);
-        setGameState('result');
-    };
-
-    const resetGame = () => {
-        setGameState('config');
-        setGeneratedDigits('');
-        setUserInput('');
-        setMemorizeDuration(0);
-        setRecallDuration(0);
-    };
-
-    const formatTime = (ms: number) => {
-        const seconds = Math.floor(ms / 1000);
-        const minutes = Math.floor(seconds / 60);
-        const remainingSeconds = seconds % 60;
-        return `${minutes}m ${remainingSeconds}s`;
     };
 
     const calculateScore = () => {
@@ -75,6 +59,41 @@ export default function DigitMemorization() {
         return { correct, total, percentage: (correct / total) * 100, comparison };
     };
 
+    const finishGame = () => {
+        const now = Date.now();
+        const duration = now - recallStartTime;
+        setRecallDuration(duration);
+        setGameState('result');
+
+        const { correct, total, percentage } = calculateScore();
+        saveGameResult({
+            type: 'digit',
+            count: total,
+            correct,
+            total,
+            percentage,
+            memorizeTime: memorizeDuration,
+            recallTime: duration
+        });
+    };
+
+    const resetGame = () => {
+        setGameState('config');
+        setGeneratedDigits('');
+        setUserInput('');
+        setMemorizeDuration(0);
+        setRecallDuration(0);
+    };
+
+    const formatTime = (ms: number) => {
+        const seconds = Math.floor(ms / 1000);
+        const minutes = Math.floor(seconds / 60);
+        const remainingSeconds = seconds % 60;
+        return `${minutes}m ${remainingSeconds}s`;
+    };
+
+
+
     return (
         <>
             <Header />
@@ -86,19 +105,45 @@ export default function DigitMemorization() {
 
                     {gameState === 'config' && (
                         <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1.5rem' }}>
-                            <div style={{ width: '100%', maxWidth: '400px' }}>
-                                <label style={{ display: 'block', marginBottom: '0.5rem', color: '#cbd5e1' }}>
-                                    Number of Digits (10 - 1000)
+                            <div style={{ width: '100%', maxWidth: '500px' }}>
+                                <label style={{ display: 'block', marginBottom: '1rem', color: '#cbd5e1', textAlign: 'center' }}>
+                                    Number of Digits (5 - 1000)
                                 </label>
-                                <input
-                                    type="number"
-                                    min="10"
-                                    max="1000"
-                                    value={digitCount}
-                                    onChange={(e) => setDigitCount(Math.max(10, Math.min(1000, parseInt(e.target.value) || 10)))}
-                                    className="input-field"
-                                    style={{ textAlign: 'center', fontSize: '1.2rem' }}
-                                />
+
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', justifyContent: 'center', marginBottom: '1.5rem' }}>
+                                    {[5, 10, 15, 20, 30, 50, 80, 100].map(num => (
+                                        <button
+                                            key={num}
+                                            onClick={() => setDigitCount(num)}
+                                            className="btn"
+                                            style={{
+                                                padding: '0.5rem 1rem',
+                                                fontSize: '0.9rem',
+                                                background: digitCount === num ? 'var(--primary)' : 'rgba(255,255,255,0.1)',
+                                                color: digitCount === num ? 'white' : 'var(--foreground)'
+                                            }}
+                                        >
+                                            {num}
+                                        </button>
+                                    ))}
+                                </div>
+
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '1rem', marginBottom: '1rem' }}>
+                                    <span style={{ fontSize: '0.9rem', opacity: 0.7 }}>Custom:</span>
+                                    <input
+                                        type="number"
+                                        min="5"
+                                        max="1000"
+                                        value={digitCount}
+                                        onChange={(e) => {
+                                            const val = e.target.value;
+                                            if (val === '') setDigitCount('');
+                                            else setDigitCount(parseInt(val));
+                                        }}
+                                        className="input-field"
+                                        style={{ textAlign: 'center', fontSize: '1.2rem', width: '120px' }}
+                                    />
+                                </div>
                             </div>
                             <button onClick={startMemorization} className="btn btn-primary" style={{ width: '100%', maxWidth: '400px' }}>
                                 Start Memorization

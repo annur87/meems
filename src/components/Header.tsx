@@ -10,8 +10,10 @@ export default function Header() {
                 <nav style={{ display: 'flex', gap: '1rem' }}>
                     <Link href="/" style={{ fontSize: '0.9rem', opacity: 0.8 }}>List</Link>
                     <Link href="/practice" style={{ fontSize: '0.9rem', opacity: 0.8 }}>Practice</Link>
+                    <Link href="/training" style={{ fontSize: '0.9rem', opacity: 0.8 }}>Training</Link>
                     <Link href="/digits" style={{ fontSize: '0.9rem', opacity: 0.8 }}>Digits</Link>
                     <Link href="/words" style={{ fontSize: '0.9rem', opacity: 0.8 }}>Words</Link>
+                    <Link href="/analytics" style={{ fontSize: '0.9rem', opacity: 0.8 }}>Analytics</Link>
                 </nav>
             </div>
         </header>

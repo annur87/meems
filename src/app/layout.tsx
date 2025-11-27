@@ -5,8 +5,8 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "WordVault",
-  description: "Remember your words.",
+  title: "meem8",
+  description: "Foundational drills for elite memory training.",
 };
 
 export const viewport = {

@@ -21,6 +21,7 @@ export default function NumberWall() {
     const [startTime, setStartTime] = useState<number>(0);
     const [endTime, setEndTime] = useState<number>(0);
     const [timeLeft, setTimeLeft] = useState(0);
+    const [isSavingResult, setIsSavingResult] = useState(false);
 
     // Timer Ref
     const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -73,9 +74,9 @@ export default function NumberWall() {
     };
 
     const submitRecall = async () => {
-        if (!digits.length) {
+        if (!digits.length || isSavingResult) {
             console.warn('Tried to submit recall without generated digits.');
-            setGameState('setup');
+            if (!digits.length) setGameState('setup');
             return;
         }
 
@@ -84,6 +85,10 @@ export default function NumberWall() {
         const memorizeStart = startTime || memorizeEnd;
         const memorizeTimeSeconds = Math.max(0, Math.floor((memorizeEnd - memorizeStart) / 1000));
         const percentage = digits.length ? Math.round((correctCount / digits.length) * 100) : 0;
+
+        setEndTime(memorizeEnd);
+        setIsSavingResult(true);
+        setGameState('result');
 
         try {
             await saveGameResult({
@@ -98,7 +103,7 @@ export default function NumberWall() {
         } catch (error) {
             console.error('Failed to save Number Wall result:', error);
         } finally {
-            setGameState('result');
+            setIsSavingResult(false);
         }
     };
 
@@ -296,6 +301,11 @@ export default function NumberWall() {
                 {gameState === 'result' && (
                     <div className="glass card animate-fade-in">
                         <h2 style={{ fontSize: '1.5rem', marginBottom: '1.5rem', textAlign: 'center' }}>Results</h2>
+                        {isSavingResult && (
+                            <p style={{ textAlign: 'center', marginBottom: '1rem', fontSize: '0.9rem', opacity: 0.7 }}>
+                                Saving result…
+                            </p>
+                        )}
 
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '2rem' }}>
                             <div style={{ background: 'rgba(0,0,0,0.2)', padding: '1rem', borderRadius: '0.5rem', textAlign: 'center' }}>

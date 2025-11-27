@@ -10,7 +10,7 @@ type GameState = 'setup' | 'memorize' | 'recall' | 'result';
 interface MatrixCell {
     coordinate: string; // e.g., "A1", "B5"
     number: string; // 00-99
-    pattern: string; // SVG pattern data
+    imageUrl: string;
     row: number;
     col: number;
 }
@@ -33,56 +33,6 @@ export default function AbstractMatrix() {
 
     const timerRef = useRef<NodeJS.Timeout | null>(null);
 
-    // Generate abstract SVG pattern
-    const generateAbstractPattern = (seed: number): string => {
-        const random = (n: number) => {
-            let x = Math.sin(seed + n) * 10000;
-            return x - Math.floor(x);
-        };
-
-        const type = Math.floor(random(1) * 4);
-        const color1 = `hsl(${random(2) * 360}, ${50 + random(3) * 50}%, ${30 + random(4) * 40}%)`;
-        const color2 = `hsl(${random(5) * 360}, ${50 + random(6) * 50}%, ${30 + random(7) * 40}%)`;
-        const color3 = `hsl(${random(8) * 360}, ${50 + random(9) * 50}%, ${30 + random(10) * 40}%)`;
-
-        switch (type) {
-            case 0: // Fractal circles
-                return `
-          <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="${20 + random(11) * 60}" cy="${20 + random(12) * 60}" r="${10 + random(13) * 30}" fill="${color1}" opacity="0.7"/>
-            <circle cx="${20 + random(14) * 60}" cy="${20 + random(15) * 60}" r="${10 + random(16) * 25}" fill="${color2}" opacity="0.6"/>
-            <circle cx="${20 + random(17) * 60}" cy="${20 + random(18) * 60}" r="${5 + random(19) * 20}" fill="${color3}" opacity="0.8"/>
-            <path d="M ${random(20) * 100} ${random(21) * 100} Q ${random(22) * 100} ${random(23) * 100} ${random(24) * 100} ${random(25) * 100}" stroke="${color1}" fill="none" stroke-width="2"/>
-          </svg>
-        `;
-            case 1: // Abstract lines
-                return `
-          <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-            <line x1="${random(11) * 100}" y1="${random(12) * 100}" x2="${random(13) * 100}" y2="${random(14) * 100}" stroke="${color1}" stroke-width="3"/>
-            <line x1="${random(15) * 100}" y1="${random(16) * 100}" x2="${random(17) * 100}" y2="${random(18) * 100}" stroke="${color2}" stroke-width="2"/>
-            <rect x="${random(19) * 70}" y="${random(20) * 70}" width="${10 + random(21) * 20}" height="${10 + random(22) * 20}" fill="${color3}" opacity="0.5" transform="rotate(${random(23) * 360} 50 50)"/>
-          </svg>
-        `;
-            case 2: // Polygons
-                return `
-          <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-            <polygon points="${random(11) * 100},${random(12) * 100} ${random(13) * 100},${random(14) * 100} ${random(15) * 100},${random(16) * 100}" fill="${color1}" opacity="0.7"/>
-            <polygon points="${random(17) * 100},${random(18) * 100} ${random(19) * 100},${random(20) * 100} ${random(21) * 100},${random(22) * 100} ${random(23) * 100},${random(24) * 100}" fill="${color2}" opacity="0.6"/>
-            <circle cx="50" cy="50" r="${5 + random(25) * 15}" fill="${color3}"/>
-          </svg>
-        `;
-            default: // Noise texture
-                return `
-          <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-            <rect width="100" height="100" fill="${color1}"/>
-            ${Array.from({ length: 20 }, (_, i) =>
-                    `<rect x="${random(11 + i * 3) * 90}" y="${random(12 + i * 3) * 90}" width="${5 + random(13 + i * 3) * 10}" height="${5 + random(14 + i * 3) * 10}" fill="${i % 2 === 0 ? color2 : color3}" opacity="${0.3 + random(15 + i * 3) * 0.5}"/>`
-                ).join('')}
-          </svg>
-        `;
-        }
-    };
-
     const generateGrid = (size: 5 | 10, count: number) => {
         const newCells: MatrixCell[] = [];
         const letters = 'ABCDEFGHIJ'.slice(0, size);
@@ -94,9 +44,10 @@ export default function AbstractMatrix() {
                 const coordinate = `${letters[col]}${row + 1}`;
                 const number = String(Math.floor(Math.random() * 100)).padStart(2, '0');
                 const seed = row * size + col + Date.now();
-                const pattern = generateAbstractPattern(seed);
+                // Using picsum with grayscale and blur for abstract effect
+                const imageUrl = `https://picsum.photos/seed/${seed}/200/200?grayscale&blur=2`;
 
-                newCells.push({ coordinate, number, pattern, row, col });
+                newCells.push({ coordinate, number, imageUrl, row, col });
             }
             if (newCells.length >= count) break;
         }
@@ -303,20 +254,41 @@ export default function AbstractMatrix() {
                         }}>
                             {cells.map((cell, idx) => (
                                 <div key={idx} className="glass" style={{
-                                    padding: '0.5rem',
+                                    padding: 0,
                                     borderRadius: '0.5rem',
                                     textAlign: 'center',
-                                    minWidth: gridSize === 10 ? '80px' : '100px'
+                                    minWidth: gridSize === 10 ? '80px' : '100px',
+                                    position: 'relative',
+                                    overflow: 'hidden',
+                                    aspectRatio: '1/1'
                                 }}>
-                                    <div
-                                        dangerouslySetInnerHTML={{ __html: cell.pattern }}
-                                        style={{ width: '100%', height: gridSize === 10 ? '60px' : '80px', marginBottom: '0.5rem' }}
+                                    <img
+                                        src={cell.imageUrl}
+                                        alt="Abstract Pattern"
+                                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                                     />
-                                    <div style={{ fontSize: '0.8rem', fontWeight: 'bold', color: 'var(--primary)' }}>
-                                        {cell.coordinate}
-                                    </div>
-                                    <div style={{ fontSize: '1rem', fontWeight: 'bold', color: 'var(--accent)' }}>
-                                        {cell.number}
+                                    <div style={{
+                                        position: 'absolute',
+                                        bottom: 0,
+                                        left: 0,
+                                        right: 0,
+                                        background: 'rgba(0, 0, 0, 0.4)',
+                                        backdropFilter: 'blur(8px)',
+                                        WebkitBackdropFilter: 'blur(8px)',
+                                        padding: '0.25rem',
+                                        display: 'flex',
+                                        justifyContent: 'center',
+                                        gap: '0.5rem',
+                                        alignItems: 'center',
+                                        borderTop: '1px solid rgba(255,255,255,0.1)'
+                                    }}>
+                                        <span style={{ fontSize: '0.9rem', fontWeight: 'bold', color: 'white' }}>
+                                            {cell.coordinate}
+                                        </span>
+                                        <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.8rem' }}>|</span>
+                                        <span style={{ fontSize: '0.9rem', fontWeight: 'bold', color: 'white' }}>
+                                            {cell.number}
+                                        </span>
                                     </div>
                                 </div>
                             ))}
@@ -343,10 +315,13 @@ export default function AbstractMatrix() {
                         }}>
                             {cells.map((cell, idx) => (
                                 <div key={idx} className="glass" style={{ padding: '1rem', borderRadius: '0.5rem' }}>
-                                    <div
-                                        dangerouslySetInnerHTML={{ __html: cell.pattern }}
-                                        style={{ width: '100%', height: '100px', marginBottom: '1rem' }}
-                                    />
+                                    <div style={{ position: 'relative', width: '100%', height: '100px', marginBottom: '1rem', borderRadius: '0.25rem', overflow: 'hidden' }}>
+                                        <img
+                                            src={cell.imageUrl}
+                                            alt="Abstract Pattern"
+                                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                        />
+                                    </div>
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                                         <input
                                             type="text"

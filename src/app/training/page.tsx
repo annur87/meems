@@ -83,6 +83,70 @@ const games = [
         week: 'Foundational',
         href: '/training/image-vault',
         color: 'from-rose-500 to-pink-500'
+    },
+    {
+        id: 'instant-visualization',
+        title: 'Instant Visualization Test',
+        description: 'Explosive image creation speed drill for digits and words.',
+        week: 'Foundational Drill',
+        href: '/training/instant-visualization',
+        color: 'from-teal-500 to-cyan-500'
+    },
+    {
+        id: 'sensory-walkthrough',
+        title: 'The Sensory Walkthrough',
+        description: 'Force deeper palace immersion with guided sensory prompts.',
+        week: 'Foundational Drill',
+        href: '/training/sensory-walkthrough',
+        color: 'from-emerald-500 to-green-500'
+    },
+    {
+        id: 'system-checker',
+        title: 'System Component Checker',
+        description: 'Rapid-fire integrity test for Major and PAO mappings.',
+        week: 'Foundational Drill',
+        href: '/training/system-component-checker',
+        color: 'from-slate-500 to-slate-700'
+    },
+    {
+        id: 'names-international',
+        title: 'International Names',
+        description: 'Memorize names and faces from diverse international backgrounds.',
+        week: 'Week 3 Focus',
+        href: '/training/names-international',
+        color: 'from-green-600 to-teal-600'
+    },
+    {
+        id: 'image-sequence',
+        title: 'Image Sequence',
+        description: 'Rapid-fire visual memory test with high-speed image presentation.',
+        week: 'Week 4 Focus',
+        href: '/training/image-sequence',
+        color: 'from-pink-500 to-rose-500'
+    },
+    {
+        id: 'n-back',
+        title: 'N-Back Challenge',
+        description: 'Classic working memory training. Match current position with N steps back.',
+        week: 'Cognitive Drill',
+        href: '/training/n-back',
+        color: 'from-violet-500 to-purple-500'
+    },
+    {
+        id: 'quick-math',
+        title: 'Quick Math',
+        description: 'High-speed arithmetic drills to improve mental calculation speed.',
+        week: 'Cognitive Drill',
+        href: '/training/quick-math',
+        color: 'from-yellow-500 to-orange-500'
+    },
+    {
+        id: 'philosophical-attribution',
+        title: 'Philosophical Attribution',
+        description: 'Memorize quotes verbatim and nail the speaker + source on demand.',
+        week: 'Foundational Drill',
+        href: '/training/philosophical-attribution',
+        color: 'from-lime-500 to-emerald-500'
     }
 ];
 

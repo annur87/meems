@@ -6,18 +6,17 @@ import Link from 'next/link';
 import {
     MajorEntry,
     PaoEntry,
-    Palace,
-    saveImageVaultData,
-    getImageVaultData
+    Palace
 } from '@/lib/firebase';
+import { SAMPLE_MAJOR_SYSTEM, SAMPLE_PAO_SYSTEM, SAMPLE_PALACES } from '@/data/sampleImageVault';
 
 type SystemType = 'major' | 'pao' | 'palace';
+
+const STORAGE_KEY = 'image_vault_data';
 
 export default function ImageVault() {
     const [activeTab, setActiveTab] = useState<SystemType>('major');
     const [searchQuery, setSearchQuery] = useState('');
-    const [syncing, setSyncing] = useState(false);
-    const [lastSynced, setLastSynced] = useState<Date | null>(null);
 
     // Major System
     const [majorSystem, setMajorSystem] = useState<MajorEntry[]>([]);
@@ -43,78 +42,45 @@ export default function ImageVault() {
     const [draggedItem, setDraggedItem] = useState<{ palaceId: string, index: number } | null>(null);
     const [dragOverItem, setDragOverItem] = useState<{ palaceId: string, index: number } | null>(null);
 
-    // Load from Firebase on mount
+    // Load from LocalStorage on mount
     useEffect(() => {
-        const loadData = async () => {
-            const data = await getImageVaultData();
-
-            if (data) {
-                setMajorSystem(data.majorSystem || []);
-                setPaoSystem(data.paoSystem || []);
-                setPalaces(data.palaces || []);
-                if (data.lastUpdated) {
-                    setLastSynced(new Date(data.lastUpdated));
+        const loadData = () => {
+            const stored = localStorage.getItem(STORAGE_KEY);
+            if (stored) {
+                try {
+                    const data = JSON.parse(stored);
+                    setMajorSystem(data.majorSystem || []);
+                    setPaoSystem(data.paoSystem || []);
+                    setPalaces(data.palaces || []);
+                } catch (e) {
+                    console.error("Failed to parse local data", e);
                 }
             } else {
-                // Initialize with sample data
-                const sampleMajor: MajorEntry[] = [
-                    { id: '1', number: '00', images: ['Sauce', 'Seas'] },
-                    { id: '2', number: '01', images: ['Suit', 'Seed'] },
-                    { id: '3', number: '02', images: ['Sun', 'Sane'] },
-                    { id: '4', number: '10', images: ['Toes', 'Dice'] },
-                    { id: '5', number: '11', images: ['Toad', 'Dad'] },
-                    { id: '6', number: '20', images: ['Nose', 'Noose'] },
-                ];
-                setMajorSystem(sampleMajor);
-
-                const samplePao: PaoEntry[] = [
-                    { id: '1', card: 'AS', person: 'Albert Einstein', action: 'Calculating', object: 'Chalkboard' },
-                    { id: '2', card: '2H', person: 'Harry Potter', action: 'Casting', object: 'Wand' },
-                    { id: '3', card: 'KC', person: 'King Kong', action: 'Climbing', object: 'Building' },
-                ];
-                setPaoSystem(samplePao);
-
-                const samplePalaces: Palace[] = [
-                    { id: '1', name: 'Home Journey', locations: ['Front Door', 'Hallway', 'Living Room', 'Kitchen', 'Bedroom'] },
-                    { id: '2', name: 'Office Route', locations: ['Parking Lot', 'Elevator', 'Reception', 'Desk', 'Conference Room'] },
-                ];
-                setPalaces(samplePalaces);
+                // Initialize with sample data if no local data exists
+                setMajorSystem(SAMPLE_MAJOR_SYSTEM.map(entry => ({ ...entry, images: [...entry.images] })));
+                setPaoSystem(SAMPLE_PAO_SYSTEM.map(entry => ({ ...entry })));
+                setPalaces(SAMPLE_PALACES.map(palace => ({ ...palace, locations: [...palace.locations] })));
             }
         };
 
         loadData();
     }, []);
 
-    // Save to Firebase with debounce
-    const syncToFirebase = async (data: { majorSystem?: MajorEntry[], paoSystem?: PaoEntry[], palaces?: Palace[] }) => {
-        setSyncing(true);
-        const success = await saveImageVaultData(data);
-        if (success) {
-            setLastSynced(new Date());
-        }
-        setSyncing(false);
-    };
-
-    // Save to Firebase whenever data changes
+    // Save to LocalStorage whenever data changes
     useEffect(() => {
-        // Only sync if majorSystem has been initialized (e.g., not an empty array from initial state)
-        // and if it's not the very first render before data is loaded.
-        if (majorSystem.length > 0 || (majorSystem.length === 0 && lastSynced !== null)) {
-            syncToFirebase({ majorSystem });
-        }
-    }, [majorSystem]);
+        // Debounce slightly to avoid excessive writes during rapid typing, though LS is synchronous and fast.
+        const timeoutId = setTimeout(() => {
+            const data = {
+                majorSystem,
+                paoSystem,
+                palaces,
+                lastUpdated: Date.now()
+            };
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+        }, 500);
 
-    useEffect(() => {
-        if (paoSystem.length > 0 || (paoSystem.length === 0 && lastSynced !== null)) {
-            syncToFirebase({ paoSystem });
-        }
-    }, [paoSystem]);
-
-    useEffect(() => {
-        if (palaces.length > 0 || (palaces.length === 0 && lastSynced !== null)) {
-            syncToFirebase({ palaces });
-        }
-    }, [palaces]);
+        return () => clearTimeout(timeoutId);
+    }, [majorSystem, paoSystem, palaces]);
 
     // Major System Functions
     const addMajorEntry = () => {
@@ -306,21 +272,10 @@ export default function ImageVault() {
                             <p style={{ opacity: 0.7, marginTop: '0.5rem' }}>Manage and organize your mnemonic systems</p>
                         </div>
                         <div style={{ textAlign: 'right', fontSize: '0.85rem', opacity: 0.7 }}>
-                            {syncing ? (
-                                <div style={{ color: 'var(--accent)' }}>
-                                    <span style={{ marginRight: '0.5rem' }}>●</span>
-                                    Syncing...
-                                </div>
-                            ) : lastSynced ? (
-                                <div style={{ color: 'var(--success)' }}>
-                                    <span style={{ marginRight: '0.5rem' }}>✓</span>
-                                    Synced {lastSynced.toLocaleTimeString()}
-                                </div>
-                            ) : (
-                                <div style={{ opacity: 0.5 }}>
-                                    Not synced
-                                </div>
-                            )}
+                            <div style={{ color: 'var(--success)' }}>
+                                <span style={{ marginRight: '0.5rem' }}>✓</span>
+                                Local Storage Active
+                            </div>
                         </div>
                     </div>
                 </div>

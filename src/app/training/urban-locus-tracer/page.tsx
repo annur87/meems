@@ -97,10 +97,6 @@ export default function UrbanLocusTracerPage() {
     const [editingLandmark, setEditingLandmark] = useState<Landmark | null>(null);
     const [editName, setEditName] = useState('');
     const [editType, setEditType] = useState('');
-    const [editLat, setEditLat] = useState('');
-    const [editLng, setEditLng] = useState('');
-    const [editMode, setEditMode] = useState<'map' | 'manual'>('map');
-    const [pendingEditLocation, setPendingEditLocation] = useState<{ lat: number; lng: number } | null>(null);
     const [quickEditLandmark, setQuickEditLandmark] = useState<Landmark | null>(null);
     const [quickEditSaving, setQuickEditSaving] = useState(false);
     const [quickEditResult, setQuickEditResult] = useState<{ name: string; lat: number; lng: number } | null>(null);
@@ -194,8 +190,6 @@ export default function UrbanLocusTracerPage() {
             setFeedbackResult(newResult);
             setQuestionStartTime(null);
             setCurrentLandmark(null);
-        } else if (editingLandmark && editMode === 'map') {
-            setPendingEditLocation({ lat, lng });
         }
     };
     
@@ -277,26 +271,11 @@ export default function UrbanLocusTracerPage() {
         if (!editingLandmark || !editName.trim()) return;
         
         try {
-            const updates: any = {
+            await updateLandmark(USER_ID, editingLandmark.id, {
                 name: editName.trim(),
                 type: editType
-            };
-            
-            if (editMode === 'map' && pendingEditLocation) {
-                updates.lat = pendingEditLocation.lat;
-                updates.lng = pendingEditLocation.lng;
-            } else if (editMode === 'manual') {
-                const lat = parseFloat(editLat);
-                const lng = parseFloat(editLng);
-                if (!isNaN(lat) && !isNaN(lng)) {
-                    updates.lat = lat;
-                    updates.lng = lng;
-                }
-            }
-            
-            await updateLandmark(USER_ID, editingLandmark.id, updates);
+            });
             setEditingLandmark(null);
-            setPendingEditLocation(null);
             await loadLandmarks();
         } catch (error) {
             console.error('Error updating landmark:', error);
@@ -427,12 +406,11 @@ export default function UrbanLocusTracerPage() {
                                 return [
                                     ...landmarks.map(l => ({
                                         id: l.id,
-                                        lat: l.lat,
-                                        lng: l.lng,
-                                        title: `${l.name} • ${formatType(l.type)}`,
-                                        color: l.verified ? '#22c55e' : '#3b82f6',
-                                        label: `${getTypeIcon(l.type)}${l.verified ? '★' : ''}`,
-                                        popup: `${l.name} (${formatType(l.type)})${l.verified ? ' • Verified' : ''}`
+                                            lat: l.lat,
+                                            lng: l.lng,
+                                            title: `${l.name} • ${formatType(l.type)}`,
+                                            color: l.verified ? '#22c55e' : '#3b82f6',
+                                            popup: `${l.name} (${formatType(l.type)})${l.verified ? ' • Verified' : ''}`
                                     })),
                                     ...(pendingLocation
                                         ? [{
@@ -544,6 +522,9 @@ export default function UrbanLocusTracerPage() {
                                     <option value="park">Park</option>
                                     <option value="mosque">Mosque</option>
                                     <option value="government">Government Building</option>
+                                    <option value="area">Area</option>
+                                    <option value="dncc">DNCC</option>
+                                    <option value="dscc">DSCC</option>
                                     <option value="other">Other</option>
                                 </select>
                             </div>
@@ -694,14 +675,11 @@ export default function UrbanLocusTracerPage() {
                                             }}
                                         >
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                                                <div style={{ fontSize: '1.5rem' }}>{getTypeIcon(landmark.type)}</div>
                                                 <div>
                                                     <div style={{ fontWeight: 'bold', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                                                        {landmark.name}
+                                                        {getTypeIcon(landmark.type)} {landmark.name}
                                                         {landmark.verified && (
-                                                            <span style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.08em', background: 'rgba(34,197,94,0.15)', color: '#22c55e', padding: '0.1rem 0.4rem', borderRadius: '999px' }}>
-                                                                Verified
-                                                            </span>
+                                                            <span style={{ fontSize: '0.9rem', color: '#22c55e' }}>✓</span>
                                                         )}
                                                     </div>
                                                     <div style={{ fontSize: '0.75rem', opacity: 0.7, display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
@@ -710,51 +688,51 @@ export default function UrbanLocusTracerPage() {
                                                 </div>
                                             </div>
                                             <div style={{ display: 'flex', gap: '0.25rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                                                <button 
-                                                    className={`btn ${landmark.verified ? 'btn-primary' : 'btn-secondary'}`} 
-                                                    style={{ padding: '0.25rem 0.5rem', fontSize: '0.7rem' }}
+                                                <button
+                                                    className="btn btn-secondary"
+                                                    title={landmark.verified ? 'Unverify' : 'Verify'}
                                                     onClick={(e) => {
                                                         e.stopPropagation();
                                                         handleToggleVerified(landmark);
                                                     }}
+                                                    style={{ padding: '0.25rem', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                                                 >
-                                                    {landmark.verified ? '★ Verified' : '☆ Verify'}
+                                                    {landmark.verified ? '★' : '☆'}
                                                 </button>
-                                                <button 
-                                                    className="btn btn-secondary" 
-                                                    style={{ padding: '0.25rem 0.5rem', fontSize: '0.7rem' }}
+                                                <button
+                                                    className="btn btn-secondary"
+                                                    title="Move"
                                                     onClick={(e) => {
                                                         e.stopPropagation();
                                                         beginQuickEdit(landmark);
                                                     }}
+                                                    style={{ padding: '0.25rem', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                                                 >
-                                                    Move
+                                                    ↕️
                                                 </button>
-                                                <button 
-                                                    className="btn btn-secondary" 
-                                                    style={{ padding: '0.25rem 0.5rem', fontSize: '0.7rem' }}
+                                                <button
+                                                    className="btn btn-secondary"
+                                                    title="Edit"
                                                     onClick={(e) => {
                                                         e.stopPropagation();
                                                         setEditingLandmark(landmark);
                                                         setEditName(landmark.name);
                                                         setEditType(landmark.type);
-                                                        setEditLat(landmark.lat.toString());
-                                                        setEditLng(landmark.lng.toString());
-                                                        setEditMode('map');
-                                                        setPendingEditLocation(null);
                                                     }}
+                                                    style={{ padding: '0.25rem', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                                                 >
-                                                    Edit
+                                                    ✏️
                                                 </button>
-                                                <button 
-                                                    className="btn btn-secondary" 
-                                                    style={{ padding: '0.25rem 0.5rem', fontSize: '0.7rem' }}
+                                                <button
+                                                    className="btn btn-secondary"
+                                                    title="Delete"
                                                     onClick={(e) => {
                                                         e.stopPropagation();
                                                         handleDeleteLandmark(landmark.id);
                                                     }}
+                                                    style={{ padding: '0.25rem', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                                                 >
-                                                    Del
+                                                    🗑️
                                                 </button>
                                             </div>
                                         </div>
@@ -918,60 +896,11 @@ export default function UrbanLocusTracerPage() {
                                 <option value="park">Park</option>
                                 <option value="mosque">Mosque</option>
                                 <option value="government">Government Building</option>
+                                <option value="area">Area</option>
+                                <option value="dncc">DNCC</option>
+                                <option value="dscc">DSCC</option>
                                 <option value="other">Other</option>
                             </select>
-                        </div>
-                        
-                        <div style={{ marginBottom: '1rem' }}>
-                            <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.5rem' }}>Update Location</label>
-                            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
-                                <button 
-                                    className={`btn ${editMode === 'map' ? 'btn-primary' : 'btn-secondary'}`}
-                                    onClick={() => setEditMode('map')}
-                                    style={{ flex: 1 }}
-                                >
-                                    Click Map
-                                </button>
-                                <button 
-                                    className={`btn ${editMode === 'manual' ? 'btn-primary' : 'btn-secondary'}`}
-                                    onClick={() => setEditMode('manual')}
-                                    style={{ flex: 1 }}
-                                >
-                                    Manual Input
-                                </button>
-                            </div>
-                            
-                            {editMode === 'map' ? (
-                                <div style={{ fontSize: '0.85rem', opacity: 0.7, padding: '0.5rem', background: 'rgba(59, 130, 246, 0.1)', borderRadius: '0.25rem' }}>
-                                    {pendingEditLocation 
-                                        ? `New location: ${pendingEditLocation.lat.toFixed(4)}, ${pendingEditLocation.lng.toFixed(4)}`
-                                        : 'Click on the map to set new location'
-                                    }
-                                </div>
-                            ) : (
-                                <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                    <div style={{ flex: 1 }}>
-                                        <label style={{ display: 'block', fontSize: '0.8rem', marginBottom: '0.25rem', opacity: 0.7 }}>Latitude</label>
-                                        <input 
-                                            type="number"
-                                            step="0.0001"
-                                            value={editLat}
-                                            onChange={(e) => setEditLat(e.target.value)}
-                                            style={{ width: '100%' }}
-                                        />
-                                    </div>
-                                    <div style={{ flex: 1 }}>
-                                        <label style={{ display: 'block', fontSize: '0.8rem', marginBottom: '0.25rem', opacity: 0.7 }}>Longitude</label>
-                                        <input 
-                                            type="number"
-                                            step="0.0001"
-                                            value={editLng}
-                                            onChange={(e) => setEditLng(e.target.value)}
-                                            style={{ width: '100%' }}
-                                        />
-                                    </div>
-                                </div>
-                            )}
                         </div>
                         
                         <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1.5rem' }}>
@@ -980,7 +909,6 @@ export default function UrbanLocusTracerPage() {
                             </button>
                             <button className="btn btn-secondary" onClick={() => {
                                 setEditingLandmark(null);
-                                setPendingEditLocation(null);
                             }} style={{ flex: 1 }}>
                                 Cancel
                             </button>

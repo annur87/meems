@@ -11,13 +11,14 @@ import RealMap from '@/components/RealMap';
 
 type GamePhase = 'setup' | 'encode' | 'recall-select' | 'recall-identify' | 'mental-walk' | 'result';
 type MapMode = 'abstract' | 'real';
+type GameMode = 'standard' | 'landmark-recall';
 
 interface Locus {
     id: number;
     x: number; // percentage 0-100 (Abstract) or lat (Real)
     y: number; // percentage 0-100 (Abstract) or lng (Real)
     data: string;
-    type: 'word' | 'number';
+    type: 'word' | 'number' | 'landmark';
     title?: string; // For Real Map landmarks
 }
 
@@ -42,6 +43,36 @@ const MAP_WIDTH = 800;
 const MAP_HEIGHT = 600;
 const POINT_RADIUS = 8;
 const HIT_RADIUS = 20;
+
+const levenshtein = (a: string, b: string): number => {
+    const matrix = [];
+    for (let i = 0; i <= b.length; i++) matrix[i] = [i];
+    for (let j = 0; j <= a.length; j++) matrix[0][j] = j;
+    for (let i = 1; i <= b.length; i++) {
+        for (let j = 1; j <= a.length; j++) {
+            if (b.charAt(i - 1) === a.charAt(j - 1)) {
+                matrix[i][j] = matrix[i - 1][j - 1];
+            } else {
+                matrix[i][j] = Math.min(
+                    matrix[i - 1][j - 1] + 1,
+                    Math.min(matrix[i][j - 1] + 1, matrix[i - 1][j] + 1)
+                );
+            }
+        }
+    }
+    return matrix[b.length][a.length];
+};
+
+const isFuzzyMatch = (input: string, target: string): boolean => {
+    const cleanInput = input.trim().toLowerCase();
+    const cleanTarget = target.trim().toLowerCase();
+    if (cleanInput === cleanTarget) return true;
+    
+    // Allow 1 error per 5 characters, max 3 errors
+    const maxErrors = Math.min(3, Math.floor(cleanTarget.length / 5) + 1);
+    const distance = levenshtein(cleanInput, cleanTarget);
+    return distance <= maxErrors;
+};
 
 // --- Helper Functions ---
 
@@ -91,6 +122,7 @@ export default function UrbanLocusTracer() {
     const [locusCount, setLocusCount] = useState(20);
     const [timeLimit, setTimeLimit] = useState(300);
     const [mapMode, setMapMode] = useState<MapMode>('abstract');
+    const [gameMode, setGameMode] = useState<GameMode>('standard');
     
     // Real Map Settings
     const [cityQuery, setCityQuery] = useState('New York');
@@ -194,15 +226,24 @@ export default function UrbanLocusTracer() {
         const selected = shuffled.slice(0, Math.min(count, shuffled.length));
         
         return selected.map((landmark, i) => {
-            const isWord = Math.random() > 0.3;
-            const data = isWord ? wordList[Math.floor(Math.random() * wordList.length)] : Math.floor(Math.random() * 100).toString().padStart(2, '0');
+            let data = '';
+            let type: 'word' | 'number' | 'landmark' = 'word';
+
+            if (gameMode === 'landmark-recall') {
+                data = landmark.tags.name;
+                type = 'landmark';
+            } else {
+                const isWord = Math.random() > 0.3;
+                data = isWord ? wordList[Math.floor(Math.random() * wordList.length)] : Math.floor(Math.random() * 100).toString().padStart(2, '0');
+                type = isWord ? 'word' : 'number';
+            }
             
             return {
                 id: i,
                 x: landmark.lat, // Using x/y as lat/lng for Real Mode
                 y: landmark.lon,
                 data,
-                type: isWord ? 'word' : 'number',
+                type,
                 title: landmark.tags.name
             };
         });
@@ -425,7 +466,14 @@ export default function UrbanLocusTracer() {
     const submitRecallInput = (e?: React.FormEvent) => {
         e?.preventDefault();
         if (!currentRecallItem) return;
-        const isCorrect = recallInput.trim().toLowerCase() === currentRecallItem.data.toLowerCase();
+        
+        let isCorrect = false;
+        if (gameMode === 'landmark-recall') {
+            isCorrect = isFuzzyMatch(recallInput, currentRecallItem.data);
+        } else {
+            isCorrect = recallInput.trim().toLowerCase() === currentRecallItem.data.toLowerCase();
+        }
+
         const newResults = [...recallResults, {
             locusId: currentRecallItem.id,
             correctData: currentRecallItem.data,
@@ -519,6 +567,21 @@ export default function UrbanLocusTracer() {
 
                         {mapMode === 'real' && (
                             <div style={{ marginBottom: '1.5rem' }}>
+                                <label style={{ display: 'block', marginBottom: '0.5rem' }}>Game Mode</label>
+                                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                    <button className={`btn ${gameMode === 'standard' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setGameMode('standard')} style={{ flex: 1 }}>Standard (Loci)</button>
+                                    <button className={`btn ${gameMode === 'landmark-recall' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setGameMode('landmark-recall')} style={{ flex: 1 }}>Landmark Recall</button>
+                                </div>
+                                {gameMode === 'landmark-recall' && (
+                                    <div style={{ fontSize: '0.8rem', opacity: 0.7, marginTop: '0.5rem' }}>
+                                        Memorize the actual names of landmarks. During recall, names will be blurred.
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {mapMode === 'real' && (
+                            <div style={{ marginBottom: '1.5rem' }}>
                                 <label style={{ display: 'block', marginBottom: '0.5rem' }}>Target City</label>
                                 <div style={{ display: 'flex', gap: '0.5rem' }}>
                                     <input 
@@ -599,6 +662,18 @@ export default function UrbanLocusTracer() {
                                     let color = '#3b82f6';
                                     let popup = undefined;
                                     let title = l.title;
+                                    let label = undefined;
+                                    let isBlurred = false;
+
+                                    if (gameMode === 'landmark-recall') {
+                                        label = l.data;
+                                        // Blur logic: Blur in recall phases
+                                        if (phase === 'recall-select' || phase === 'recall-identify') {
+                                            isBlurred = true;
+                                            // Optional: Unblur if correctly answered? 
+                                            // For now, keep simple.
+                                        }
+                                    }
 
                                     if (phase === 'encode') {
                                         popup = `<b>${l.title}</b><br/>${l.data}`;
@@ -624,7 +699,9 @@ export default function UrbanLocusTracer() {
                                         lng: l.y,
                                         title: title,
                                         color: color,
-                                        popup: popup
+                                        popup: popup,
+                                        label: label,
+                                        isBlurred: isBlurred
                                     };
                                 })}
                                 onMarkerClick={(id) => {
@@ -632,6 +709,9 @@ export default function UrbanLocusTracer() {
                                         setSelectedLocusId(id);
                                     } else if (phase === 'recall-select') {
                                         handleRecallSelection(id);
+                                    } else if (phase === 'recall-identify' && gameMode === 'landmark-recall') {
+                                        // In landmark recall, clicking a blurred label could focus the input?
+                                        // Or maybe we just let them type.
                                     }
                                 }}
                                 onMapClick={handleRealMapClick}

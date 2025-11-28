@@ -10,6 +10,8 @@ interface MarkerData {
     title?: string;
     color?: string;
     popup?: string;
+    label?: string;
+    isBlurred?: boolean;
 }
 
 interface RealMapProps {
@@ -102,26 +104,77 @@ export default function RealMap({ center, zoom, markers, onMarkerClick, onMapCli
         markers.forEach(marker => {
             if (markersRef.current[marker.id]) {
                 const existing = markersRef.current[marker.id];
+                
+                // If label status changed, we might need to recreate the icon
+                // For simplicity, let's just update the icon if it's a marker
+                if (marker.label) {
+                    const icon = window.L.divIcon({
+                        className: 'custom-label-icon',
+                        html: `<div style="
+                            background: white; 
+                            padding: 2px 6px; 
+                            border-radius: 4px; 
+                            border: 1px solid #333; 
+                            font-weight: bold; 
+                            font-size: 12px; 
+                            white-space: nowrap;
+                            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+                            filter: ${marker.isBlurred ? 'blur(4px)' : 'none'};
+                            cursor: pointer;
+                            transition: filter 0.3s;
+                        ">${marker.label}</div>`,
+                        iconSize: null, // Auto size
+                        iconAnchor: [10, 20] // Approximate center bottom
+                    });
+                    existing.setIcon(icon);
+                } else {
+                    // Standard circle marker update
+                    existing.setStyle({ fillColor: marker.color || '#3b82f6', color: '#fff' });
+                }
+
                 if (marker.popup) existing.setPopupContent(marker.popup);
-                existing.setStyle({ fillColor: marker.color || '#3b82f6', color: '#fff' });
             } else {
-                const circle = window.L.circleMarker([marker.lat, marker.lng], {
-                    radius: 8,
-                    fillColor: marker.color || '#3b82f6',
-                    color: '#fff',
-                    weight: 2,
-                    opacity: 1,
-                    fillOpacity: 0.8
-                }).addTo(map);
+                let layer;
+                
+                if (marker.label) {
+                    const icon = window.L.divIcon({
+                        className: 'custom-label-icon',
+                        html: `<div style="
+                            background: white; 
+                            padding: 2px 6px; 
+                            border-radius: 4px; 
+                            border: 1px solid #333; 
+                            font-weight: bold; 
+                            font-size: 12px; 
+                            white-space: nowrap;
+                            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+                            filter: ${marker.isBlurred ? 'blur(4px)' : 'none'};
+                            cursor: pointer;
+                            transition: filter 0.3s;
+                        ">${marker.label}</div>`,
+                        iconSize: null,
+                        iconAnchor: [10, 20]
+                    });
+                    layer = window.L.marker([marker.lat, marker.lng], { icon }).addTo(map);
+                } else {
+                    layer = window.L.circleMarker([marker.lat, marker.lng], {
+                        radius: 8,
+                        fillColor: marker.color || '#3b82f6',
+                        color: '#fff',
+                        weight: 2,
+                        opacity: 1,
+                        fillOpacity: 0.8
+                    }).addTo(map);
+                }
 
-                if (marker.popup) circle.bindPopup(marker.popup);
-                if (marker.title) circle.bindTooltip(marker.title);
+                if (marker.popup) layer.bindPopup(marker.popup);
+                if (marker.title && !marker.label) layer.bindTooltip(marker.title);
 
-                circle.on('click', () => {
+                layer.on('click', () => {
                     if (onMarkerClick) onMarkerClick(marker.id);
                 });
 
-                markersRef.current[marker.id] = circle;
+                markersRef.current[marker.id] = layer;
             }
         });
     }, [markers, onMarkerClick]);

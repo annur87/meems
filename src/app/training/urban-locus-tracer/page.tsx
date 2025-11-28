@@ -360,8 +360,41 @@ export default function UrbanLocusTracerPage() {
                             </button>
                             
                             {landmarks.length === 0 ? (
-                                <div style={{ textAlign: 'center', opacity: 0.5, padding: '2rem' }}>
-                                    No landmarks yet. Click the map to add one!
+                                <div style={{ textAlign: 'center', padding: '2rem' }}>
+                                    <div style={{ opacity: 0.5, marginBottom: '1rem' }}>
+                                        No landmarks yet.
+                                    </div>
+                                    <button 
+                                        className="btn btn-primary"
+                                        onClick={async () => {
+                                            if (!confirm('Load all Dhaka landmarks? This will add 70+ landmarks to your database.')) return;
+                                            setIsLoading(true);
+                                            try {
+                                                const { dhakaLandmarks } = await import('@/data/dhaka-landmarks');
+                                                for (const landmark of dhakaLandmarks) {
+                                                    await saveLandmark(USER_ID, {
+                                                        name: landmark.name,
+                                                        type: landmark.category,
+                                                        lat: landmark.lat,
+                                                        lng: landmark.lng,
+                                                        createdAt: Date.now()
+                                                    });
+                                                }
+                                                await loadLandmarks();
+                                                alert('Successfully loaded all Dhaka landmarks!');
+                                            } catch (error) {
+                                                console.error('Error bootstrapping:', error);
+                                                alert('Error loading landmarks. Check console.');
+                                            }
+                                            setIsLoading(false);
+                                        }}
+                                        disabled={isLoading}
+                                    >
+                                        {isLoading ? 'Loading...' : '📍 Load Dhaka Landmarks'}
+                                    </button>
+                                    <div style={{ fontSize: '0.8rem', opacity: 0.6, marginTop: '0.5rem' }}>
+                                        Or click the map to add manually
+                                    </div>
                                 </div>
                             ) : (
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>

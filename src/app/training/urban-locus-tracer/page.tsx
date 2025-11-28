@@ -15,6 +15,7 @@ interface RecallResult {
     selectedLat: number;
     selectedLng: number;
     distanceError: number; // in meters
+    timeTakenMs: number;
 }
 
 // Haversine formula to calculate distance between two lat/lng points in meters
@@ -31,6 +32,15 @@ function calculateDistance(lat1: number, lng1: number, lat2: number, lng2: numbe
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
     return R * c; // Distance in meters
+}
+
+function formatDuration(ms: number) {
+    if (!ms || ms < 0) return '0.0s';
+    const seconds = ms / 1000;
+    if (seconds < 60) return `${seconds.toFixed(1)}s`;
+    const mins = Math.floor(seconds / 60);
+    const remainingSeconds = seconds - mins * 60;
+    return `${mins}m ${remainingSeconds.toFixed(1)}s`;
 }
 
 // Hardcoded user ID for now (in production, use actual auth)
@@ -60,6 +70,12 @@ export default function UrbanLocusTracerPage() {
     const [searchQuery, setSearchQuery] = useState('');
     const [recallResults, setRecallResults] = useState<RecallResult[]>([]);
     const [pendingRecallClick, setPendingRecallClick] = useState(false);
+    const [feedbackResult, setFeedbackResult] = useState<RecallResult | null>(null);
+    const [questionStartTime, setQuestionStartTime] = useState<number | null>(null);
+    const [recallStartTime, setRecallStartTime] = useState<number | null>(null);
+    const [recallDurationMs, setRecallDurationMs] = useState<number | null>(null);
+    const [recallCount, setRecallCount] = useState(5);
+    const [recallOrder, setRecallOrder] = useState<'random' | 'sequential'>('random');
     
     // Edit Mode State
     const [editingLandmark, setEditingLandmark] = useState<Landmark | null>(null);
@@ -77,6 +93,14 @@ export default function UrbanLocusTracerPage() {
     useEffect(() => {
         loadLandmarks();
     }, []);
+
+    useEffect(() => {
+        if (landmarks.length === 0) return;
+        setRecallCount(prev => {
+            const safeValue = Math.max(1, Math.min(prev, landmarks.length));
+            return safeValue;
+        });
+    }, [landmarks.length]);
     
     const loadLandmarks = async () => {
         setIsLoading(true);
@@ -100,6 +124,8 @@ export default function UrbanLocusTracerPage() {
                 lat,
                 lng
             );
+            const now = Date.now();
+            const timeTaken = questionStartTime ? now - questionStartTime : 0;
             
             const newResult: RecallResult = {
                 landmarkId: currentLandmark.id,
@@ -108,24 +134,15 @@ export default function UrbanLocusTracerPage() {
                 correctLng: currentLandmark.lng,
                 selectedLat: lat,
                 selectedLng: lng,
-                distanceError: distance
+                distanceError: distance,
+                timeTakenMs: timeTaken
             };
             
-            const newResults = [...recallResults, newResult];
-            setRecallResults(newResults);
+            setRecallResults(prev => [...prev, newResult]);
             setPendingRecallClick(false);
-            
-            // Move to next
-            const remaining = recallQueue.slice(1);
-            if (remaining.length > 0) {
-                setCurrentLandmark(remaining[0]);
-                setRecallQueue(remaining);
-                setCityCenter([23.8103, 90.4125]); // Reset to Dhaka center
-                setCityZoom(14);
-                setPendingRecallClick(true);
-            } else {
-                setPhase('result');
-            }
+            setFeedbackResult(newResult);
+            setQuestionStartTime(null);
+            setCurrentLandmark(null);
         } else if (editingLandmark && editMode === 'map') {
             setPendingEditLocation({ lat, lng });
         }
@@ -165,15 +182,26 @@ export default function UrbanLocusTracerPage() {
             alert('Add at least 2 landmarks before starting recall!');
             return;
         }
-        
-        // Shuffle landmarks
-        const shuffled = [...landmarks].sort(() => Math.random() - 0.5);
-        setRecallQueue(shuffled);
-        setCurrentLandmark(shuffled[0]);
+
+        const cappedCount = Math.max(1, Math.min(recallCount, landmarks.length));
+        let candidates = [...landmarks];
+        if (recallOrder === 'random') {
+            candidates = candidates.sort(() => Math.random() - 0.5);
+        } else {
+            candidates = candidates.sort((a, b) => a.name.localeCompare(b.name));
+        }
+        const selected = candidates.slice(0, cappedCount);
+
+        setRecallQueue(selected.slice(1));
+        setCurrentLandmark(selected[0]);
         setRecallResults([]);
+        setFeedbackResult(null);
         setSearchQuery('');
         setPendingRecallClick(true);
         setPhase('recall');
+        setQuestionStartTime(Date.now());
+        setRecallStartTime(Date.now());
+        setRecallDurationMs(null);
         
         // Reset to Dhaka center
         setCityCenter([23.8103, 90.4125]);
@@ -209,6 +237,28 @@ export default function UrbanLocusTracerPage() {
             console.error('Error updating landmark:', error);
         }
     };
+
+    const handleNextRecallStep = () => {
+        if (recallQueue.length > 0) {
+            const [next, ...rest] = recallQueue;
+            setCurrentLandmark(next);
+            setRecallQueue(rest);
+            setFeedbackResult(null);
+            setPendingRecallClick(true);
+            setCityCenter([23.8103, 90.4125]);
+            setCityZoom(14);
+            setQuestionStartTime(Date.now());
+        } else {
+            setFeedbackResult(null);
+            setPhase('result');
+            setPendingRecallClick(false);
+            setQuestionStartTime(null);
+            if (recallStartTime) {
+                setRecallDurationMs(Date.now() - recallStartTime);
+            }
+            setRecallStartTime(null);
+        }
+    };
     
     const resetGame = () => {
         setPhase('add');
@@ -218,9 +268,20 @@ export default function UrbanLocusTracerPage() {
         setCityZoom(14);
     };
     
+    const maxRecallSelectable = Math.max(1, landmarks.length);
+    const effectiveRecallCount = Math.min(recallCount, maxRecallSelectable);
+
     const filteredLandmarks = landmarks.filter(l => 
         l.name.toLowerCase().includes(searchQuery.toLowerCase())
     );
+    const remainingToAnswer = recallQueue.length + (currentLandmark ? 1 : 0);
+    const totalRecallTargets = recallResults.length + remainingToAnswer;
+    const totalRecallTimeMs = recallDurationMs ?? recallResults.reduce((sum, r) => sum + r.timeTakenMs, 0);
+    const averageError = recallResults.length ? (recallResults.reduce((sum, r) => sum + r.distanceError, 0) / recallResults.length) : 0;
+    const averageTimeMs = recallResults.length ? totalRecallTimeMs / recallResults.length : 0;
+    const sortedByError = recallResults.length ? [...recallResults].sort((a, b) => a.distanceError - b.distanceError) : [];
+    const bestResult = sortedByError[0];
+    const worstResult = sortedByError.length > 0 ? sortedByError[sortedByError.length - 1] : undefined;
     
     return (
         <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
@@ -260,9 +321,9 @@ export default function UrbanLocusTracerPage() {
                         drawnRectangles={drawnRectangles}
                         onRectangleDrawn={(rect) => setDrawnRectangles([...drawnRectangles, rect])}
                         onRectangleDeleted={(index) => setDrawnRectangles(drawnRectangles.filter((_, i) => i !== index))}
-                        markers={
-                            phase === 'add' 
-                                ? [
+                        markers={(() => {
+                            if (phase === 'add') {
+                                return [
                                     ...landmarks.map(l => ({
                                         id: l.id,
                                         lat: l.lat,
@@ -271,26 +332,55 @@ export default function UrbanLocusTracerPage() {
                                         color: selectedLandmarkId === l.id ? '#22c55e' : '#3b82f6',
                                         popup: l.name
                                     })),
-                                    ...(pendingLocation ? [{
-                                        id: 'pending',
-                                        lat: pendingLocation.lat,
-                                        lng: pendingLocation.lng,
-                                        title: 'New Location',
-                                        color: '#f59e0b',
-                                        popup: 'Click to place'
-                                    }] : [])
-                                ]
-                                : phase === 'recall' && currentLandmark
-                                    ? [{
+                                    ...(pendingLocation
+                                        ? [{
+                                            id: 'pending',
+                                            lat: pendingLocation.lat,
+                                            lng: pendingLocation.lng,
+                                            title: 'New Location',
+                                            color: '#f59e0b',
+                                            popup: 'Click to place'
+                                        }]
+                                        : [])
+                                ];
+                            }
+
+                            if (phase === 'recall') {
+                                if (feedbackResult) {
+                                    return [
+                                        {
+                                            id: `${feedbackResult.landmarkId}-actual`,
+                                            lat: feedbackResult.correctLat,
+                                            lng: feedbackResult.correctLng,
+                                            title: `${feedbackResult.correctName} (Actual)`,
+                                            color: '#22c55e',
+                                            popup: `${feedbackResult.correctName} • Actual`
+                                        },
+                                        {
+                                            id: `${feedbackResult.landmarkId}-guess`,
+                                            lat: feedbackResult.selectedLat,
+                                            lng: feedbackResult.selectedLng,
+                                            title: 'Your Guess',
+                                            color: '#f97316',
+                                            popup: `Your guess • ${Math.round(feedbackResult.distanceError)}m off`
+                                        }
+                                    ];
+                                }
+
+                                if (currentLandmark && pendingRecallClick) {
+                                    return [{
                                         id: currentLandmark.id,
                                         lat: currentLandmark.lat,
                                         lng: currentLandmark.lng,
                                         title: '???',
                                         color: '#ef4444',
                                         popup: undefined
-                                    }]
-                                    : []
-                        }
+                                    }];
+                                }
+                            }
+
+                            return [];
+                        })()}
                         onMapClick={handleMapClick}
                         onMarkerClick={(id) => {
                             if (phase === 'add') {
@@ -354,6 +444,36 @@ export default function UrbanLocusTracerPage() {
                             </div>
                         </div>
                     )}
+
+                    {phase === 'recall' && feedbackResult && (
+                        <div className="glass card" style={{ position: 'absolute', top: '20px', left: '50%', transform: 'translateX(-50%)', padding: '1.25rem', zIndex: 1000, textAlign: 'center', maxWidth: '420px' }}>
+                            <div style={{ fontSize: '1rem', fontWeight: 'bold', marginBottom: '0.5rem' }}>
+                                {feedbackResult.correctName} revealed
+                            </div>
+                            <div style={{ fontSize: '0.9rem', marginBottom: '0.25rem' }}>
+                                Distance error: <strong>{Math.round(feedbackResult.distanceError)}m</strong>
+                            </div>
+                            <div style={{ fontSize: '0.85rem', opacity: 0.8, marginBottom: '0.25rem' }}>
+                                Time taken: {formatDuration(feedbackResult.timeTakenMs)}
+                            </div>
+                            <div style={{ fontSize: '0.75rem', opacity: 0.75 }}>
+                                Actual: {feedbackResult.correctLat.toFixed(4)}, {feedbackResult.correctLng.toFixed(4)}
+                            </div>
+                            <div style={{ fontSize: '0.75rem', opacity: 0.75, marginBottom: '0.5rem' }}>
+                                Guess: {feedbackResult.selectedLat.toFixed(4)}, {feedbackResult.selectedLng.toFixed(4)}
+                            </div>
+                            <div style={{ fontSize: '0.75rem', opacity: 0.7, marginBottom: '0.75rem' }}>
+                                Actual location pinned in green • your guess in orange
+                            </div>
+                            <button 
+                                className="btn btn-primary" 
+                                onClick={handleNextRecallStep}
+                                style={{ width: '100%' }}
+                            >
+                                {recallQueue.length > 0 ? 'Next Location' : 'View Summary'}
+                            </button>
+                        </div>
+                    )}
                 </div>
                 
                 {/* Right Panel */}
@@ -364,6 +484,47 @@ export default function UrbanLocusTracerPage() {
                             <p style={{ fontSize: '0.9rem', opacity: 0.7, marginBottom: '0.5rem' }}>
                                 Click anywhere on the map to add a new landmark.
                             </p>
+                            <div className="glass" style={{ padding: '1rem', borderRadius: '0.75rem', marginBottom: '1rem' }}>
+                                <h4 style={{ marginBottom: '0.75rem', fontSize: '1rem' }}>Recall Settings</h4>
+                                <div style={{ marginBottom: '0.75rem' }}>
+                                    <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '0.25rem', opacity: 0.8 }}>
+                                        Number of landmarks to test
+                                    </label>
+                                    <input 
+                                        type="number" 
+                                        min={1} 
+                                        max={maxRecallSelectable}
+                                        value={effectiveRecallCount}
+                                        onChange={(e) => {
+                                            const value = parseInt(e.target.value, 10);
+                                            if (isNaN(value)) return;
+                                            const capped = Math.max(1, Math.min(value, maxRecallSelectable));
+                                            setRecallCount(capped);
+                                        }}
+                                        style={{ width: '100%' }}
+                                        disabled={landmarks.length === 0}
+                                    />
+                                    <div style={{ fontSize: '0.75rem', opacity: 0.6, marginTop: '0.25rem' }}>
+                                        {landmarks.length === 0 
+                                            ? 'Add landmarks to enable recall.'
+                                            : `Max available: ${landmarks.length}`}
+                                    </div>
+                                </div>
+                                <div>
+                                    <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '0.25rem', opacity: 0.8 }}>
+                                        Order
+                                    </label>
+                                    <select 
+                                        value={recallOrder}
+                                        onChange={(e) => setRecallOrder(e.target.value as 'random' | 'sequential')}
+                                        style={{ width: '100%' }}
+                                        disabled={landmarks.length === 0}
+                                    >
+                                        <option value="random">Randomized</option>
+                                        <option value="sequential">Alphabetical</option>
+                                    </select>
+                                </div>
+                            </div>
                             <button 
                                 className={`btn ${isDrawingMode ? 'btn-primary' : 'btn-secondary'}`}
                                 style={{ width: '100%', marginBottom: '1rem', fontSize: '0.85rem' }}
@@ -478,15 +639,27 @@ export default function UrbanLocusTracerPage() {
                             <h3 style={{ marginBottom: '1rem' }}>Instructions</h3>
                             <div className="glass" style={{ padding: '1rem', borderRadius: '0.5rem', marginBottom: '1rem' }}>
                                 <p style={{ fontSize: '0.9rem', marginBottom: '0.5rem' }}>
-                                    <strong>Click on the map</strong> where you think <strong>{currentLandmark?.name}</strong> is located.
+                                    <strong>Click on the map</strong> where you think <strong>{currentLandmark?.name || 'the hidden location'}</strong> is located.
                                 </p>
                                 <p style={{ fontSize: '0.8rem', opacity: 0.7 }}>
                                     Your accuracy will be measured in meters.
                                 </p>
                             </div>
                             
-                            <div style={{ fontSize: '0.9rem', opacity: 0.7, textAlign: 'center' }}>
-                                Progress: {recallResults.length} / {recallQueue.length + recallResults.length}
+                            <div className="glass" style={{ padding: '1rem', borderRadius: '0.5rem', marginBottom: '1rem' }}>
+                                <div style={{ fontSize: '0.85rem', marginBottom: '0.5rem' }}>
+                                    Round size: {totalRecallTargets || effectiveRecallCount} landmarks
+                                </div>
+                                <div style={{ fontSize: '0.85rem', marginBottom: '0.25rem' }}>
+                                    Completed: {recallResults.length} • Remaining: {remainingToAnswer}
+                                </div>
+                                <div style={{ fontSize: '0.75rem', opacity: 0.7 }}>
+                                    {feedbackResult 
+                                        ? 'Review the revealed location, then continue.'
+                                        : pendingRecallClick 
+                                            ? 'Click on the map to lock in your guess.'
+                                            : 'Preparing next location...'}
+                                </div>
                             </div>
                         </>
                     )}
@@ -494,14 +667,43 @@ export default function UrbanLocusTracerPage() {
                     {phase === 'result' && (
                         <>
                             <h3 style={{ marginBottom: '1rem' }}>Results</h3>
-                            <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-                                <div style={{ fontSize: '2.5rem', fontWeight: 'bold' }}>
-                                    {Math.round(recallResults.reduce((sum, r) => sum + r.distanceError, 0) / recallResults.length)}m
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.75rem', marginBottom: '1.5rem' }}>
+                                <div className="glass" style={{ padding: '0.75rem', borderRadius: '0.5rem', textAlign: 'center' }}>
+                                    <div style={{ fontSize: '1.75rem', fontWeight: 'bold' }}>
+                                        {Math.round(averageError)}m
+                                    </div>
+                                    <div style={{ fontSize: '0.8rem', opacity: 0.7 }}>Average Error</div>
                                 </div>
-                                <div style={{ opacity: 0.7 }}>
-                                    Average Error
+                                <div className="glass" style={{ padding: '0.75rem', borderRadius: '0.5rem', textAlign: 'center' }}>
+                                    <div style={{ fontSize: '1.35rem', fontWeight: 'bold' }}>
+                                        {formatDuration(averageTimeMs)}
+                                    </div>
+                                    <div style={{ fontSize: '0.8rem', opacity: 0.7 }}>Avg Time per Guess</div>
+                                </div>
+                                <div className="glass" style={{ padding: '0.75rem', borderRadius: '0.5rem', textAlign: 'center' }}>
+                                    <div style={{ fontSize: '1.35rem', fontWeight: 'bold' }}>
+                                        {formatDuration(totalRecallTimeMs)}
+                                    </div>
+                                    <div style={{ fontSize: '0.8rem', opacity: 0.7 }}>Total Session Time</div>
                                 </div>
                             </div>
+
+                            {bestResult && (
+                                <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
+                                    <div className="glass" style={{ flex: 1, padding: '0.75rem', borderRadius: '0.5rem' }}>
+                                        <div style={{ fontSize: '0.8rem', opacity: 0.6 }}>Closest</div>
+                                        <div style={{ fontWeight: 'bold' }}>{bestResult.correctName}</div>
+                                        <div style={{ fontSize: '0.85rem' }}>{Math.round(bestResult.distanceError)}m • {formatDuration(bestResult.timeTakenMs)}</div>
+                                    </div>
+                                    {worstResult && worstResult !== bestResult && (
+                                        <div className="glass" style={{ flex: 1, padding: '0.75rem', borderRadius: '0.5rem' }}>
+                                            <div style={{ fontSize: '0.8rem', opacity: 0.6 }}>Farthest</div>
+                                            <div style={{ fontWeight: 'bold' }}>{worstResult.correctName}</div>
+                                            <div style={{ fontSize: '0.85rem' }}>{Math.round(worstResult.distanceError)}m • {formatDuration(worstResult.timeTakenMs)}</div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                             
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '1rem' }}>
                                 {recallResults.map((result, i) => (
@@ -521,6 +723,9 @@ export default function UrbanLocusTracerPage() {
                                         </div>
                                         <div style={{ fontSize: '0.7rem', opacity: 0.6 }}>
                                             Your guess: {result.selectedLat.toFixed(4)}, {result.selectedLng.toFixed(4)}
+                                        </div>
+                                        <div style={{ fontSize: '0.7rem', opacity: 0.6 }}>
+                                            Time: {formatDuration(result.timeTakenMs)}
                                         </div>
                                     </div>
                                 ))}

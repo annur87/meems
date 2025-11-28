@@ -181,6 +181,7 @@ export default function SystemComponentChecker() {
         const generated: DrillQuestion[] = [];
         const availableMajor = majorSystem.filter((entry) => entry.images?.length);
         const availablePao = paoSystem.filter((entry) => entry.person || entry.action || entry.object);
+        const usedIds = new Set<string>(); // Track used entries to avoid duplicates
 
         const pools: QuestionCategory[] =
             poolType === 'mixed'
@@ -195,24 +196,62 @@ export default function SystemComponentChecker() {
                                 : ['major-reverse']
                         : ['pao-person', 'pao-action', 'pao-object'];
 
-        for (let i = 0; i < questionCount; i++) {
+        // For major-mastery, create a pool of all possible questions first
+        if (poolType === 'major-mastery') {
+            const allQuestions: DrillQuestion[] = [];
+            
+            if (majorSubMode === 'mixed' || majorSubMode === 'num-to-word') {
+                availableMajor.forEach(entry => {
+                    const q = buildQuestionFromMajor(entry, false);
+                    if (q) allQuestions.push(q);
+                });
+            }
+            
+            if (majorSubMode === 'mixed' || majorSubMode === 'word-to-num') {
+                availableMajor.forEach(entry => {
+                    const q = buildQuestionFromMajor(entry, true);
+                    if (q) allQuestions.push(q);
+                });
+            }
+            
+            // Shuffle and take the requested count
+            const shuffled = allQuestions.sort(() => Math.random() - 0.5);
+            return shuffled.slice(0, Math.min(questionCount, shuffled.length));
+        }
+
+        // For other modes, use the existing logic with duplicate prevention
+        let attempts = 0;
+        const maxAttempts = questionCount * 10; // Prevent infinite loops
+
+        while (generated.length < questionCount && attempts < maxAttempts) {
+            attempts++;
             const category = pools[Math.floor(Math.random() * pools.length)];
             let question: DrillQuestion | null = null;
 
             if ((category === 'major-image' || category === 'major-reverse') && availableMajor.length) {
-                // For major-mastery, we want to ensure we cover the range if possible, but random is fine for now
-                // If count is large (e.g. 200), we might want to be more systematic, but random sampling is the current pattern.
-                // To support "mix of all", if count >= available * 2, we should just generate all.
-                // But let's stick to random for consistency with existing code, or improve if needed.
                 const entry = availableMajor[Math.floor(Math.random() * availableMajor.length)];
-                question = buildQuestionFromMajor(entry, category === 'major-reverse');
+                const uniqueKey = `${category}-${entry.id}`;
+                
+                if (!usedIds.has(uniqueKey)) {
+                    question = buildQuestionFromMajor(entry, category === 'major-reverse');
+                    if (question) {
+                        usedIds.add(uniqueKey);
+                    }
+                }
             } else if (category !== 'major-image' && category !== 'major-reverse' && availablePao.length) {
                 const entry = availablePao[Math.floor(Math.random() * availablePao.length)];
-                question = buildQuestionFromPao(entry, category);
+                const uniqueKey = `${category}-${entry.id}`;
+                
+                if (!usedIds.has(uniqueKey)) {
+                    question = buildQuestionFromPao(entry, category);
+                    if (question) {
+                        usedIds.add(uniqueKey);
+                    }
+                }
             }
 
             if (question) {
-                generated.push({ ...question, id: `${question.id}-${i}-${Date.now()}` });
+                generated.push({ ...question, id: `${question.id}-${generated.length}-${Date.now()}` });
             }
         }
 
@@ -479,23 +518,33 @@ export default function SystemComponentChecker() {
                             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
                                 <thead style={{ position: 'sticky', top: 0, background: 'rgba(15,23,42,0.95)' }}>
                                     <tr>
-                                        <th style={{ textAlign: 'left', padding: '0.5rem' }}>Prompt</th>
-                                        <th style={{ textAlign: 'left', padding: '0.5rem' }}>Your Answer</th>
-                                        <th style={{ textAlign: 'left', padding: '0.5rem' }}>Correct</th>
-                                        <th style={{ textAlign: 'center', padding: '0.5rem' }}>Time (s)</th>
+                                        <th style={{ textAlign: 'left', padding: '0.5rem' }}>number</th>
+                                        <th style={{ textAlign: 'left', padding: '0.5rem' }}>word</th>
+                                        <th style={{ textAlign: 'left', padding: '0.5rem' }}>your answer</th>
+                                        <th style={{ textAlign: 'left', padding: '0.5rem' }}>correct</th>
+                                        <th style={{ textAlign: 'center', padding: '0.5rem' }}>time (s)</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {responses.map((resp, idx) => (
-                                        <tr key={`${resp.question.id}-${idx}`} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                                            <td style={{ padding: '0.5rem', fontWeight: 600 }}>{resp.question.prompt}</td>
-                                            <td style={{ padding: '0.5rem', color: resp.isCorrect ? 'var(--success)' : 'var(--error)' }}>
-                                                {resp.given || '—'}
-                                            </td>
-                                            <td style={{ padding: '0.5rem', opacity: 0.8 }}>{resp.question.answer}</td>
-                                            <td style={{ padding: '0.5rem', textAlign: 'center' }}>{resp.duration.toFixed(2)}</td>
-                                        </tr>
-                                    ))}
+                                    {responses.map((resp, idx) => {
+                                        const isNumToWord = resp.question.category === 'major-image';
+                                        const number = isNumToWord ? resp.question.source : resp.question.answer;
+                                        const word = isNumToWord ? resp.question.answer : resp.question.source;
+                                        
+                                        return (
+                                            <tr key={`${resp.question.id}-${idx}`} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                                                <td style={{ padding: '0.5rem' }}>{number.toLowerCase()}</td>
+                                                <td style={{ padding: '0.5rem' }}>{word.toLowerCase()}</td>
+                                                <td style={{ padding: '0.5rem', color: resp.isCorrect ? 'var(--success)' : 'var(--error)' }}>
+                                                    {resp.given ? resp.given.toLowerCase() : '—'}
+                                                </td>
+                                                <td style={{ padding: '0.5rem', opacity: 0.8 }}>
+                                                    {resp.isCorrect ? '✓' : '✗'}
+                                                </td>
+                                                <td style={{ padding: '0.5rem', textAlign: 'center' }}>{resp.duration.toFixed(2)}</td>
+                                            </tr>
+                                        );
+                                    })}
                                 </tbody>
                             </table>
                         </div>

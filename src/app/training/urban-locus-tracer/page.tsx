@@ -128,7 +128,7 @@ export default function UrbanLocusTracer() {
     // Real Map Settings
     const [cityQuery, setCityQuery] = useState('Dhaka');
     const [cityCenter, setCityCenter] = useState<[number, number]>([23.8103, 90.4125]); // Dhaka center
-    const [cityZoom, setCityZoom] = useState(12);
+    const [cityZoom, setCityZoom] = useState(14); // Increased from 12 to 14 for better visibility
     const [isLoadingCity, setIsLoadingCity] = useState(false);
     const [realLandmarks, setRealLandmarks] = useState<any[]>([]);
 
@@ -168,7 +168,7 @@ export default function UrbanLocusTracer() {
             // Use hardcoded Dhaka landmarks
             if (cityQuery.toLowerCase().includes('dhaka') || cityQuery.toLowerCase().includes('bangladesh')) {
                 setCityCenter([23.8103, 90.4125]);
-                setCityZoom(12);
+                setCityZoom(14); // Increased zoom for better visibility
                 
                 // Convert Dhaka landmarks to the format expected by the game
                 const formattedLandmarks = dhakaLandmarks.map(landmark => ({
@@ -692,7 +692,7 @@ export default function UrbanLocusTracer() {
                                     zoom={cityZoom}
                                     markers={loci.map(l => {
                                         // Determine color/popup based on phase
-                                        let color = '#3b82f6';
+                                        let color = '#3b82f6'; // Default blue
                                         let popup = undefined;
                                         let title = l.title;
                                         let label = undefined;
@@ -704,9 +704,9 @@ export default function UrbanLocusTracer() {
                                             if (phase === 'recall-select' || phase === 'recall-identify') {
                                                 isBlurred = true;
                                             }
-                                            // Highlight selected in encode
+                                            // Highlight selected in encode - GREEN for selected
                                             if (phase === 'encode' && selectedLocusId === l.id) {
-                                                color = '#f472b6';
+                                                color = '#22c55e'; // Green for selected
                                             }
                                         }
 
@@ -789,8 +789,8 @@ export default function UrbanLocusTracer() {
                                             style={{
                                                 padding: '0.75rem',
                                                 borderRadius: '0.5rem',
-                                                background: selectedLocusId === l.id ? 'rgba(59, 130, 246, 0.2)' : 'rgba(255,255,255,0.05)',
-                                                border: selectedLocusId === l.id ? '1px solid #3b82f6' : '1px solid transparent',
+                                                background: selectedLocusId === l.id ? 'rgba(34, 197, 94, 0.2)' : 'rgba(255,255,255,0.05)', // Green background for selected
+                                                border: selectedLocusId === l.id ? '2px solid #22c55e' : '1px solid transparent', // Green border for selected
                                                 cursor: 'pointer',
                                                 transition: 'all 0.2s'
                                             }}

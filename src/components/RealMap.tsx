@@ -165,10 +165,10 @@ export default function RealMap({ center, zoom, markers, onMarkerClick, onMapCli
                     layer = window.L.marker([marker.lat, marker.lng], { icon }).addTo(map);
                 } else {
                     layer = window.L.circleMarker([marker.lat, marker.lng], {
-                        radius: 8,
+                        radius: 5, // Reduced from 8 to 5 for smaller markers
                         fillColor: marker.color || '#3b82f6',
                         color: '#fff',
-                        weight: 2,
+                        weight: 1.5, // Reduced from 2 to 1.5 for thinner border
                         opacity: 1,
                         fillOpacity: 0.8
                     }).addTo(map);

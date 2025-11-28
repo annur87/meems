@@ -148,23 +148,30 @@ export default function UrbanLocusTracer() {
             setCityCenter([lat, lon]);
 
             // 2. Fetch Landmarks (Overpass)
-            // Optimized query: smaller radius (1500m), timeout, limit 20
+            // 2. Fetch Landmarks (Overpass)
+            // Broadened query: larger radius (5000m), more types, limit 50
             const overpassQuery = `
-                [out:json][timeout:10];
+                [out:json][timeout:15];
                 (
-                  node["tourism"="attraction"](around:1500,${lat},${lon});
-                  node["amenity"="place_of_worship"](around:1500,${lat},${lon});
-                  node["historic"="memorial"](around:1500,${lat},${lon});
-                  node["leisure"="park"](around:1500,${lat},${lon});
+                  node["tourism"="attraction"](around:5000,${lat},${lon});
+                  node["amenity"="place_of_worship"](around:5000,${lat},${lon});
+                  node["historic"="memorial"](around:5000,${lat},${lon});
+                  node["leisure"="park"](around:5000,${lat},${lon});
+                  node["amenity"="university"](around:5000,${lat},${lon});
+                  node["amenity"="hospital"](around:5000,${lat},${lon});
+                  node["shop"="mall"](around:5000,${lat},${lon});
                 );
-                out body 20;
+                out body 50;
             `;
             
             const overpassRes = await fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(overpassQuery)}`);
             const overpassData = await overpassRes.json();
             
             if (overpassData.elements && overpassData.elements.length > 0) {
-                setRealLandmarks(overpassData.elements.filter((e: any) => e.tags && e.tags.name));
+                // Filter out items without names and deduplicate by name
+                const validElements = overpassData.elements.filter((e: any) => e.tags && e.tags.name);
+                const uniqueLandmarks = Array.from(new Map(validElements.map((item: any) => [item.tags.name, item])).values());
+                setRealLandmarks(uniqueLandmarks);
             } else {
                 // Fallback if no landmarks found
                 setRealLandmarks([]);

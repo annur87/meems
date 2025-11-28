@@ -76,6 +76,7 @@ export default function UrbanLocusTracerPage() {
     const [recallDurationMs, setRecallDurationMs] = useState<number | null>(null);
     const [recallCount, setRecallCount] = useState(5);
     const [recallOrder, setRecallOrder] = useState<'random' | 'sequential'>('random');
+    const [isRecallConfigOpen, setIsRecallConfigOpen] = useState(false);
     
     // Edit Mode State
     const [editingLandmark, setEditingLandmark] = useState<Landmark | null>(null);
@@ -118,17 +119,18 @@ export default function UrbanLocusTracerPage() {
     
     const handleMapClick = async (lat: number, lng: number) => {
         if (phase === 'add' && quickEditLandmark) {
+            if (quickEditSaving) return;
             setQuickEditSaving(true);
+            setLandmarks(prev => prev.map(l => 
+                l.id === quickEditLandmark.id ? { ...l, lat, lng } : l
+            ));
+            setCityCenter([lat, lng]);
+            setCityZoom(16);
             try {
                 await updateLandmark(USER_ID, quickEditLandmark.id, {
                     lat,
                     lng
                 });
-                setLandmarks(prev => prev.map(l => 
-                    l.id === quickEditLandmark.id ? { ...l, lat, lng } : l
-                ));
-                setCityCenter([lat, lng]);
-                setCityZoom(16);
                 setQuickEditResult({
                     name: quickEditLandmark.name,
                     lat,
@@ -139,6 +141,7 @@ export default function UrbanLocusTracerPage() {
             } catch (error) {
                 console.error('Error updating landmark via quick edit:', error);
                 alert('Failed to update landmark location. Please try again.');
+                await loadLandmarks();
             }
             setQuickEditSaving(false);
             return;
@@ -207,6 +210,14 @@ export default function UrbanLocusTracerPage() {
         }
     };
     
+    const openRecallConfig = () => {
+        if (landmarks.length < 2) {
+            alert('Add at least 2 landmarks before starting recall!');
+            return;
+        }
+        setIsRecallConfigOpen(true);
+    };
+
     const startRecall = () => {
         if (landmarks.length < 2) {
             alert('Add at least 2 landmarks before starting recall!');
@@ -236,6 +247,11 @@ export default function UrbanLocusTracerPage() {
         // Reset to Dhaka center
         setCityCenter([23.8103, 90.4125]);
         setCityZoom(14);
+    };
+
+    const confirmRecallStart = () => {
+        startRecall();
+        setIsRecallConfigOpen(false);
     };
     
     const handleSaveEdit = async () => {
@@ -341,7 +357,7 @@ export default function UrbanLocusTracerPage() {
                 </button>
                 <button 
                     className={`btn ${phase === 'recall' ? 'btn-primary' : 'btn-secondary'}`}
-                    onClick={startRecall}
+                    onClick={openRecallConfig}
                     disabled={phase === 'recall' || landmarks.length < 2}
                 >
                     Start Recall
@@ -564,47 +580,13 @@ export default function UrbanLocusTracerPage() {
                             <p style={{ fontSize: '0.9rem', opacity: 0.7, marginBottom: '0.5rem' }}>
                                 Click anywhere on the map to add a new landmark.
                             </p>
-                            <div className="glass" style={{ padding: '1rem', borderRadius: '0.75rem', marginBottom: '1rem' }}>
-                                <h4 style={{ marginBottom: '0.75rem', fontSize: '1rem' }}>Recall Settings</h4>
-                                <div style={{ marginBottom: '0.75rem' }}>
-                                    <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '0.25rem', opacity: 0.8 }}>
-                                        Number of landmarks to test
-                                    </label>
-                                    <input 
-                                        type="number" 
-                                        min={1} 
-                                        max={maxRecallSelectable}
-                                        value={effectiveRecallCount}
-                                        onChange={(e) => {
-                                            const value = parseInt(e.target.value, 10);
-                                            if (isNaN(value)) return;
-                                            const capped = Math.max(1, Math.min(value, maxRecallSelectable));
-                                            setRecallCount(capped);
-                                        }}
-                                        style={{ width: '100%' }}
-                                        disabled={landmarks.length === 0}
-                                    />
-                                    <div style={{ fontSize: '0.75rem', opacity: 0.6, marginTop: '0.25rem' }}>
-                                        {landmarks.length === 0 
-                                            ? 'Add landmarks to enable recall.'
-                                            : `Max available: ${landmarks.length}`}
-                                    </div>
-                                </div>
-                                <div>
-                                    <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '0.25rem', opacity: 0.8 }}>
-                                        Order
-                                    </label>
-                                    <select 
-                                        value={recallOrder}
-                                        onChange={(e) => setRecallOrder(e.target.value as 'random' | 'sequential')}
-                                        style={{ width: '100%' }}
-                                        disabled={landmarks.length === 0}
-                                    >
-                                        <option value="random">Randomized</option>
-                                        <option value="sequential">Alphabetical</option>
-                                    </select>
-                                </div>
-                            </div>
+                            <input 
+                                type="text"
+                                placeholder="Search landmarks..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                style={{ width: '100%', padding: '0.5rem 0.75rem', borderRadius: '0.5rem', border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(0,0,0,0.2)', color: 'white', marginBottom: '1rem' }}
+                            />
                             <button 
                                 className={`btn ${isDrawingMode ? 'btn-primary' : 'btn-secondary'}`}
                                 style={{ width: '100%', marginBottom: '1rem', fontSize: '0.85rem' }}
@@ -734,6 +716,13 @@ export default function UrbanLocusTracerPage() {
                                 <p style={{ fontSize: '0.8rem', opacity: 0.7 }}>
                                     Your accuracy will be measured in meters.
                                 </p>
+                                <button 
+                                    className="btn btn-secondary" 
+                                    style={{ width: '100%', marginTop: '0.75rem' }}
+                                    onClick={openRecallConfig}
+                                >
+                                    Recall Settings
+                                </button>
                             </div>
                             
                             <div className="glass" style={{ padding: '1rem', borderRadius: '0.5rem', marginBottom: '1rem' }}>
@@ -935,6 +924,80 @@ export default function UrbanLocusTracerPage() {
                                 setEditingLandmark(null);
                                 setPendingEditLocation(null);
                             }} style={{ flex: 1 }}>
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Recall Config Modal */}
+            {isRecallConfigOpen && (
+                <div style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    background: 'rgba(0,0,0,0.8)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 2500
+                }}>
+                    <div className="glass card" style={{ width: '480px', maxWidth: '90vw', padding: '2rem' }}>
+                        <h2 style={{ marginBottom: '0.5rem' }}>Recall Settings</h2>
+                        <p style={{ fontSize: '0.85rem', opacity: 0.7, marginBottom: '1.5rem' }}>
+                            Choose how many landmarks to include and their order. Starting a new recall session resets current progress.
+                        </p>
+                        <div style={{ marginBottom: '1rem' }}>
+                            <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.35rem' }}>
+                                Number of landmarks to test
+                            </label>
+                            <input
+                                type="number"
+                                min={1}
+                                max={maxRecallSelectable}
+                                value={effectiveRecallCount}
+                                onChange={(e) => {
+                                    const value = parseInt(e.target.value, 10);
+                                    if (isNaN(value)) return;
+                                    const capped = Math.max(1, Math.min(value, maxRecallSelectable));
+                                    setRecallCount(capped);
+                                }}
+                                style={{ width: '100%' }}
+                            />
+                            <div style={{ fontSize: '0.75rem', opacity: 0.6, marginTop: '0.25rem' }}>
+                                Max available: {landmarks.length}
+                            </div>
+                        </div>
+                        <div style={{ marginBottom: '1.5rem' }}>
+                            <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.35rem' }}>
+                                Order
+                            </label>
+                            <select 
+                                value={recallOrder}
+                                onChange={(e) => setRecallOrder(e.target.value as 'random' | 'sequential')}
+                                style={{ width: '100%' }}
+                            >
+                                <option value="random">Randomized</option>
+                                <option value="sequential">Alphabetical</option>
+                            </select>
+                        </div>
+                        <div style={{ display: 'flex', gap: '0.75rem' }}>
+                            <button 
+                                className="btn btn-primary"
+                                onClick={confirmRecallStart}
+                                style={{ flex: 1 }}
+                                disabled={landmarks.length < 2}
+                            >
+                                Start Recall
+                            </button>
+                            <button 
+                                className="btn btn-secondary"
+                                onClick={() => setIsRecallConfigOpen(false)}
+                                style={{ flex: 1 }}
+                            >
                                 Cancel
                             </button>
                         </div>

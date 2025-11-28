@@ -124,6 +124,11 @@ export default function UrbanLocusTracerPage() {
                     lat,
                     lng
                 });
+                setLandmarks(prev => prev.map(l => 
+                    l.id === quickEditLandmark.id ? { ...l, lat, lng } : l
+                ));
+                setCityCenter([lat, lng]);
+                setCityZoom(16);
                 setQuickEditResult({
                     name: quickEditLandmark.name,
                     lat,

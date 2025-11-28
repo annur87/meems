@@ -150,14 +150,15 @@ export default function UrbanLocusTracerPage() {
     );
     
     return (
-        <div className="container" style={{ padding: '2rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-                <h1>🗺️ Urban Locus Tracer</h1>
+        <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
+            {/* Header */}
+            <div style={{ padding: '1rem 2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+                <h1 style={{ margin: 0 }}>🗺️ Urban Locus Tracer</h1>
                 <Link href="/training" className="btn btn-secondary">← Back</Link>
             </div>
             
             {/* Phase Tabs */}
-            <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem' }}>
+            <div style={{ padding: '1rem 2rem', display: 'flex', gap: '1rem', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
                 <button 
                     className={`btn ${phase === 'add' ? 'btn-primary' : 'btn-secondary'}`}
                     onClick={() => setPhase('add')}
@@ -175,7 +176,7 @@ export default function UrbanLocusTracerPage() {
             </div>
             
             {/* Main Content */}
-            <div style={{ display: 'flex', gap: '1rem', height: 'calc(100vh - 250px)', minHeight: '600px' }}>
+            <div style={{ display: 'flex', gap: 0, flex: 1, overflow: 'hidden' }}>
                 
                 {/* Map Area */}
                 <div style={{ flex: 1, position: 'relative' }}>
@@ -274,7 +275,7 @@ export default function UrbanLocusTracerPage() {
                 </div>
                 
                 {/* Right Panel */}
-                <div className="glass card" style={{ width: '280px', padding: '1.5rem', overflowY: 'auto' }}>
+                <div className="glass card" style={{ width: '280px', padding: '1.5rem', overflowY: 'auto', borderRadius: 0, borderLeft: '1px solid rgba(255,255,255,0.1)' }}>
                     {phase === 'add' && (
                         <>
                             <h3 style={{ marginBottom: '1rem' }}>Your Landmarks</h3>

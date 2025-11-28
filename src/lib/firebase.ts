@@ -54,6 +54,7 @@ export interface Landmark {
     lat: number;
     lng: number;
     createdAt: number;
+    verified?: boolean;
 }
 
 export interface ImageVaultData {
@@ -109,6 +110,7 @@ export const saveLandmark = async (userId: string, landmark: Omit<Landmark, 'id'
         const landmarksRef = collection(db, 'landmarks', userId, 'entries');
         const docRef = await addDoc(landmarksRef, {
             ...landmark,
+            verified: landmark.verified ?? false,
             createdAt: Date.now()
         });
         return docRef.id;

@@ -46,6 +46,21 @@ function formatDuration(ms: number) {
 // Hardcoded user ID for now (in production, use actual auth)
 const USER_ID = 'default_user';
 
+const typeIconMap: Record<string, string> = {
+    school: '🏫',
+    university: '🎓',
+    hospital: '🏥',
+    restaurant: '🍽️',
+    shopping: '🛍️',
+    park: '🌳',
+    mosque: '🕌',
+    government: '🏛️',
+    other: '📍'
+};
+
+const getTypeIcon = (type: string) => typeIconMap[type] || '📍';
+const formatType = (type: string) => type.charAt(0).toUpperCase() + type.slice(1);
+
 export default function UrbanLocusTracerPage() {
     
     // Game State
@@ -110,7 +125,10 @@ export default function UrbanLocusTracerPage() {
         setIsLoading(true);
         try {
             const data = await getLandmarks(USER_ID);
-            setLandmarks(data);
+            setLandmarks(data.map(l => ({
+                ...l,
+                verified: l.verified ?? false
+            })));
         } catch (error) {
             console.error('Error loading landmarks:', error);
         }
@@ -190,7 +208,8 @@ export default function UrbanLocusTracerPage() {
                 type: newLandmarkType,
                 lat: pendingLocation.lat,
                 lng: pendingLocation.lng,
-                createdAt: Date.now()
+                createdAt: Date.now(),
+                verified: false
             });
             setNewLandmarkName('');
             setNewLandmarkType('school');
@@ -211,21 +230,21 @@ export default function UrbanLocusTracerPage() {
     };
     
     const openRecallConfig = () => {
-        if (landmarks.length < 2) {
-            alert('Add at least 2 landmarks before starting recall!');
+        if (verifiedLandmarks.length < 2) {
+            alert('Verify at least 2 landmarks before starting recall!');
             return;
         }
         setIsRecallConfigOpen(true);
     };
 
     const startRecall = () => {
-        if (landmarks.length < 2) {
-            alert('Add at least 2 landmarks before starting recall!');
+        if (verifiedLandmarks.length < 2) {
+            alert('Verify at least 2 landmarks before starting recall!');
             return;
         }
 
-        const cappedCount = Math.max(1, Math.min(recallCount, landmarks.length));
-        let candidates = [...landmarks];
+        const cappedCount = Math.max(1, Math.min(recallCount, verifiedLandmarks.length));
+        let candidates = [...verifiedLandmarks];
         if (recallOrder === 'random') {
             candidates = candidates.sort(() => Math.random() - 0.5);
         } else {
@@ -284,6 +303,20 @@ export default function UrbanLocusTracerPage() {
         }
     };
 
+    const handleToggleVerified = async (landmark: Landmark) => {
+        const nextStatus = !landmark.verified;
+        setLandmarks(prev => prev.map(l => 
+            l.id === landmark.id ? { ...l, verified: nextStatus } : l
+        ));
+        try {
+            await updateLandmark(USER_ID, landmark.id, { verified: nextStatus });
+        } catch (error) {
+            console.error('Error updating verification status:', error);
+            await loadLandmarks();
+            alert('Could not update verified status. Please try again.');
+        }
+    };
+
     const beginQuickEdit = (landmark: Landmark) => {
         setQuickEditLandmark(landmark);
         setQuickEditResult(null);
@@ -323,8 +356,11 @@ export default function UrbanLocusTracerPage() {
         setCityZoom(14);
     };
     
-    const maxRecallSelectable = Math.max(1, landmarks.length);
-    const effectiveRecallCount = Math.min(recallCount, maxRecallSelectable);
+    const verifiedLandmarks = landmarks.filter(l => l.verified);
+    const maxRecallSelectable = Math.max(1, verifiedLandmarks.length || 1);
+    const effectiveRecallCount = verifiedLandmarks.length > 0
+        ? Math.min(recallCount, verifiedLandmarks.length)
+        : Math.min(recallCount, maxRecallSelectable);
 
     const filteredLandmarks = landmarks.filter(l => 
         l.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -358,7 +394,7 @@ export default function UrbanLocusTracerPage() {
                 <button 
                     className={`btn ${phase === 'recall' ? 'btn-primary' : 'btn-secondary'}`}
                     onClick={openRecallConfig}
-                    disabled={phase === 'recall' || landmarks.length < 2}
+                    disabled={phase === 'recall' || verifiedLandmarks.length < 2}
                 >
                     Start Recall
                 </button>
@@ -393,9 +429,10 @@ export default function UrbanLocusTracerPage() {
                                         id: l.id,
                                         lat: l.lat,
                                         lng: l.lng,
-                                        title: l.name,
-                                        color: selectedLandmarkId === l.id ? '#22c55e' : '#3b82f6',
-                                        popup: l.name
+                                        title: `${l.name} • ${formatType(l.type)}`,
+                                        color: l.verified ? '#22c55e' : '#3b82f6',
+                                        label: `${getTypeIcon(l.type)}${l.verified ? '★' : ''}`,
+                                        popup: `${l.name} (${formatType(l.type)})${l.verified ? ' • Verified' : ''}`
                                     })),
                                     ...(pendingLocation
                                         ? [{
@@ -613,7 +650,8 @@ export default function UrbanLocusTracerPage() {
                                                         type: landmark.category,
                                                         lat: landmark.lat,
                                                         lng: landmark.lng,
-                                                        createdAt: Date.now()
+                                                        createdAt: Date.now(),
+                                                        verified: false
                                                     });
                                                 }
                                                 await loadLandmarks();
@@ -655,13 +693,33 @@ export default function UrbanLocusTracerPage() {
                                                 setCityZoom(16);
                                             }}
                                         >
-                                            <div>
-                                                <div style={{ fontWeight: 'bold', fontSize: '0.85rem' }}>{landmark.name}</div>
-                                                <div style={{ fontSize: '0.7rem', opacity: 0.6 }}>
-                                                    {landmark.type} • {landmark.lat.toFixed(4)}, {landmark.lng.toFixed(4)}
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                                                <div style={{ fontSize: '1.5rem' }}>{getTypeIcon(landmark.type)}</div>
+                                                <div>
+                                                    <div style={{ fontWeight: 'bold', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                                        {landmark.name}
+                                                        {landmark.verified && (
+                                                            <span style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.08em', background: 'rgba(34,197,94,0.15)', color: '#22c55e', padding: '0.1rem 0.4rem', borderRadius: '999px' }}>
+                                                                Verified
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <div style={{ fontSize: '0.75rem', opacity: 0.7, display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                                                        <span>{formatType(landmark.type)}</span>
+                                                    </div>
                                                 </div>
                                             </div>
-                                            <div style={{ display: 'flex', gap: '0.25rem' }}>
+                                            <div style={{ display: 'flex', gap: '0.25rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                                                <button 
+                                                    className={`btn ${landmark.verified ? 'btn-primary' : 'btn-secondary'}`} 
+                                                    style={{ padding: '0.25rem 0.5rem', fontSize: '0.7rem' }}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleToggleVerified(landmark);
+                                                    }}
+                                                >
+                                                    {landmark.verified ? '★ Verified' : '☆ Verify'}
+                                                </button>
                                                 <button 
                                                     className="btn btn-secondary" 
                                                     style={{ padding: '0.25rem 0.5rem', fontSize: '0.7rem' }}
@@ -968,7 +1026,7 @@ export default function UrbanLocusTracerPage() {
                                 style={{ width: '100%' }}
                             />
                             <div style={{ fontSize: '0.75rem', opacity: 0.6, marginTop: '0.25rem' }}>
-                                Max available: {landmarks.length}
+                                Verified available: {verifiedLandmarks.length}
                             </div>
                         </div>
                         <div style={{ marginBottom: '1.5rem' }}>

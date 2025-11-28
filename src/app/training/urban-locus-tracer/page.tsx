@@ -100,7 +100,7 @@ export default function UrbanLocusTracerPage() {
     
     // Add Mode State
     const [newLandmarkName, setNewLandmarkName] = useState('');
-    const [newLandmarkType, setNewLandmarkType] = useState('school');
+    const [newLandmarkType, setNewLandmarkType] = useState('area');
     const [pendingLocation, setPendingLocation] = useState<{ lat: number; lng: number } | null>(null);
     const [isDrawingMode, setIsDrawingMode] = useState(false);
     const [drawnRectangles, setDrawnRectangles] = useState<any[]>([]);
@@ -236,7 +236,7 @@ export default function UrbanLocusTracerPage() {
                 verified: true
             });
             setNewLandmarkName('');
-            setNewLandmarkType('school');
+            setNewLandmarkType('area');
             setPendingLocation(null);
             await loadLandmarks();
         } catch (error) {

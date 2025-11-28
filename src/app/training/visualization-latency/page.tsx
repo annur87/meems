@@ -71,6 +71,7 @@ export default function VisualizationLatencyDrill() {
     const [itemCount, setItemCount] = useState(50);
     const [pace, setPace] = useState(2000);
     const [itemType, setItemType] = useState<ItemType>('mixed');
+    const [timedMode, setTimedMode] = useState(true);
 
     // State
     const [phase, setPhase] = useState<GamePhase>('setup');
@@ -88,6 +89,9 @@ export default function VisualizationLatencyDrill() {
     const timerRef = useRef<NodeJS.Timeout | null>(null);
     const sessionStartRef = useRef<number>(0);
     const drillEndRef = useRef<number>(0);
+    
+    // Live timer for untimed mode
+    const [currentElapsed, setCurrentElapsed] = useState(0);
 
     const stopTimer = () => {
         if (timerRef.current) {
@@ -121,10 +125,12 @@ export default function VisualizationLatencyDrill() {
         }
 
         itemStartRef.current = Date.now();
-        timerRef.current = setTimeout(() => {
-            handleLapse();
-        }, pace);
-    }, [currentIndex, items.length, pace]);
+        if (timedMode) {
+            timerRef.current = setTimeout(() => {
+                handleLapse();
+            }, pace);
+        }
+    }, [currentIndex, items.length, pace, timedMode]);
 
     useEffect(() => {
         if (phase === 'drill') {
@@ -132,6 +138,16 @@ export default function VisualizationLatencyDrill() {
         }
         return stopTimer;
     }, [phase, currentIndex]); // Dependency on currentIndex triggers next item
+    
+    // Update live timer in untimed mode
+    useEffect(() => {
+        if (phase === 'drill' && !timedMode) {
+            const interval = setInterval(() => {
+                setCurrentElapsed(Date.now() - itemStartRef.current);
+            }, 100);
+            return () => clearInterval(interval);
+        }
+    }, [phase, timedMode, currentIndex]);
 
     const handleImageReady = () => {
         if (phase !== 'drill') return;
@@ -331,19 +347,44 @@ export default function VisualizationLatencyDrill() {
                             </div>
 
                             <div>
-                                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem', color: '#cbd5e1' }}>Max Display Time</label>
-                                <select
-                                    className="input-field"
-                                    value={pace}
-                                    onChange={(e) => setPace(parseInt(e.target.value, 10))}
-                                >
-                                    {PACE_OPTIONS.map((option) => (
-                                        <option key={option} value={option}>
-                                            {(option / 1000).toFixed(1)}s
-                                        </option>
-                                    ))}
-                                </select>
+                                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem', color: '#cbd5e1' }}>Mode</label>
+                                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                    <button
+                                        className={`btn ${timedMode ? 'btn-primary' : 'btn-secondary'}`}
+                                        onClick={() => setTimedMode(true)}
+                                        style={{ flex: 1 }}
+                                    >
+                                        Timed
+                                    </button>
+                                    <button
+                                        className={`btn ${!timedMode ? 'btn-primary' : 'btn-secondary'}`}
+                                        onClick={() => setTimedMode(false)}
+                                        style={{ flex: 1 }}
+                                    >
+                                        Untimed
+                                    </button>
+                                </div>
+                                <div style={{ fontSize: '0.75rem', opacity: 0.6, marginTop: '0.25rem' }}>
+                                    {timedMode ? 'Auto-advance after max time' : 'Manual advance (time still tracked)'}
+                                </div>
                             </div>
+
+                            {timedMode && (
+                                <div>
+                                    <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem', color: '#cbd5e1' }}>Max Display Time</label>
+                                    <select
+                                        className="input-field"
+                                        value={pace}
+                                        onChange={(e) => setPace(parseInt(e.target.value, 10))}
+                                    >
+                                        {PACE_OPTIONS.map((option) => (
+                                            <option key={option} value={option}>
+                                                {(option / 1000).toFixed(1)}s
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                            )}
                         </div>
 
                         <button className="btn btn-primary" onClick={startDrill} style={{ alignSelf: 'center', minWidth: '240px' }}>
@@ -377,8 +418,13 @@ export default function VisualizationLatencyDrill() {
                             style={{ minWidth: '200px', fontSize: '1.2rem', padding: '1rem 2rem' }} 
                             onClick={handleImageReady}
                         >
-                            Image Ready
+                            {timedMode ? 'Image Ready' : 'Next'}
                         </button>
+                        {!timedMode && (
+                            <div style={{ marginTop: '1rem', fontSize: '0.85rem', opacity: 0.6 }}>
+                                Time: {(currentElapsed / 1000).toFixed(2)}s
+                            </div>
+                        )}
                     </div>
                 )}
 

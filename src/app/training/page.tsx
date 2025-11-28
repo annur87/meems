@@ -147,6 +147,46 @@ const games = [
         week: 'Foundational Drill',
         href: '/training/philosophical-attribution',
         color: 'from-lime-500 to-emerald-500'
+    },
+    {
+        id: 'focus-shifter',
+        title: 'Focus Shifter',
+        description: 'Rapidly switch between processing numbers and visual-spatial information.',
+        week: 'Concentration Drill',
+        href: '/training/focus-shifter',
+        color: 'from-fuchsia-500 to-purple-500'
+    },
+    {
+        id: 'urban-locus-tracer',
+        title: 'Urban Locus Tracer',
+        description: 'Build and test your memory palace using real-world map locations.',
+        week: 'Spatial Memory',
+        href: '/training/urban-locus-tracer',
+        color: 'from-blue-500 to-indigo-500'
+    },
+    {
+        id: 'visualization-latency',
+        title: 'Visualization Latency',
+        description: 'Measure and improve your image creation speed with precision timing.',
+        week: 'Speed Drill',
+        href: '/training/visualization-latency',
+        color: 'from-red-500 to-pink-500'
+    },
+    {
+        id: 'card-sequence',
+        title: 'Card Sequence Memory',
+        description: 'Memorize sequences of playing cards with speed and accuracy.',
+        week: 'Week 2 Focus',
+        href: '/training/card-sequence',
+        color: 'from-amber-500 to-yellow-500'
+    },
+    {
+        id: 'chain-reaction',
+        title: 'Chain Reaction Latency',
+        description: 'Measure transition speed between consecutive mnemonic images in a chain.',
+        week: 'System Fluidity',
+        href: '/training/chain-reaction',
+        color: 'from-cyan-500 to-blue-500'
     }
 ];
 

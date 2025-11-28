@@ -792,7 +792,7 @@ export default function UrbanLocusTracerPage() {
                                 </div>
                             ) : (
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                                    {landmarks.map(landmark => (
+                                    {filteredLandmarks.map(landmark => (
                                         <div 
                                             key={landmark.id} 
                                             id={`landmark-${landmark.id}`}

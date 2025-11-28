@@ -155,6 +155,30 @@ export default function RealMap({ center, zoom, markers, lines = [], onMarkerCli
         };
     }, []);
 
+    // Handle tile layer switching when hideLabels changes
+    useEffect(() => {
+        if (!mapInstanceRef.current || !window.L || !tileLayerRef.current) return;
+
+        const map = mapInstanceRef.current;
+        
+        // Remove old tile layer
+        map.removeLayer(tileLayerRef.current);
+        
+        // Add new tile layer based on hideLabels
+        const tileUrl = hideLabels 
+            ? 'https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png'
+            : 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}';
+        
+        const attribution = hideLabels
+            ? '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+            : 'Tiles &copy; Esri &mdash; Source: Esri, DeLorme, NAVTEQ, USGS, Intermap, iPC, NRCAN, Esri Japan, METI, Esri China (Hong Kong), Esri (Thailand), TomTom, 2012';
+        
+        tileLayerRef.current = window.L.tileLayer(tileUrl, {
+            attribution,
+            maxZoom: 19
+        }).addTo(map);
+    }, [hideLabels]);
+
     // Update Markers
     useEffect(() => {
         if (!mapInstanceRef.current || !window.L) return;

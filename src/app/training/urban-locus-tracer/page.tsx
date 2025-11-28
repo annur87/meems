@@ -85,6 +85,9 @@ export default function UrbanLocusTracerPage() {
     const [editLng, setEditLng] = useState('');
     const [editMode, setEditMode] = useState<'map' | 'manual'>('map');
     const [pendingEditLocation, setPendingEditLocation] = useState<{ lat: number; lng: number } | null>(null);
+    const [quickEditLandmark, setQuickEditLandmark] = useState<Landmark | null>(null);
+    const [quickEditSaving, setQuickEditSaving] = useState(false);
+    const [quickEditResult, setQuickEditResult] = useState<{ name: string; lat: number; lng: number } | null>(null);
     
     // Selected landmark for map/sidebar sync
     const [selectedLandmarkId, setSelectedLandmarkId] = useState<string | null>(null);
@@ -113,7 +116,29 @@ export default function UrbanLocusTracerPage() {
         setIsLoading(false);
     };
     
-    const handleMapClick = (lat: number, lng: number) => {
+    const handleMapClick = async (lat: number, lng: number) => {
+        if (phase === 'add' && quickEditLandmark) {
+            setQuickEditSaving(true);
+            try {
+                await updateLandmark(USER_ID, quickEditLandmark.id, {
+                    lat,
+                    lng
+                });
+                setQuickEditResult({
+                    name: quickEditLandmark.name,
+                    lat,
+                    lng
+                });
+                setQuickEditLandmark(null);
+                await loadLandmarks();
+            } catch (error) {
+                console.error('Error updating landmark via quick edit:', error);
+                alert('Failed to update landmark location. Please try again.');
+            }
+            setQuickEditSaving(false);
+            return;
+        }
+
         if (phase === 'add') {
             setPendingLocation({ lat, lng });
         } else if (phase === 'recall' && currentLandmark && pendingRecallClick) {
@@ -236,6 +261,15 @@ export default function UrbanLocusTracerPage() {
         } catch (error) {
             console.error('Error updating landmark:', error);
         }
+    };
+
+    const beginQuickEdit = (landmark: Landmark) => {
+        setQuickEditLandmark(landmark);
+        setQuickEditResult(null);
+        setPendingLocation(null);
+        setEditingLandmark(null);
+        setCityCenter([landmark.lat, landmark.lng]);
+        setCityZoom(16);
     };
 
     const handleNextRecallStep = () => {
@@ -395,7 +429,47 @@ export default function UrbanLocusTracerPage() {
                         }}
                     />
                     
-                    {phase === 'add' && pendingLocation && (
+                    {phase === 'add' && quickEditLandmark && (
+                        <div className="glass card" style={{ position: 'absolute', top: '20px', left: '50%', transform: 'translateX(-50%)', padding: '1rem', zIndex: 1200, textAlign: 'center', maxWidth: '420px' }}>
+                            <div style={{ fontSize: '1rem', fontWeight: 'bold', marginBottom: '0.5rem' }}>
+                                Move {quickEditLandmark.name}
+                            </div>
+                            <div style={{ fontSize: '0.9rem', marginBottom: '0.5rem' }}>
+                                Click a new spot on the map to update its coordinates.
+                            </div>
+                            <div style={{ fontSize: '0.8rem', opacity: 0.8, marginBottom: '0.75rem' }}>
+                                {quickEditSaving ? 'Saving new location...' : 'Your change will save instantly.'}
+                            </div>
+                            <button 
+                                className="btn btn-secondary" 
+                                onClick={() => setQuickEditLandmark(null)}
+                                disabled={quickEditSaving}
+                                style={{ width: '100%' }}
+                            >
+                                Cancel
+                            </button>
+                        </div>
+                    )}
+
+                    {phase === 'add' && quickEditResult && !quickEditLandmark && (
+                        <div className="glass card" style={{ position: 'absolute', top: '20px', right: '20px', padding: '1rem', zIndex: 1100, maxWidth: '260px' }}>
+                            <div style={{ fontSize: '0.95rem', fontWeight: 'bold', marginBottom: '0.25rem' }}>
+                                Updated {quickEditResult.name}
+                            </div>
+                            <div style={{ fontSize: '0.8rem', opacity: 0.8, marginBottom: '0.25rem' }}>
+                                {quickEditResult.lat.toFixed(4)}, {quickEditResult.lng.toFixed(4)}
+                            </div>
+                            <button 
+                                className="btn btn-primary" 
+                                onClick={() => setQuickEditResult(null)}
+                                style={{ width: '100%', fontSize: '0.8rem' }}
+                            >
+                                Dismiss
+                            </button>
+                        </div>
+                    )}
+
+                    {phase === 'add' && pendingLocation && !quickEditLandmark && (
                         <div className="glass card" style={{ position: 'absolute', bottom: '20px', left: '50%', transform: 'translateX(-50%)', padding: '1rem', zIndex: 1000, minWidth: '300px' }}>
                             <div style={{ marginBottom: '0.5rem' }}>
                                 <label style={{ display: 'block', fontSize: '0.8rem', marginBottom: '0.25rem', opacity: 0.7 }}>Type</label>
@@ -601,6 +675,16 @@ export default function UrbanLocusTracerPage() {
                                                 </div>
                                             </div>
                                             <div style={{ display: 'flex', gap: '0.25rem' }}>
+                                                <button 
+                                                    className="btn btn-secondary" 
+                                                    style={{ padding: '0.25rem 0.5rem', fontSize: '0.7rem' }}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        beginQuickEdit(landmark);
+                                                    }}
+                                                >
+                                                    Move
+                                                </button>
                                                 <button 
                                                     className="btn btn-secondary" 
                                                     style={{ padding: '0.25rem 0.5rem', fontSize: '0.7rem' }}

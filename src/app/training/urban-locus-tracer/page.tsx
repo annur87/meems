@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { saveLandmark, getLandmarks, deleteLandmark, type Landmark } from '@/lib/firebase';
+import { saveLandmark, getLandmarks, deleteLandmark, updateLandmark, type Landmark } from '@/lib/firebase';
 import RealMap from '@/components/RealMap';
 
 type GamePhase = 'add' | 'recall' | 'result';
@@ -176,6 +176,36 @@ export default function UrbanLocusTracerPage() {
         setCityZoom(14);
     };
     
+    const handleSaveEdit = async () => {
+        if (!editingLandmark || !editName.trim()) return;
+        
+        try {
+            const updates: any = {
+                name: editName.trim(),
+                type: editType
+            };
+            
+            if (editMode === 'map' && pendingEditLocation) {
+                updates.lat = pendingEditLocation.lat;
+                updates.lng = pendingEditLocation.lng;
+            } else if (editMode === 'manual') {
+                const lat = parseFloat(editLat);
+                const lng = parseFloat(editLng);
+                if (!isNaN(lat) && !isNaN(lng)) {
+                    updates.lat = lat;
+                    updates.lng = lng;
+                }
+            }
+            
+            await updateLandmark(USER_ID, editingLandmark.id, updates);
+            setEditingLandmark(null);
+            setPendingEditLocation(null);
+            await loadLandmarks();
+        } catch (error) {
+            console.error('Error updating landmark:', error);
+        }
+    };
+    
     const resetGame = () => {
         setPhase('add');
         setRecallResults([]);
@@ -304,10 +334,10 @@ export default function UrbanLocusTracerPage() {
                     {phase === 'recall' && currentLandmark && (
                         <div className="glass card" style={{ position: 'absolute', top: '20px', left: '50%', transform: 'translateX(-50%)', padding: '1rem', zIndex: 1000, textAlign: 'center' }}>
                             <div style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>
-                                {currentLandmark.type ? `What ${currentLandmark.type} is this?` : 'What is this location?'}
+                                Where is {currentLandmark.name}?
                             </div>
                             <div style={{ fontSize: '0.9rem', opacity: 0.7, marginTop: '0.5rem' }}>
-                                {recallResults.length + 1} / {recallQueue.length + recallResults.length}
+                                Click on the map to guess
                             </div>
                         </div>
                     )}
@@ -343,13 +373,30 @@ export default function UrbanLocusTracerPage() {
                                                     {landmark.type} • {landmark.lat.toFixed(4)}, {landmark.lng.toFixed(4)}
                                                 </div>
                                             </div>
-                                            <button 
-                                                className="btn btn-secondary" 
-                                                style={{ padding: '0.25rem 0.5rem', fontSize: '0.7rem' }}
-                                                onClick={() => handleDeleteLandmark(landmark.id)}
-                                            >
-                                                Del
-                                            </button>
+                                            <div style={{ display: 'flex', gap: '0.25rem' }}>
+                                                <button 
+                                                    className="btn btn-secondary" 
+                                                    style={{ padding: '0.25rem 0.5rem', fontSize: '0.7rem' }}
+                                                    onClick={() => {
+                                                        setEditingLandmark(landmark);
+                                                        setEditName(landmark.name);
+                                                        setEditType(landmark.type);
+                                                        setEditLat(landmark.lat.toString());
+                                                        setEditLng(landmark.lng.toString());
+                                                        setEditMode('map');
+                                                        setPendingEditLocation(null);
+                                                    }}
+                                                >
+                                                    Edit
+                                                </button>
+                                                <button 
+                                                    className="btn btn-secondary" 
+                                                    style={{ padding: '0.25rem 0.5rem', fontSize: '0.7rem' }}
+                                                    onClick={() => handleDeleteLandmark(landmark.id)}
+                                                >
+                                                    Del
+                                                </button>
+                                            </div>
                                         </div>
                                     ))}
                                 </div>
@@ -417,6 +464,119 @@ export default function UrbanLocusTracerPage() {
                     )}
                 </div>
             </div>
+            
+            {/* Edit Modal */}
+            {editingLandmark && (
+                <div style={{ 
+                    position: 'fixed', 
+                    top: 0, 
+                    left: 0, 
+                    right: 0, 
+                    bottom: 0, 
+                    background: 'rgba(0,0,0,0.8)', 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center',
+                    zIndex: 2000
+                }}>
+                    <div className="glass card" style={{ width: '500px', maxWidth: '90vw', padding: '2rem' }}>
+                        <h2 style={{ marginBottom: '1.5rem' }}>Edit Landmark</h2>
+                        
+                        <div style={{ marginBottom: '1rem' }}>
+                            <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.5rem' }}>Name</label>
+                            <input 
+                                type="text"
+                                value={editName}
+                                onChange={(e) => setEditName(e.target.value)}
+                                style={{ width: '100%' }}
+                            />
+                        </div>
+                        
+                        <div style={{ marginBottom: '1rem' }}>
+                            <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.5rem' }}>Type</label>
+                            <select 
+                                value={editType}
+                                onChange={(e) => setEditType(e.target.value)}
+                                style={{ width: '100%' }}
+                            >
+                                <option value="school">School</option>
+                                <option value="university">University</option>
+                                <option value="hospital">Hospital</option>
+                                <option value="restaurant">Restaurant</option>
+                                <option value="shopping">Shopping Mall</option>
+                                <option value="park">Park</option>
+                                <option value="mosque">Mosque</option>
+                                <option value="government">Government Building</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </div>
+                        
+                        <div style={{ marginBottom: '1rem' }}>
+                            <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.5rem' }}>Update Location</label>
+                            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                                <button 
+                                    className={`btn ${editMode === 'map' ? 'btn-primary' : 'btn-secondary'}`}
+                                    onClick={() => setEditMode('map')}
+                                    style={{ flex: 1 }}
+                                >
+                                    Click Map
+                                </button>
+                                <button 
+                                    className={`btn ${editMode === 'manual' ? 'btn-primary' : 'btn-secondary'}`}
+                                    onClick={() => setEditMode('manual')}
+                                    style={{ flex: 1 }}
+                                >
+                                    Manual Input
+                                </button>
+                            </div>
+                            
+                            {editMode === 'map' ? (
+                                <div style={{ fontSize: '0.85rem', opacity: 0.7, padding: '0.5rem', background: 'rgba(59, 130, 246, 0.1)', borderRadius: '0.25rem' }}>
+                                    {pendingEditLocation 
+                                        ? `New location: ${pendingEditLocation.lat.toFixed(4)}, ${pendingEditLocation.lng.toFixed(4)}`
+                                        : 'Click on the map to set new location'
+                                    }
+                                </div>
+                            ) : (
+                                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                    <div style={{ flex: 1 }}>
+                                        <label style={{ display: 'block', fontSize: '0.8rem', marginBottom: '0.25rem', opacity: 0.7 }}>Latitude</label>
+                                        <input 
+                                            type="number"
+                                            step="0.0001"
+                                            value={editLat}
+                                            onChange={(e) => setEditLat(e.target.value)}
+                                            style={{ width: '100%' }}
+                                        />
+                                    </div>
+                                    <div style={{ flex: 1 }}>
+                                        <label style={{ display: 'block', fontSize: '0.8rem', marginBottom: '0.25rem', opacity: 0.7 }}>Longitude</label>
+                                        <input 
+                                            type="number"
+                                            step="0.0001"
+                                            value={editLng}
+                                            onChange={(e) => setEditLng(e.target.value)}
+                                            style={{ width: '100%' }}
+                                        />
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                        
+                        <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1.5rem' }}>
+                            <button className="btn btn-primary" onClick={handleSaveEdit} style={{ flex: 1 }}>
+                                Save Changes
+                            </button>
+                            <button className="btn btn-secondary" onClick={() => {
+                                setEditingLandmark(null);
+                                setPendingEditLocation(null);
+                            }} style={{ flex: 1 }}>
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

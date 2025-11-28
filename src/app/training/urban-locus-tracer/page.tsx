@@ -5,17 +5,20 @@ import Header from '@/components/Header';
 import Link from 'next/link';
 import { saveGameResult } from '@/lib/firebase';
 import wordList from '@/data/words.json';
+import RealMap from '@/components/RealMap';
 
 // --- Types ---
 
 type GamePhase = 'setup' | 'encode' | 'recall-select' | 'recall-identify' | 'mental-walk' | 'result';
+type MapMode = 'abstract' | 'real';
 
 interface Locus {
     id: number;
-    x: number; // percentage 0-100
-    y: number; // percentage 0-100
+    x: number; // percentage 0-100 (Abstract) or lat (Real)
+    y: number; // percentage 0-100 (Abstract) or lng (Real)
     data: string;
     type: 'word' | 'number';
+    title?: string; // For Real Map landmarks
 }
 
 interface WalkResult {
@@ -27,8 +30,8 @@ interface WalkResult {
 interface RecallResult {
     locusId: number;
     correctData: string;
-    inputData?: string; // For 'identify' type recall
-    clickedLocusId?: number; // For 'select' type recall
+    inputData?: string;
+    clickedLocusId?: number;
     isCorrect: boolean;
     type: 'data-to-loc' | 'loc-to-data';
 }
@@ -42,9 +45,9 @@ const HIT_RADIUS = 20;
 
 // --- Helper Functions ---
 
-const generateLoci = (count: number): Locus[] => {
+const generateAbstractLoci = (count: number): Locus[] => {
     const loci: Locus[] = [];
-    const minDistance = 10; // minimum distance between points in %
+    const minDistance = 10; 
 
     for (let i = 0; i < count; i++) {
         let attempts = 0;
@@ -55,7 +58,6 @@ const generateLoci = (count: number): Locus[] => {
             x = 5 + Math.random() * 90;
             y = 5 + Math.random() * 90;
             
-            // Check distance from existing
             valid = true;
             for (const l of loci) {
                 const dx = l.x - x;
@@ -68,14 +70,8 @@ const generateLoci = (count: number): Locus[] => {
             attempts++;
         }
 
-        // Assign Data
         const isWord = Math.random() > 0.3;
-        let data = '';
-        if (isWord) {
-            data = wordList[Math.floor(Math.random() * wordList.length)];
-        } else {
-            data = Math.floor(Math.random() * 100).toString().padStart(2, '0');
-        }
+        let data = isWord ? wordList[Math.floor(Math.random() * wordList.length)] : Math.floor(Math.random() * 100).toString().padStart(2, '0');
 
         loci.push({
             id: i,
@@ -93,7 +89,15 @@ const generateLoci = (count: number): Locus[] => {
 export default function UrbanLocusTracer() {
     // Settings
     const [locusCount, setLocusCount] = useState(20);
-    const [timeLimit, setTimeLimit] = useState(300); // 5 minutes total for encoding
+    const [timeLimit, setTimeLimit] = useState(300);
+    const [mapMode, setMapMode] = useState<MapMode>('abstract');
+    
+    // Real Map Settings
+    const [cityQuery, setCityQuery] = useState('New York');
+    const [cityCenter, setCityCenter] = useState<[number, number]>([40.7128, -74.0060]);
+    const [cityZoom, setCityZoom] = useState(13);
+    const [isLoadingCity, setIsLoadingCity] = useState(false);
+    const [realLandmarks, setRealLandmarks] = useState<any[]>([]);
 
     // State
     const [phase, setPhase] = useState<GamePhase>('setup');
@@ -124,62 +128,104 @@ export default function UrbanLocusTracer() {
     const timerRef = useRef<NodeJS.Timeout | null>(null);
     const startTimeRef = useRef(0);
 
-    // --- Map Drawing ---
+    // --- Real Map Logic ---
+
+    const searchCity = async () => {
+        setIsLoadingCity(true);
+        try {
+            // 1. Get City Bounds
+            const nomRes = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(cityQuery)}&format=json&limit=1`);
+            const nomData = await nomRes.json();
+            
+            if (!nomData || nomData.length === 0) {
+                alert("City not found");
+                setIsLoadingCity(false);
+                return;
+            }
+
+            const lat = parseFloat(nomData[0].lat);
+            const lon = parseFloat(nomData[0].lon);
+            setCityCenter([lat, lon]);
+
+            // 2. Fetch Landmarks (Overpass)
+            // Query for tourism=attraction, amenity=place_of_worship, historic=memorial, etc.
+            // Around the center point (radius 5000m)
+            const overpassQuery = `
+                [out:json];
+                (
+                  node["tourism"="attraction"](around:3000,${lat},${lon});
+                  node["historic"="memorial"](around:3000,${lat},${lon});
+                  node["amenity"="place_of_worship"](around:3000,${lat},${lon});
+                  node["leisure"="park"](around:3000,${lat},${lon});
+                );
+                out body 50;
+            `;
+            
+            const overpassRes = await fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(overpassQuery)}`);
+            const overpassData = await overpassRes.json();
+            
+            if (overpassData.elements) {
+                setRealLandmarks(overpassData.elements.filter((e: any) => e.tags && e.tags.name));
+            }
+
+        } catch (e) {
+            console.error(e);
+            alert("Failed to load city data");
+        } finally {
+            setIsLoadingCity(false);
+        }
+    };
+
+    const generateRealLoci = (count: number): Locus[] => {
+        if (realLandmarks.length === 0) return [];
+        
+        // Shuffle landmarks
+        const shuffled = [...realLandmarks].sort(() => Math.random() - 0.5);
+        const selected = shuffled.slice(0, Math.min(count, shuffled.length));
+        
+        return selected.map((landmark, i) => {
+            const isWord = Math.random() > 0.3;
+            const data = isWord ? wordList[Math.floor(Math.random() * wordList.length)] : Math.floor(Math.random() * 100).toString().padStart(2, '0');
+            
+            return {
+                id: i,
+                x: landmark.lat, // Using x/y as lat/lng for Real Mode
+                y: landmark.lon,
+                data,
+                type: isWord ? 'word' : 'number',
+                title: landmark.tags.name
+            };
+        });
+    };
+
+    // --- Abstract Map Drawing ---
 
     const drawMap = useCallback((ctx: CanvasRenderingContext2D) => {
-        // Clear
-        ctx.fillStyle = '#1e293b'; // Slate-800
+        // ... (Same as before)
+        ctx.fillStyle = '#1e293b';
         ctx.fillRect(0, 0, MAP_WIDTH, MAP_HEIGHT);
-
-        // Draw "Streets" (Random Grid)
-        ctx.strokeStyle = '#334155'; // Slate-700
+        ctx.strokeStyle = '#334155';
         ctx.lineWidth = 2;
-        
-        // Seeded random for consistent map in session? 
-        // For now just random lines that look like a city
-        // We'll use a simple grid with some irregularities
-        
-        // Vertical streets
         for (let i = 50; i < MAP_WIDTH; i += 60 + Math.random() * 40) {
-            ctx.beginPath();
-            ctx.moveTo(i, 0);
-            ctx.lineTo(i, MAP_HEIGHT);
-            ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, MAP_HEIGHT); ctx.stroke();
         }
-        // Horizontal streets
         for (let i = 50; i < MAP_HEIGHT; i += 60 + Math.random() * 40) {
-            ctx.beginPath();
-            ctx.moveTo(0, i);
-            ctx.lineTo(MAP_WIDTH, i);
-            ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(MAP_WIDTH, i); ctx.stroke();
         }
-
-        // Draw Parks/Water (Random Blobs)
-        ctx.fillStyle = '#0f172a'; // Slate-900 (Water/Park)
-        ctx.beginPath();
-        ctx.arc(MAP_WIDTH * 0.7, MAP_HEIGHT * 0.3, 80, 0, Math.PI * 2);
-        ctx.fill();
-        
-        ctx.beginPath();
-        ctx.rect(MAP_WIDTH * 0.2, MAP_HEIGHT * 0.6, 100, 120);
-        ctx.fill();
-
+        ctx.fillStyle = '#0f172a';
+        ctx.beginPath(); ctx.arc(MAP_WIDTH * 0.7, MAP_HEIGHT * 0.3, 80, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.rect(MAP_WIDTH * 0.2, MAP_HEIGHT * 0.6, 100, 120); ctx.fill();
     }, []);
 
-    const render = useCallback(() => {
+    const renderAbstract = useCallback(() => {
+        if (mapMode === 'real') return;
         const canvas = canvasRef.current;
         if (!canvas) return;
         const ctx = canvas.getContext('2d');
         if (!ctx) return;
 
-        // Draw Base Map
         drawMap(ctx);
 
-        // Draw Loci
-        // In 'recall-select' (Data -> Loc), we show points but no data.
-        // In 'recall-identify' (Loc -> Data), we show ONE point highlighted.
-        // In 'mental-walk', we show TWO points highlighted.
-        
         const showAllPoints = phase === 'encode' || phase === 'recall-select' || phase === 'result';
         const showDataOnHover = phase === 'encode' || phase === 'result';
 
@@ -187,31 +233,18 @@ export default function UrbanLocusTracer() {
             loci.forEach(locus => {
                 const cx = (locus.x / 100) * MAP_WIDTH;
                 const cy = (locus.y / 100) * MAP_HEIGHT;
-
-                // Highlight logic
                 const isSelected = selectedLocusId === locus.id;
                 const isHovered = hoveredLocusId === locus.id;
                 
                 ctx.beginPath();
                 ctx.arc(cx, cy, isSelected || isHovered ? POINT_RADIUS * 1.5 : POINT_RADIUS, 0, Math.PI * 2);
-                
-                if (phase === 'result') {
-                    // Color by correctness?
-                    // Complex to map back, just keep standard for now
-                    ctx.fillStyle = '#38bdf8';
-                } else {
-                    ctx.fillStyle = isSelected ? '#f472b6' : (isHovered ? '#60a5fa' : '#38bdf8');
-                }
+                ctx.fillStyle = isSelected ? '#f472b6' : (isHovered ? '#60a5fa' : '#38bdf8');
                 ctx.fill();
                 
-                // Selection Ring
                 if (isSelected || isHovered) {
-                    ctx.strokeStyle = '#fff';
-                    ctx.lineWidth = 2;
-                    ctx.stroke();
+                    ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
                 }
 
-                // Show Data Label
                 if (showDataOnHover && (isSelected || isHovered || phase === 'result')) {
                     ctx.fillStyle = 'rgba(0,0,0,0.8)';
                     ctx.fillRect(cx + 10, cy - 15, ctx.measureText(locus.data).width + 10, 24);
@@ -223,90 +256,65 @@ export default function UrbanLocusTracer() {
         }
 
         if (phase === 'recall-identify' && currentRecallItem) {
-            // Show only the target locus
             const cx = (currentRecallItem.x / 100) * MAP_WIDTH;
             const cy = (currentRecallItem.y / 100) * MAP_HEIGHT;
-            
-            ctx.beginPath();
-            ctx.arc(cx, cy, POINT_RADIUS * 1.5, 0, Math.PI * 2);
-            ctx.fillStyle = '#f472b6'; // Pink highlight
-            ctx.fill();
-            ctx.strokeStyle = '#fff';
-            ctx.lineWidth = 2;
-            ctx.stroke();
+            ctx.beginPath(); ctx.arc(cx, cy, POINT_RADIUS * 1.5, 0, Math.PI * 2);
+            ctx.fillStyle = '#f472b6'; ctx.fill();
+            ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
         }
 
         if (phase === 'mental-walk' && walkStartNode && walkEndNode) {
-            // Draw Start
             const sx = (walkStartNode.x / 100) * MAP_WIDTH;
             const sy = (walkStartNode.y / 100) * MAP_HEIGHT;
-            ctx.beginPath();
-            ctx.arc(sx, sy, POINT_RADIUS * 1.5, 0, Math.PI * 2);
-            ctx.fillStyle = '#22c55e'; // Green
-            ctx.fill();
-            ctx.fillStyle = '#fff';
-            ctx.fillText("START", sx + 15, sy);
+            ctx.beginPath(); ctx.arc(sx, sy, POINT_RADIUS * 1.5, 0, Math.PI * 2);
+            ctx.fillStyle = '#22c55e'; ctx.fill();
+            ctx.fillStyle = '#fff'; ctx.fillText("START", sx + 15, sy);
 
-            // Draw End
             const ex = (walkEndNode.x / 100) * MAP_WIDTH;
             const ey = (walkEndNode.y / 100) * MAP_HEIGHT;
-            ctx.beginPath();
-            ctx.arc(ex, ey, POINT_RADIUS * 1.5, 0, Math.PI * 2);
-            ctx.fillStyle = '#ef4444'; // Red
-            ctx.fill();
-            ctx.fillStyle = '#fff';
-            ctx.fillText("END", ex + 15, ey);
+            ctx.beginPath(); ctx.arc(ex, ey, POINT_RADIUS * 1.5, 0, Math.PI * 2);
+            ctx.fillStyle = '#ef4444'; ctx.fill();
+            ctx.fillStyle = '#fff'; ctx.fillText("END", ex + 15, ey);
         }
-
-    }, [loci, phase, selectedLocusId, hoveredLocusId, currentRecallItem, walkStartNode, walkEndNode, drawMap]);
+    }, [loci, phase, selectedLocusId, hoveredLocusId, currentRecallItem, walkStartNode, walkEndNode, drawMap, mapMode]);
 
     useEffect(() => {
-        render();
-    }, [render]);
+        renderAbstract();
+    }, [renderAbstract]);
 
     // --- Interaction ---
 
     const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
+        if (mapMode === 'real') return;
         const canvas = canvasRef.current;
         if (!canvas) return;
-
         const rect = canvas.getBoundingClientRect();
         const scaleX = canvas.width / rect.width;
         const scaleY = canvas.height / rect.height;
-        
         const clickX = (e.clientX - rect.left) * scaleX;
         const clickY = (e.clientY - rect.top) * scaleY;
 
-        // Find clicked locus
         let clickedId: number | null = null;
         for (const locus of loci) {
             const lx = (locus.x / 100) * MAP_WIDTH;
             const ly = (locus.y / 100) * MAP_HEIGHT;
-            const dist = Math.sqrt(Math.pow(clickX - lx, 2) + Math.pow(clickY - ly, 2));
-            
-            if (dist <= HIT_RADIUS) {
+            if (Math.sqrt(Math.pow(clickX - lx, 2) + Math.pow(clickY - ly, 2)) <= HIT_RADIUS) {
                 clickedId = locus.id;
                 break;
             }
         }
 
-        if (phase === 'encode') {
-            setSelectedLocusId(clickedId);
-        } else if (phase === 'recall-select' && clickedId !== null) {
-            handleRecallSelection(clickedId);
-        }
+        if (phase === 'encode') setSelectedLocusId(clickedId);
+        else if (phase === 'recall-select' && clickedId !== null) handleRecallSelection(clickedId);
     };
 
     const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
-        if (phase !== 'encode' && phase !== 'recall-select' && phase !== 'result') return;
-
+        if (mapMode === 'real' || (phase !== 'encode' && phase !== 'recall-select' && phase !== 'result')) return;
         const canvas = canvasRef.current;
         if (!canvas) return;
-
         const rect = canvas.getBoundingClientRect();
         const scaleX = canvas.width / rect.width;
         const scaleY = canvas.height / rect.height;
-        
         const mouseX = (e.clientX - rect.left) * scaleX;
         const mouseY = (e.clientY - rect.top) * scaleY;
 
@@ -314,9 +322,7 @@ export default function UrbanLocusTracer() {
         for (const locus of loci) {
             const lx = (locus.x / 100) * MAP_WIDTH;
             const ly = (locus.y / 100) * MAP_HEIGHT;
-            const dist = Math.sqrt(Math.pow(mouseX - lx, 2) + Math.pow(mouseY - ly, 2));
-            
-            if (dist <= HIT_RADIUS) {
+            if (Math.sqrt(Math.pow(mouseX - lx, 2) + Math.pow(mouseY - ly, 2)) <= HIT_RADIUS) {
                 foundId = locus.id;
                 break;
             }
@@ -327,7 +333,17 @@ export default function UrbanLocusTracer() {
     // --- Game Logic ---
 
     const startEncoding = () => {
-        const newLoci = generateLoci(locusCount);
+        let newLoci: Locus[] = [];
+        if (mapMode === 'real') {
+            if (realLandmarks.length === 0) {
+                alert("Please search for a city first to load landmarks.");
+                return;
+            }
+            newLoci = generateRealLoci(locusCount);
+        } else {
+            newLoci = generateAbstractLoci(locusCount);
+        }
+        
         setLoci(newLoci);
         setPhase('encode');
         setTimeLeft(timeLimit);
@@ -350,8 +366,6 @@ export default function UrbanLocusTracer() {
             clearInterval(timerRef.current);
             timerRef.current = null;
         }
-        
-        // Prepare recall queue (randomized)
         const queue = [...loci].sort(() => Math.random() - 0.5);
         setRecallQueue(queue);
         setRecallResults([]);
@@ -360,66 +374,46 @@ export default function UrbanLocusTracer() {
 
     const nextRecallItem = (queue: Locus[], currentResults: RecallResult[]) => {
         if (queue.length === 0) {
-            // Recall finished, start Mental Walk
             startMentalWalkPhase();
             return;
         }
-
         const item = queue[0];
-        const remaining = queue.slice(1);
-        setRecallQueue(remaining);
+        setRecallQueue(queue.slice(1));
         setCurrentRecallItem(item);
-        
-        // Randomly decide recall type: Data->Loc or Loc->Data
         const type = Math.random() > 0.5 ? 'data-to-loc' : 'loc-to-data';
         setRecallType(type);
         setRecallInput('');
-        
-        if (type === 'data-to-loc') {
-            setPhase('recall-select');
-        } else {
-            setPhase('recall-identify');
-        }
+        setPhase(type === 'data-to-loc' ? 'recall-select' : 'recall-identify');
     };
 
     const handleRecallSelection = (clickedId: number) => {
         if (!currentRecallItem) return;
-
         const isCorrect = clickedId === currentRecallItem.id;
-        const result: RecallResult = {
+        const newResults = [...recallResults, {
             locusId: currentRecallItem.id,
             correctData: currentRecallItem.data,
             clickedLocusId: clickedId,
             isCorrect,
-            type: 'data-to-loc'
-        };
-
-        const newResults = [...recallResults, result];
+            type: 'data-to-loc' as const
+        }];
         setRecallResults(newResults);
-        
-        // Brief delay or immediate? Immediate for flow.
         nextRecallItem(recallQueue, newResults);
     };
 
     const submitRecallInput = (e?: React.FormEvent) => {
         e?.preventDefault();
         if (!currentRecallItem) return;
-
         const isCorrect = recallInput.trim().toLowerCase() === currentRecallItem.data.toLowerCase();
-        const result: RecallResult = {
+        const newResults = [...recallResults, {
             locusId: currentRecallItem.id,
             correctData: currentRecallItem.data,
             inputData: recallInput,
             isCorrect,
-            type: 'loc-to-data'
-        };
-
-        const newResults = [...recallResults, result];
+            type: 'loc-to-data' as const
+        }];
         setRecallResults(newResults);
         nextRecallItem(recallQueue, newResults);
     };
-
-    // --- Mental Walk Logic ---
 
     const startMentalWalkPhase = () => {
         setPhase('mental-walk');
@@ -433,12 +427,9 @@ export default function UrbanLocusTracer() {
             finishGame();
             return;
         }
-
-        // Pick two random distinct loci
         const idx1 = Math.floor(Math.random() * loci.length);
         let idx2 = Math.floor(Math.random() * loci.length);
         while (idx2 === idx1) idx2 = Math.floor(Math.random() * loci.length);
-
         setWalkStartNode(loci[idx1]);
         setWalkEndNode(loci[idx2]);
         setWalkStartTime(Date.now());
@@ -448,29 +439,15 @@ export default function UrbanLocusTracer() {
     const completeWalk = () => {
         if (!walkStartNode || !walkEndNode) return;
         const duration = (Date.now() - walkStartTime) / 1000;
-        
-        setWalkResults(prev => [...prev, {
-            fromId: walkStartNode.id,
-            toId: walkEndNode.id,
-            time: duration
-        }]);
-
+        setWalkResults(prev => [...prev, { fromId: walkStartNode.id, toId: walkEndNode.id, time: duration }]);
         nextWalk();
     };
 
     const finishGame = async () => {
         setPhase('result');
-        
-        // Calculate Stats
         const correctCount = recallResults.filter(r => r.isCorrect).length;
         const totalRecall = recallResults.length;
         const accuracy = totalRecall > 0 ? Math.round((correctCount / totalRecall) * 100) : 0;
-        
-        const avgWalkTime = walkResults.length 
-            ? walkResults.reduce((sum, w) => sum + w.time, 0) / walkResults.length 
-            : 0;
-
-        // Save
         try {
             await saveGameResult({
                 type: 'urban-locus-tracer',
@@ -478,8 +455,8 @@ export default function UrbanLocusTracer() {
                 correct: correctCount,
                 total: totalRecall,
                 percentage: accuracy,
-                memorizeTime: timeLimit - timeLeft, // Approx
-                recallTime: 0, // Not tracked separately per item
+                memorizeTime: timeLimit - timeLeft,
+                recallTime: 0,
             });
         } catch (error) {
             console.error(error);
@@ -509,12 +486,37 @@ export default function UrbanLocusTracer() {
                 {phase === 'setup' && (
                     <div className="glass card animate-fade-in" style={{ padding: '2rem', maxWidth: '600px', margin: '0 auto' }}>
                         <h2 style={{ marginBottom: '1.5rem' }}>Mission Briefing</h2>
-                        <p style={{ marginBottom: '1.5rem', opacity: 0.8 }}>
-                            You will be dropped into a random city sector. 
-                            Identify the marked locations and encode the data found there.
-                            You will then be tested on your ability to recall data by location, and locate data by name.
-                            Finally, you will perform rapid "Mental Walks" between locations.
-                        </p>
+                        
+                        <div style={{ marginBottom: '1.5rem' }}>
+                            <label style={{ display: 'block', marginBottom: '0.5rem' }}>Map Mode</label>
+                            <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                <button className={`btn ${mapMode === 'abstract' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setMapMode('abstract')} style={{ flex: 1 }}>Abstract City</button>
+                                <button className={`btn ${mapMode === 'real' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setMapMode('real')} style={{ flex: 1 }}>Real City</button>
+                            </div>
+                        </div>
+
+                        {mapMode === 'real' && (
+                            <div style={{ marginBottom: '1.5rem' }}>
+                                <label style={{ display: 'block', marginBottom: '0.5rem' }}>Target City</label>
+                                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                    <input 
+                                        type="text" 
+                                        className="input-field" 
+                                        value={cityQuery} 
+                                        onChange={(e) => setCityQuery(e.target.value)}
+                                        placeholder="e.g. London, Tokyo"
+                                    />
+                                    <button className="btn btn-secondary" onClick={searchCity} disabled={isLoadingCity}>
+                                        {isLoadingCity ? '...' : 'Load'}
+                                    </button>
+                                </div>
+                                {realLandmarks.length > 0 && (
+                                    <div style={{ fontSize: '0.8rem', color: 'var(--success)', marginTop: '0.5rem' }}>
+                                        {realLandmarks.length} landmarks found.
+                                    </div>
+                                )}
+                            </div>
+                        )}
                         
                         <div style={{ marginBottom: '1.5rem' }}>
                             <label style={{ display: 'block', marginBottom: '0.5rem' }}>Number of Locations</label>
@@ -545,33 +547,76 @@ export default function UrbanLocusTracer() {
                 <div style={{ display: phase === 'setup' ? 'none' : 'flex', gap: '2rem', flexDirection: 'column' }}>
                     
                     {/* Game Area */}
-                    <div style={{ position: 'relative', margin: '0 auto' }}>
-                        <canvas
-                            ref={canvasRef}
-                            width={MAP_WIDTH}
-                            height={MAP_HEIGHT}
-                            onClick={handleCanvasClick}
-                            onMouseMove={handleMouseMove}
-                            style={{
-                                borderRadius: '1rem',
-                                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
-                                cursor: (phase === 'encode' || phase === 'recall-select') ? 'pointer' : 'default',
-                                maxWidth: '100%',
-                                height: 'auto',
-                                background: '#1e293b'
-                            }}
-                        />
+                    <div style={{ position: 'relative', margin: '0 auto', width: '100%', height: '600px' }}>
+                        {mapMode === 'abstract' ? (
+                            <canvas
+                                ref={canvasRef}
+                                width={MAP_WIDTH}
+                                height={MAP_HEIGHT}
+                                onClick={handleCanvasClick}
+                                onMouseMove={handleMouseMove}
+                                style={{
+                                    borderRadius: '1rem',
+                                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                                    cursor: (phase === 'encode' || phase === 'recall-select') ? 'pointer' : 'default',
+                                    width: '100%',
+                                    height: '100%',
+                                    background: '#1e293b',
+                                    objectFit: 'contain'
+                                }}
+                            />
+                        ) : (
+                            <RealMap 
+                                center={cityCenter}
+                                zoom={cityZoom}
+                                markers={loci.map(l => {
+                                    // Determine color/popup based on phase
+                                    let color = '#3b82f6';
+                                    let popup = undefined;
+                                    let title = l.title;
+
+                                    if (phase === 'encode') {
+                                        popup = `<b>${l.title}</b><br/>${l.data}`;
+                                    } else if (phase === 'recall-select') {
+                                        // No popup, just location
+                                    } else if (phase === 'recall-identify') {
+                                        if (currentRecallItem?.id === l.id) {
+                                            color = '#f472b6'; // Highlight target
+                                        }
+                                    } else if (phase === 'mental-walk') {
+                                        if (walkStartNode?.id === l.id) {
+                                            color = '#22c55e';
+                                            title = "START";
+                                        } else if (walkEndNode?.id === l.id) {
+                                            color = '#ef4444';
+                                            title = "END";
+                                        }
+                                    }
+
+                                    return {
+                                        id: l.id,
+                                        lat: l.x,
+                                        lng: l.y,
+                                        title: title,
+                                        color: color,
+                                        popup: popup
+                                    };
+                                })}
+                                onMarkerClick={(id) => {
+                                    if (phase === 'encode') {
+                                        setSelectedLocusId(id);
+                                    } else if (phase === 'recall-select') {
+                                        handleRecallSelection(id);
+                                    }
+                                }}
+                            />
+                        )}
                         
-                        {/* Overlay UI for Phases */}
-                        {phase === 'encode' && selectedLocusId !== null && (
+                        {/* Overlay UI for Abstract Mode (Real Mode handles its own popups mostly, but we can add overlay) */}
+                        {mapMode === 'abstract' && phase === 'encode' && selectedLocusId !== null && (
                             <div className="glass" style={{ 
-                                position: 'absolute', 
-                                bottom: '20px', 
-                                left: '50%', 
-                                transform: 'translateX(-50%)',
-                                padding: '1rem 2rem',
-                                borderRadius: '2rem',
-                                pointerEvents: 'none'
+                                position: 'absolute', bottom: '20px', left: '50%', transform: 'translateX(-50%)',
+                                padding: '1rem 2rem', borderRadius: '2rem', pointerEvents: 'none'
                             }}>
                                 <span style={{ opacity: 0.7, marginRight: '0.5rem' }}>Locus #{selectedLocusId + 1}:</span>
                                 <span style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>
@@ -583,7 +628,7 @@ export default function UrbanLocusTracer() {
                         {phase === 'encode' && (
                             <button 
                                 className="btn btn-primary"
-                                style={{ position: 'absolute', top: '20px', right: '20px' }}
+                                style={{ position: 'absolute', top: '20px', right: '20px', zIndex: 1000 }}
                                 onClick={startRecall}
                             >
                                 Finish Encoding
@@ -607,6 +652,7 @@ export default function UrbanLocusTracer() {
                         {phase === 'recall-identify' && currentRecallItem && (
                             <div className="glass card animate-fade-in" style={{ textAlign: 'center', padding: '2rem' }}>
                                 <h3 style={{ marginBottom: '1rem', opacity: 0.7 }}>What was at the highlighted location?</h3>
+                                {mapMode === 'real' && <p style={{marginBottom: '1rem', fontStyle: 'italic'}}>{currentRecallItem.title}</p>}
                                 <form onSubmit={submitRecallInput}>
                                     <input
                                         autoFocus
@@ -641,7 +687,6 @@ export default function UrbanLocusTracer() {
                         {phase === 'result' && (
                             <div className="glass card animate-fade-in" style={{ padding: '2rem' }}>
                                 <h2 style={{ textAlign: 'center', marginBottom: '2rem' }}>Mission Report</h2>
-                                
                                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
                                     <div className="glass" style={{ padding: '1rem', borderRadius: '0.75rem', textAlign: 'center' }}>
                                         <div style={{ fontSize: '0.9rem', opacity: 0.7 }}>Recall Accuracy</div>
@@ -656,7 +701,6 @@ export default function UrbanLocusTracer() {
                                         </div>
                                     </div>
                                 </div>
-
                                 <div style={{ display: 'flex', gap: '1rem' }}>
                                     <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setPhase('setup')}>
                                         New Mission

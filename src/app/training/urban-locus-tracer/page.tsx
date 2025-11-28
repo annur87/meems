@@ -323,17 +323,40 @@ export default function UrbanLocusTracerPage() {
         }
     };
 
-    const handleToggleVerified = async (landmark: Landmark) => {
-        const nextStatus = !landmark.verified;
-        setLandmarks(prev => prev.map(l => 
-            l.id === landmark.id ? { ...l, verified: nextStatus } : l
-        ));
+    const handleToggleVerified = async (id: string, currentStatus: boolean) => {
         try {
-            await updateLandmark(USER_ID, landmark.id, { verified: nextStatus });
+            await updateLandmark(USER_ID, id, { verified: !currentStatus });
+            setLandmarks(landmarks.map(l => l.id === id ? { ...l, verified: !currentStatus } : l));
         } catch (error) {
-            console.error('Error updating verification status:', error);
+            console.error("Error toggling verification:", error);
+            alert("Failed to update status");
+        }
+    };
+
+    const handleDeleteAllUnverified = async () => {
+        const unverifiedCount = landmarks.filter(l => !l.verified).length;
+        if (unverifiedCount === 0) {
+            alert("No unverified landmarks to delete.");
+            return;
+        }
+
+        if (!confirm(`Are you sure you want to delete all ${unverifiedCount} unverified landmarks? This action cannot be undone.`)) {
+            return;
+        }
+
+        setIsLoading(true);
+        try {
+            const unverifiedLandmarks = landmarks.filter(l => !l.verified);
+            for (const landmark of unverifiedLandmarks) {
+                await deleteLandmark(USER_ID, landmark.id);
+            }
             await loadLandmarks();
-            alert('Could not update verified status. Please try again.');
+            alert(`Successfully deleted ${unverifiedCount} unverified landmarks.`);
+        } catch (error) {
+            console.error("Error deleting unverified landmarks:", error);
+            alert("Failed to delete some landmarks. Check console for details.");
+        } finally {
+            setIsLoading(false);
         }
     };
 
@@ -746,10 +769,18 @@ export default function UrbanLocusTracerPage() {
                             
                             <button 
                                 className={`btn ${isDrawingMode ? 'btn-primary' : 'btn-secondary'}`}
-                                style={{ width: '100%', marginBottom: '1rem', fontSize: '0.85rem' }}
+                                style={{ width: '100%', marginBottom: '0.5rem', fontSize: '0.85rem' }}
                                 onClick={() => setIsDrawingMode(!isDrawingMode)}
                             >
                                 {isDrawingMode ? '🟦 Drawing Mode ON' : '⬜ Drawing Mode OFF'}
+                            </button>
+
+                            <button 
+                                className="btn"
+                                style={{ width: '100%', marginBottom: '1rem', fontSize: '0.85rem', background: 'rgba(239, 68, 68, 0.2)', color: '#fca5a5', border: '1px solid rgba(239, 68, 68, 0.5)' }}
+                                onClick={handleDeleteAllUnverified}
+                            >
+                                🗑️ Delete All Unverified
                             </button>
                             
                             {landmarks.length === 0 ? (
@@ -850,7 +881,7 @@ export default function UrbanLocusTracerPage() {
                                                     title={landmark.verified ? 'Unverify' : 'Verify'}
                                                     onClick={(e) => {
                                                         e.stopPropagation();
-                                                        handleToggleVerified(landmark);
+                                                        handleToggleVerified(landmark.id, landmark.verified || false);
                                                     }}
                                                     style={{ padding: '0.25rem', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                                                 >

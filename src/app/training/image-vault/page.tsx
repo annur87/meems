@@ -6,11 +6,14 @@ import Link from 'next/link';
 import {
     MajorEntry,
     PaoEntry,
-    Palace
+    DigitPaoEntry,
+    Palace,
+    getImageVaultData,
+    saveImageVaultData
 } from '@/lib/firebase';
 import { SAMPLE_MAJOR_SYSTEM, SAMPLE_PAO_SYSTEM, SAMPLE_PALACES } from '@/data/sampleImageVault';
 
-type SystemType = 'major' | 'pao' | 'palace';
+type SystemType = 'major' | 'card-pao' | 'digit-pao' | 'palace';
 
 const STORAGE_KEY = 'image_vault_data';
 
@@ -24,13 +27,19 @@ export default function ImageVault() {
     const [newMajorNumber, setNewMajorNumber] = useState('');
     const [newMajorImage, setNewMajorImage] = useState('');
 
-    // PAO System
-    const [paoSystem, setPaoSystem] = useState<PaoEntry[]>([]);
-    const [editingPao, setEditingPao] = useState<string | null>(null);
-    const [newPaoCard, setNewPaoCard] = useState('');
-    const [newPaoPerson, setNewPaoPerson] = useState('');
-    const [newPaoAction, setNewPaoAction] = useState('');
-    const [newPaoObject, setNewPaoObject] = useState('');
+    // Card PAO System
+    const [cardPaoSystem, setCardPaoSystem] = useState<PaoEntry[]>([]);
+    const [newCardPaoCard, setNewCardPaoCard] = useState('');
+    const [newCardPaoPerson, setNewCardPaoPerson] = useState('');
+    const [newCardPaoAction, setNewCardPaoAction] = useState('');
+    const [newCardPaoObject, setNewCardPaoObject] = useState('');
+
+    // Digit PAO System
+    const [digitPaoSystem, setDigitPaoSystem] = useState<DigitPaoEntry[]>([]);
+    const [newDigitPaoNumber, setNewDigitPaoNumber] = useState('');
+    const [newDigitPaoPerson, setNewDigitPaoPerson] = useState('');
+    const [newDigitPaoAction, setNewDigitPaoAction] = useState('');
+    const [newDigitPaoObject, setNewDigitPaoObject] = useState('');
 
     // Memory Palaces
     const [palaces, setPalaces] = useState<Palace[]>([]);
@@ -42,45 +51,40 @@ export default function ImageVault() {
     const [draggedItem, setDraggedItem] = useState<{ palaceId: string, index: number } | null>(null);
     const [dragOverItem, setDragOverItem] = useState<{ palaceId: string, index: number } | null>(null);
 
-    // Load from LocalStorage on mount
+    // Load from Firestore on mount
     useEffect(() => {
-        const loadData = () => {
-            const stored = localStorage.getItem(STORAGE_KEY);
-            if (stored) {
-                try {
-                    const data = JSON.parse(stored);
-                    setMajorSystem(data.majorSystem || []);
-                    setPaoSystem(data.paoSystem || []);
-                    setPalaces(data.palaces || []);
-                } catch (e) {
-                    console.error("Failed to parse local data", e);
-                }
+        const loadData = async () => {
+            const data = await getImageVaultData();
+            if (data) {
+                setMajorSystem(data.majorSystem || []);
+                setCardPaoSystem(data.paoSystem || []);
+                setDigitPaoSystem(data.digitPaoSystem || []);
+                setPalaces(data.palaces || []);
             } else {
-                // Initialize with sample data if no local data exists
+                // Initialize with sample data if no cloud data exists (or handle empty state)
+                // For now, we'll just leave them empty or rely on the bootstrap logic from TrainingHub
+                // But if we want to be safe:
                 setMajorSystem(SAMPLE_MAJOR_SYSTEM.map(entry => ({ ...entry, images: [...entry.images] })));
-                setPaoSystem(SAMPLE_PAO_SYSTEM.map(entry => ({ ...entry })));
-                setPalaces(SAMPLE_PALACES.map(palace => ({ ...palace, locations: [...palace.locations] })));
+                // We don't load sample PAO here to avoid overwriting the bootstrapped data potentially
             }
         };
 
         loadData();
     }, []);
 
-    // Save to LocalStorage whenever data changes
+    // Save to Firestore whenever data changes (Debounced)
     useEffect(() => {
-        // Debounce slightly to avoid excessive writes during rapid typing, though LS is synchronous and fast.
         const timeoutId = setTimeout(() => {
-            const data = {
+            saveImageVaultData({
                 majorSystem,
-                paoSystem,
-                palaces,
-                lastUpdated: Date.now()
-            };
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-        }, 500);
+                paoSystem: cardPaoSystem,
+                digitPaoSystem,
+                palaces
+            });
+        }, 1000); // 1 second debounce for cloud save
 
         return () => clearTimeout(timeoutId);
-    }, [majorSystem, paoSystem, palaces]);
+    }, [majorSystem, cardPaoSystem, digitPaoSystem, palaces]);
 
     // Major System Functions
     const addMajorEntry = () => {
@@ -122,34 +126,64 @@ export default function ImageVault() {
         setMajorSystem(majorSystem.filter(e => e.id !== id));
     };
 
-    // PAO System Functions
-    const addPaoEntry = () => {
-        if (!newPaoCard || !newPaoPerson) return;
+    // Card PAO System Functions
+    const addCardPaoEntry = () => {
+        if (!newCardPaoCard || !newCardPaoPerson) return;
 
         const newEntry: PaoEntry = {
             id: Date.now().toString(),
-            card: newPaoCard.toUpperCase(),
-            person: newPaoPerson,
-            action: newPaoAction,
-            object: newPaoObject
+            card: newCardPaoCard.toUpperCase(),
+            person: newCardPaoPerson,
+            action: newCardPaoAction,
+            object: newCardPaoObject
         };
 
-        setPaoSystem([...paoSystem, newEntry].sort((a, b) => a.card.localeCompare(b.card)));
+        setCardPaoSystem([...cardPaoSystem, newEntry].sort((a, b) => a.card.localeCompare(b.card)));
 
-        setNewPaoCard('');
-        setNewPaoPerson('');
-        setNewPaoAction('');
-        setNewPaoObject('');
+        setNewCardPaoCard('');
+        setNewCardPaoPerson('');
+        setNewCardPaoAction('');
+        setNewCardPaoObject('');
     };
 
-    const updatePaoEntry = (id: string, field: keyof PaoEntry, value: string) => {
-        setPaoSystem(paoSystem.map(e =>
+    const updateCardPaoEntry = (id: string, field: keyof PaoEntry, value: string) => {
+        setCardPaoSystem(cardPaoSystem.map(e =>
             e.id === id ? { ...e, [field]: value } : e
         ));
     };
 
-    const deletePaoEntry = (id: string) => {
-        setPaoSystem(paoSystem.filter(e => e.id !== id));
+    const deleteCardPaoEntry = (id: string) => {
+        setCardPaoSystem(cardPaoSystem.filter(e => e.id !== id));
+    };
+
+    // Digit PAO System Functions
+    const addDigitPaoEntry = () => {
+        if (!newDigitPaoNumber || !newDigitPaoPerson) return;
+
+        const newEntry: DigitPaoEntry = {
+            id: Date.now().toString(),
+            number: newDigitPaoNumber,
+            person: newDigitPaoPerson,
+            action: newDigitPaoAction,
+            object: newDigitPaoObject
+        };
+
+        setDigitPaoSystem([...digitPaoSystem, newEntry].sort((a, b) => parseInt(a.number) - parseInt(b.number)));
+
+        setNewDigitPaoNumber('');
+        setNewDigitPaoPerson('');
+        setNewDigitPaoAction('');
+        setNewDigitPaoObject('');
+    };
+
+    const updateDigitPaoEntry = (id: string, field: keyof DigitPaoEntry, value: string) => {
+        setDigitPaoSystem(digitPaoSystem.map(e =>
+            e.id === id ? { ...e, [field]: value } : e
+        ));
+    };
+
+    const deleteDigitPaoEntry = (id: string) => {
+        setDigitPaoSystem(digitPaoSystem.filter(e => e.id !== id));
     };
 
     // Palace Functions
@@ -245,8 +279,15 @@ export default function ImageVault() {
         e.images.some(img => img.toLowerCase().includes(searchQuery.toLowerCase()))
     );
 
-    const filteredPao = paoSystem.filter(e =>
+    const filteredCardPao = cardPaoSystem.filter(e =>
         e.card.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        e.person.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        e.action.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        e.object.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+
+    const filteredDigitPao = digitPaoSystem.filter(e =>
+        e.number.includes(searchQuery) ||
         e.person.toLowerCase().includes(searchQuery.toLowerCase()) ||
         e.action.toLowerCase().includes(searchQuery.toLowerCase()) ||
         e.object.toLowerCase().includes(searchQuery.toLowerCase())
@@ -310,19 +351,34 @@ export default function ImageVault() {
                         Major System ({majorSystem.length})
                     </button>
                     <button
-                        onClick={() => { setActiveTab('pao'); setSearchQuery(''); }}
+                        onClick={() => { setActiveTab('card-pao'); setSearchQuery(''); }}
                         style={{
                             padding: '1rem 1.5rem',
                             background: 'none',
                             border: 'none',
-                            color: activeTab === 'pao' ? 'var(--primary)' : 'var(--foreground)',
-                            borderBottom: activeTab === 'pao' ? '2px solid var(--primary)' : 'none',
+                            color: activeTab === 'card-pao' ? 'var(--primary)' : 'var(--foreground)',
+                            borderBottom: activeTab === 'card-pao' ? '2px solid var(--primary)' : 'none',
                             cursor: 'pointer',
                             fontSize: '1rem',
-                            fontWeight: activeTab === 'pao' ? 'bold' : 'normal'
+                            fontWeight: activeTab === 'card-pao' ? 'bold' : 'normal'
                         }}
                     >
-                        PAO System ({paoSystem.length})
+                        Card PAO ({cardPaoSystem.length})
+                    </button>
+                    <button
+                        onClick={() => { setActiveTab('digit-pao'); setSearchQuery(''); }}
+                        style={{
+                            padding: '1rem 1.5rem',
+                            background: 'none',
+                            border: 'none',
+                            color: activeTab === 'digit-pao' ? 'var(--primary)' : 'var(--foreground)',
+                            borderBottom: activeTab === 'digit-pao' ? '2px solid var(--primary)' : 'none',
+                            cursor: 'pointer',
+                            fontSize: '1rem',
+                            fontWeight: activeTab === 'digit-pao' ? 'bold' : 'normal'
+                        }}
+                    >
+                        Digit PAO ({digitPaoSystem.length})
                     </button>
                     <button
                         onClick={() => { setActiveTab('palace'); setSearchQuery(''); }}
@@ -502,12 +558,12 @@ export default function ImageVault() {
                     </div>
                 )}
 
-                {/* PAO System Tab */}
-                {activeTab === 'pao' && (
+                {/* Card PAO System Tab */}
+                {activeTab === 'card-pao' && (
                     <div className="animate-fade-in">
                         {/* Add New Entry */}
                         <div className="glass card" style={{ marginBottom: '2rem' }}>
-                            <h3 style={{ fontSize: '1.1rem', marginBottom: '1rem' }}>Add PAO Entry</h3>
+                            <h3 style={{ fontSize: '1.1rem', marginBottom: '1rem' }}>Add Card PAO Entry</h3>
                             <div style={{ display: 'grid', gridTemplateColumns: '80px 1fr 1fr 1fr auto', gap: '1rem', alignItems: 'end' }}>
                                 <div>
                                     <label style={{ display: 'block', fontSize: '0.8rem', marginBottom: '0.5rem', opacity: 0.7 }}>Card</label>
@@ -515,8 +571,8 @@ export default function ImageVault() {
                                         type="text"
                                         className="input-field"
                                         placeholder="AS"
-                                        value={newPaoCard}
-                                        onChange={(e) => setNewPaoCard(e.target.value.toUpperCase().slice(0, 2))}
+                                        value={newCardPaoCard}
+                                        onChange={(e) => setNewCardPaoCard(e.target.value.toUpperCase().slice(0, 2))}
                                         maxLength={2}
                                     />
                                 </div>
@@ -526,8 +582,8 @@ export default function ImageVault() {
                                         type="text"
                                         className="input-field"
                                         placeholder="Albert Einstein"
-                                        value={newPaoPerson}
-                                        onChange={(e) => setNewPaoPerson(e.target.value)}
+                                        value={newCardPaoPerson}
+                                        onChange={(e) => setNewCardPaoPerson(e.target.value)}
                                     />
                                 </div>
                                 <div>
@@ -536,8 +592,8 @@ export default function ImageVault() {
                                         type="text"
                                         className="input-field"
                                         placeholder="Calculating"
-                                        value={newPaoAction}
-                                        onChange={(e) => setNewPaoAction(e.target.value)}
+                                        value={newCardPaoAction}
+                                        onChange={(e) => setNewCardPaoAction(e.target.value)}
                                     />
                                 </div>
                                 <div>
@@ -546,12 +602,12 @@ export default function ImageVault() {
                                         type="text"
                                         className="input-field"
                                         placeholder="Chalkboard"
-                                        value={newPaoObject}
-                                        onChange={(e) => setNewPaoObject(e.target.value)}
-                                        onKeyPress={(e) => e.key === 'Enter' && addPaoEntry()}
+                                        value={newCardPaoObject}
+                                        onChange={(e) => setNewCardPaoObject(e.target.value)}
+                                        onKeyPress={(e) => e.key === 'Enter' && addCardPaoEntry()}
                                     />
                                 </div>
-                                <button className="btn btn-primary" onClick={addPaoEntry}>
+                                <button className="btn btn-primary" onClick={addCardPaoEntry}>
                                     Add
                                 </button>
                             </div>
@@ -559,12 +615,12 @@ export default function ImageVault() {
 
                         {/* Entries List */}
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                            {filteredPao.length === 0 ? (
+                            {filteredCardPao.length === 0 ? (
                                 <div className="glass-panel" style={{ padding: '2rem', textAlign: 'center', opacity: 0.5 }}>
-                                    {searchQuery ? 'No results found' : 'No PAO entries yet. Add your first one above!'}
+                                    {searchQuery ? 'No results found' : 'No Card PAO entries yet. Add your first one above!'}
                                 </div>
                             ) : (
-                                filteredPao.map((entry) => (
+                                filteredCardPao.map((entry) => (
                                     <div key={entry.id} className="glass-panel" style={{ padding: '1rem' }}>
                                         <div style={{ display: 'grid', gridTemplateColumns: '60px 1fr 1fr 1fr auto', gap: '1rem', alignItems: 'center' }}>
                                             <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: 'var(--accent)' }}>
@@ -574,25 +630,128 @@ export default function ImageVault() {
                                                 type="text"
                                                 className="input-field"
                                                 value={entry.person}
-                                                onChange={(e) => updatePaoEntry(entry.id, 'person', e.target.value)}
+                                                onChange={(e) => updateCardPaoEntry(entry.id, 'person', e.target.value)}
                                                 style={{ padding: '0.5rem' }}
                                             />
                                             <input
                                                 type="text"
                                                 className="input-field"
                                                 value={entry.action}
-                                                onChange={(e) => updatePaoEntry(entry.id, 'action', e.target.value)}
+                                                onChange={(e) => updateCardPaoEntry(entry.id, 'action', e.target.value)}
                                                 style={{ padding: '0.5rem' }}
                                             />
                                             <input
                                                 type="text"
                                                 className="input-field"
                                                 value={entry.object}
-                                                onChange={(e) => updatePaoEntry(entry.id, 'object', e.target.value)}
+                                                onChange={(e) => updateCardPaoEntry(entry.id, 'object', e.target.value)}
                                                 style={{ padding: '0.5rem' }}
                                             />
                                             <button
-                                                onClick={() => deletePaoEntry(entry.id)}
+                                                onClick={() => deleteCardPaoEntry(entry.id)}
+                                                style={{ background: 'none', border: 'none', color: 'var(--error)', cursor: 'pointer', fontSize: '1.5rem' }}
+                                            >
+                                                ×
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                {/* Digit PAO System Tab */}
+                {activeTab === 'digit-pao' && (
+                    <div className="animate-fade-in">
+                        {/* Add New Entry */}
+                        <div className="glass card" style={{ marginBottom: '2rem' }}>
+                            <h3 style={{ fontSize: '1.1rem', marginBottom: '1rem' }}>Add Digit PAO Entry</h3>
+                            <div style={{ display: 'grid', gridTemplateColumns: '80px 1fr 1fr 1fr auto', gap: '1rem', alignItems: 'end' }}>
+                                <div>
+                                    <label style={{ display: 'block', fontSize: '0.8rem', marginBottom: '0.5rem', opacity: 0.7 }}>Number</label>
+                                    <input
+                                        type="text"
+                                        className="input-field"
+                                        placeholder="00"
+                                        value={newDigitPaoNumber}
+                                        onChange={(e) => setNewDigitPaoNumber(e.target.value.replace(/\D/g, '').slice(0, 2))}
+                                        maxLength={2}
+                                    />
+                                </div>
+                                <div>
+                                    <label style={{ display: 'block', fontSize: '0.8rem', marginBottom: '0.5rem', opacity: 0.7 }}>Person</label>
+                                    <input
+                                        type="text"
+                                        className="input-field"
+                                        placeholder="Person Name"
+                                        value={newDigitPaoPerson}
+                                        onChange={(e) => setNewDigitPaoPerson(e.target.value)}
+                                    />
+                                </div>
+                                <div>
+                                    <label style={{ display: 'block', fontSize: '0.8rem', marginBottom: '0.5rem', opacity: 0.7 }}>Action</label>
+                                    <input
+                                        type="text"
+                                        className="input-field"
+                                        placeholder="Doing something"
+                                        value={newDigitPaoAction}
+                                        onChange={(e) => setNewDigitPaoAction(e.target.value)}
+                                    />
+                                </div>
+                                <div>
+                                    <label style={{ display: 'block', fontSize: '0.8rem', marginBottom: '0.5rem', opacity: 0.7 }}>Object</label>
+                                    <input
+                                        type="text"
+                                        className="input-field"
+                                        placeholder="With something"
+                                        value={newDigitPaoObject}
+                                        onChange={(e) => setNewDigitPaoObject(e.target.value)}
+                                        onKeyPress={(e) => e.key === 'Enter' && addDigitPaoEntry()}
+                                    />
+                                </div>
+                                <button className="btn btn-primary" onClick={addDigitPaoEntry}>
+                                    Add
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Entries List */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                            {filteredDigitPao.length === 0 ? (
+                                <div className="glass-panel" style={{ padding: '2rem', textAlign: 'center', opacity: 0.5 }}>
+                                    {searchQuery ? 'No results found' : 'No Digit PAO entries yet. Add your first one above!'}
+                                </div>
+                            ) : (
+                                filteredDigitPao.map((entry) => (
+                                    <div key={entry.id} className="glass-panel" style={{ padding: '1rem' }}>
+                                        <div style={{ display: 'grid', gridTemplateColumns: '60px 1fr 1fr 1fr auto', gap: '1rem', alignItems: 'center' }}>
+                                            <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: 'var(--accent)' }}>
+                                                {entry.number}
+                                            </div>
+                                            <input
+                                                type="text"
+                                                className="input-field"
+                                                value={entry.person}
+                                                onChange={(e) => updateDigitPaoEntry(entry.id, 'person', e.target.value)}
+                                                style={{ padding: '0.5rem' }}
+                                            />
+                                            <input
+                                                type="text"
+                                                className="input-field"
+                                                value={entry.action}
+                                                onChange={(e) => updateDigitPaoEntry(entry.id, 'action', e.target.value)}
+                                                style={{ padding: '0.5rem' }}
+                                            />
+                                            <input
+                                                type="text"
+                                                className="input-field"
+                                                value={entry.object}
+                                                onChange={(e) => updateDigitPaoEntry(entry.id, 'object', e.target.value)}
+                                                style={{ padding: '0.5rem' }}
+                                            />
+                                            <button
+                                                onClick={() => deleteDigitPaoEntry(entry.id)}
                                                 style={{ background: 'none', border: 'none', color: 'var(--error)', cursor: 'pointer', fontSize: '1.5rem' }}
                                             >
                                                 ×

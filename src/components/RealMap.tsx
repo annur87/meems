@@ -33,6 +33,7 @@ export default function RealMap({ center, zoom, markers, onMarkerClick, onMapCli
     const mapInstanceRef = useRef<any>(null);
     const markersRef = useRef<{ [key: number]: any }>({});
     const [isScriptLoaded, setIsScriptLoaded] = useState(false);
+    const prevCenterRef = useRef<[number, number]>(center);
 
     // Initialize Map
     useEffect(() => {
@@ -42,6 +43,7 @@ export default function RealMap({ center, zoom, markers, onMarkerClick, onMapCli
             // Create Map
             const map = window.L.map(mapContainerRef.current).setView(center, zoom);
             mapInstanceRef.current = map;
+            prevCenterRef.current = center;
 
             // Add Tiles (Esri World Street Map)
             window.L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
@@ -61,8 +63,13 @@ export default function RealMap({ center, zoom, markers, onMarkerClick, onMapCli
                 map.invalidateSize();
             }, 100);
         } else {
-            // Update View
-            mapInstanceRef.current.setView(center, zoom);
+            // Only update view if center actually changed
+            const [prevLat, prevLng] = prevCenterRef.current;
+            const [newLat, newLng] = center;
+            if (Math.abs(prevLat - newLat) > 0.0001 || Math.abs(prevLng - newLng) > 0.0001) {
+                mapInstanceRef.current.setView(center, zoom);
+                prevCenterRef.current = center;
+            }
         }
 
         // Cleanup on unmount

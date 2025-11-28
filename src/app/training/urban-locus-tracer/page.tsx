@@ -192,6 +192,10 @@ export default function UrbanLocusTracer() {
                   node["amenity"="university"](around:5000,${lat},${lon});
                   node["amenity"="hospital"](around:5000,${lat},${lon});
                   node["shop"="mall"](around:5000,${lat},${lon});
+                  node["amenity"="school"](around:5000,${lat},${lon});
+                  node["amenity"="college"](around:5000,${lat},${lon});
+                  node["office"="government"](around:5000,${lat},${lon});
+                  node["building"="public"](around:5000,${lat},${lon});
                 );
                 out body 50;
             `;
@@ -443,7 +447,16 @@ export default function UrbanLocusTracer() {
         const item = queue[0];
         setRecallQueue(queue.slice(1));
         setCurrentRecallItem(item);
-        const type = Math.random() > 0.5 ? 'data-to-loc' : 'loc-to-data';
+        
+        let type: 'data-to-loc' | 'loc-to-data' = 'loc-to-data';
+        if (gameMode === 'landmark-recall') {
+            // In landmark recall, we primarily want "Find X on map" (data-to-loc)
+            // But occasionally mixing it up is fine. Let's bias heavily towards data-to-loc.
+            type = Math.random() > 0.2 ? 'data-to-loc' : 'loc-to-data';
+        } else {
+            type = Math.random() > 0.5 ? 'data-to-loc' : 'loc-to-data';
+        }
+
         setRecallType(type);
         setRecallInput('');
         setPhase(type === 'data-to-loc' ? 'recall-select' : 'recall-identify');
@@ -634,111 +647,143 @@ export default function UrbanLocusTracer() {
 
                 <div style={{ display: phase === 'setup' ? 'none' : 'flex', gap: '2rem', flexDirection: 'column' }}>
                     
-                    {/* Game Area */}
-                    <div style={{ position: 'relative', margin: '0 auto', width: '100%', height: '600px' }}>
-                        {mapMode === 'abstract' ? (
-                            <canvas
-                                ref={canvasRef}
-                                width={MAP_WIDTH}
-                                height={MAP_HEIGHT}
-                                onClick={handleCanvasClick}
-                                onMouseMove={handleMouseMove}
-                                style={{
-                                    borderRadius: '1rem',
-                                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
-                                    cursor: (phase === 'encode' || phase === 'recall-select') ? 'pointer' : 'default',
-                                    width: '100%',
-                                    height: '100%',
-                                    background: '#1e293b',
-                                    objectFit: 'contain'
-                                }}
-                            />
-                        ) : (
-                            <RealMap 
-                                center={cityCenter}
-                                zoom={cityZoom}
-                                markers={loci.map(l => {
-                                    // Determine color/popup based on phase
-                                    let color = '#3b82f6';
-                                    let popup = undefined;
-                                    let title = l.title;
-                                    let label = undefined;
-                                    let isBlurred = false;
-
-                                    if (gameMode === 'landmark-recall') {
-                                        label = l.data;
-                                        // Blur logic: Blur in recall phases
-                                        if (phase === 'recall-select' || phase === 'recall-identify') {
-                                            isBlurred = true;
-                                            // Optional: Unblur if correctly answered? 
-                                            // For now, keep simple.
-                                        }
-                                    }
-
-                                    if (phase === 'encode') {
-                                        popup = `<b>${l.title}</b><br/>${l.data}`;
-                                    } else if (phase === 'recall-select') {
-                                        // No popup, just location
-                                    } else if (phase === 'recall-identify') {
-                                        if (currentRecallItem?.id === l.id) {
-                                            color = '#f472b6'; // Highlight target
-                                        }
-                                    } else if (phase === 'mental-walk') {
-                                        if (walkStartNode?.id === l.id) {
-                                            color = '#22c55e';
-                                            title = "START";
-                                        } else if (walkEndNode?.id === l.id) {
-                                            color = '#ef4444';
-                                            title = "END";
-                                        }
-                                    }
-
-                                    return {
-                                        id: l.id,
-                                        lat: l.x,
-                                        lng: l.y,
-                                        title: title,
-                                        color: color,
-                                        popup: popup,
-                                        label: label,
-                                        isBlurred: isBlurred
-                                    };
-                                })}
-                                onMarkerClick={(id) => {
-                                    if (phase === 'encode') {
-                                        setSelectedLocusId(id);
-                                    } else if (phase === 'recall-select') {
-                                        handleRecallSelection(id);
-                                    } else if (phase === 'recall-identify' && gameMode === 'landmark-recall') {
-                                        // In landmark recall, clicking a blurred label could focus the input?
-                                        // Or maybe we just let them type.
-                                    }
-                                }}
-                                onMapClick={handleRealMapClick}
-                            />
-                        )}
+                    {/* Game Area Container */}
+                    <div style={{ display: 'flex', gap: '1rem', height: '600px' }}>
                         
-                        {/* Overlay UI for Abstract Mode (Real Mode handles its own popups mostly, but we can add overlay) */}
-                        {mapMode === 'abstract' && phase === 'encode' && selectedLocusId !== null && (
-                            <div className="glass" style={{ 
-                                position: 'absolute', bottom: '20px', left: '50%', transform: 'translateX(-50%)',
-                                padding: '1rem 2rem', borderRadius: '2rem', pointerEvents: 'none'
-                            }}>
-                                <span style={{ opacity: 0.7, marginRight: '0.5rem' }}>Locus #{selectedLocusId + 1}:</span>
-                                <span style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>
-                                    {loci.find(l => l.id === selectedLocusId)?.data}
-                                </span>
-                            </div>
-                        )}
+                        {/* Map Area */}
+                        <div style={{ position: 'relative', flex: 1, height: '100%', minWidth: 0 }}>
+                            {mapMode === 'abstract' ? (
+                                <canvas
+                                    ref={canvasRef}
+                                    width={MAP_WIDTH}
+                                    height={MAP_HEIGHT}
+                                    onClick={handleCanvasClick}
+                                    onMouseMove={handleMouseMove}
+                                    style={{
+                                        borderRadius: '1rem',
+                                        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                                        cursor: (phase === 'encode' || phase === 'recall-select') ? 'pointer' : 'default',
+                                        width: '100%',
+                                        height: '100%',
+                                        background: '#1e293b',
+                                        objectFit: 'contain'
+                                    }}
+                                />
+                            ) : (
+                                <RealMap 
+                                    center={cityCenter}
+                                    zoom={cityZoom}
+                                    markers={loci.map(l => {
+                                        // Determine color/popup based on phase
+                                        let color = '#3b82f6';
+                                        let popup = undefined;
+                                        let title = l.title;
+                                        let label = undefined;
+                                        let isBlurred = false;
 
-                        {phase === 'encode' && (
-                            <button 
-                                className="btn btn-primary"
-                                style={{ position: 'absolute', top: '20px', right: '20px', zIndex: 1000 }}
-                                onClick={startRecall}
-                            >
-                                Finish Encoding
-                            </button>
+                                        if (gameMode === 'landmark-recall') {
+                                            label = l.data;
+                                            // Blur logic: Blur in recall phases
+                                            if (phase === 'recall-select' || phase === 'recall-identify') {
+                                                isBlurred = true;
+                                            }
+                                            // Highlight selected in encode
+                                            if (phase === 'encode' && selectedLocusId === l.id) {
+                                                color = '#f472b6';
+                                            }
+                                        }
+
+                                        if (phase === 'encode') {
+                                            popup = `<b>${l.title}</b><br/>${l.data}`;
+                                        } else if (phase === 'recall-select') {
+                                            // No popup, just location
+                                        } else if (phase === 'recall-identify') {
+                                            if (currentRecallItem?.id === l.id) {
+                                                color = '#f472b6'; // Highlight target
+                                            }
+                                        } else if (phase === 'mental-walk') {
+                                            if (walkStartNode?.id === l.id) {
+                                                color = '#22c55e';
+                                                title = "START";
+                                            } else if (walkEndNode?.id === l.id) {
+                                                color = '#ef4444';
+                                                title = "END";
+                                            }
+                                        }
+
+                                        return {
+                                            id: l.id,
+                                            lat: l.x,
+                                            lng: l.y,
+                                            title: title,
+                                            color: color,
+                                            popup: popup,
+                                            label: label,
+                                            isBlurred: isBlurred
+                                        };
+                                    })}
+                                    onMarkerClick={(id) => {
+                                        if (phase === 'encode') {
+                                            setSelectedLocusId(id);
+                                        } else if (phase === 'recall-select') {
+                                            handleRecallSelection(id);
+                                        } else if (phase === 'recall-identify' && gameMode === 'landmark-recall') {
+                                            // In landmark recall, clicking a blurred label could focus the input?
+                                            // Or maybe we just let them type.
+                                        }
+                                    }}
+                                    onMapClick={handleRealMapClick}
+                                />
+                            )}
+                            
+                            {/* Overlay UI for Abstract Mode */}
+                            {mapMode === 'abstract' && phase === 'encode' && selectedLocusId !== null && (
+                                <div className="glass" style={{ 
+                                    position: 'absolute', bottom: '20px', left: '50%', transform: 'translateX(-50%)',
+                                    padding: '1rem 2rem', borderRadius: '2rem', pointerEvents: 'none'
+                                }}>
+                                    <span style={{ opacity: 0.7, marginRight: '0.5rem' }}>Locus #{selectedLocusId + 1}:</span>
+                                    <span style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>
+                                        {loci.find(l => l.id === selectedLocusId)?.data}
+                                    </span>
+                                </div>
+                            )}
+
+                            {phase === 'encode' && (
+                                <button 
+                                    className="btn btn-primary"
+                                    style={{ position: 'absolute', top: '20px', right: '20px', zIndex: 1000 }}
+                                    onClick={startRecall}
+                                >
+                                    Finish Encoding
+                                </button>
+                            )}
+                        </div>
+
+                        {/* Sidebar List (Encode Phase Only) */}
+                        {phase === 'encode' && gameMode === 'landmark-recall' && (
+                            <div className="glass card" style={{ width: '300px', overflowY: 'auto', padding: '1rem' }}>
+                                <h3 style={{ marginBottom: '1rem', fontSize: '1.2rem', fontWeight: 'bold' }}>Landmarks to Memorize</h3>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                    {loci.map(l => (
+                                        <div 
+                                            key={l.id}
+                                            onClick={() => setSelectedLocusId(l.id)}
+                                            style={{
+                                                padding: '0.75rem',
+                                                borderRadius: '0.5rem',
+                                                background: selectedLocusId === l.id ? 'rgba(59, 130, 246, 0.2)' : 'rgba(255,255,255,0.05)',
+                                                border: selectedLocusId === l.id ? '1px solid #3b82f6' : '1px solid transparent',
+                                                cursor: 'pointer',
+                                                transition: 'all 0.2s'
+                                            }}
+                                        >
+                                            <div style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>{l.data}</div>
+                                            <div style={{ fontSize: '0.8rem', opacity: 0.6 }}>Locus #{l.id + 1}</div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
                         )}
                     </div>
 

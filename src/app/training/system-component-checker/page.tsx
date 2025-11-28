@@ -7,8 +7,8 @@ import { MajorEntry, PaoEntry, getImageVaultData, saveGameResult } from '@/lib/f
 import { SAMPLE_MAJOR_SYSTEM, SAMPLE_PAO_SYSTEM } from '@/data/sampleImageVault';
 
 type GameState = 'loading' | 'setup' | 'running' | 'result';
-type PoolType = 'mixed' | 'numbers' | 'cards';
-type QuestionCategory = 'major-image' | 'pao-person' | 'pao-action' | 'pao-object';
+type PoolType = 'mixed' | 'numbers' | 'cards' | 'major-mastery';
+type QuestionCategory = 'major-image' | 'major-reverse' | 'pao-person' | 'pao-action' | 'pao-object';
 
 interface DrillQuestion {
     id: string;
@@ -26,7 +26,8 @@ interface DrillResponse {
 }
 
 const questionLabels: Record<QuestionCategory, string> = {
-    'major-image': 'Major System Image',
+    'major-image': 'Major: Number → Word',
+    'major-reverse': 'Major: Word → Number',
     'pao-person': 'PAO Person',
     'pao-action': 'PAO Action',
     'pao-object': 'PAO Object',
@@ -34,11 +35,20 @@ const questionLabels: Record<QuestionCategory, string> = {
 
 const normalize = (value: string) => value.trim().toLowerCase();
 
-const buildQuestionFromMajor = (entry: MajorEntry): DrillQuestion | null => {
+const buildQuestionFromMajor = (entry: MajorEntry, reverse: boolean = false): DrillQuestion | null => {
     if (!entry.images || entry.images.length === 0) return null;
+    if (reverse) {
+        return {
+            id: `major-rev-${entry.id}`,
+            prompt: `What is the number for "${entry.images[0]}"?`,
+            answer: entry.number,
+            category: 'major-reverse',
+            source: entry.images[0],
+        };
+    }
     return {
         id: `major-${entry.id}`,
-        prompt: `What is your image for ${entry.number}?`,
+        prompt: `What is the word for ${entry.number}?`,
         answer: entry.images[0],
         category: 'major-image',
         source: entry.number,
@@ -168,16 +178,22 @@ export default function SystemComponentChecker() {
                 ? ['major-image', 'pao-person', 'pao-action', 'pao-object']
                 : poolType === 'numbers'
                     ? ['major-image']
-                    : ['pao-person', 'pao-action', 'pao-object'];
+                    : poolType === 'major-mastery'
+                        ? ['major-image', 'major-reverse']
+                        : ['pao-person', 'pao-action', 'pao-object'];
 
         for (let i = 0; i < questionCount; i++) {
             const category = pools[Math.floor(Math.random() * pools.length)];
             let question: DrillQuestion | null = null;
 
-            if (category === 'major-image' && availableMajor.length) {
+            if ((category === 'major-image' || category === 'major-reverse') && availableMajor.length) {
+                // For major-mastery, we want to ensure we cover the range if possible, but random is fine for now
+                // If count is large (e.g. 200), we might want to be more systematic, but random sampling is the current pattern.
+                // To support "mix of all", if count >= available * 2, we should just generate all.
+                // But let's stick to random for consistency with existing code, or improve if needed.
                 const entry = availableMajor[Math.floor(Math.random() * availableMajor.length)];
-                question = buildQuestionFromMajor(entry);
-            } else if (category !== 'major-image' && availablePao.length) {
+                question = buildQuestionFromMajor(entry, category === 'major-reverse');
+            } else if (category !== 'major-image' && category !== 'major-reverse' && availablePao.length) {
                 const entry = availablePao[Math.floor(Math.random() * availablePao.length)];
                 question = buildQuestionFromPao(entry, category);
             }
@@ -276,6 +292,7 @@ export default function SystemComponentChecker() {
                             <div>
                                 <label style={{ display: 'block', marginBottom: '0.5rem', color: '#cbd5e1' }}>Question Pool</label>
                                 <select className="input-field" value={poolType} onChange={(e) => setPoolType(e.target.value as PoolType)}>
+                                    <option value="major-mastery">Major System Mastery (00-99 Mix)</option>
                                     <option value="mixed">Mixed (Numbers + Cards)</option>
                                     <option value="numbers">Numbers Only (Major)</option>
                                     <option value="cards">Cards Only (PAO)</option>
@@ -291,7 +308,7 @@ export default function SystemComponentChecker() {
                                         max={100}
                                         className="input-field"
                                         value={questionCount}
-                                        onChange={(e) => setQuestionCount(Math.max(10, Math.min(100, parseInt(e.target.value, 10) || 10)))}
+                                        onChange={(e) => setQuestionCount(Math.max(10, Math.min(200, parseInt(e.target.value, 10) || 10)))}
                                     />
                                 </div>
                                 <div>
@@ -299,10 +316,10 @@ export default function SystemComponentChecker() {
                                     <input
                                         type="number"
                                         min={30}
-                                        max={180}
+                                        max={600}
                                         className="input-field"
                                         value={timeLimit}
-                                        onChange={(e) => setTimeLimit(Math.max(30, Math.min(180, parseInt(e.target.value, 10) || 60)))}
+                                        onChange={(e) => setTimeLimit(Math.max(30, Math.min(600, parseInt(e.target.value, 10) || 60)))}
                                     />
                                 </div>
                             </div>
@@ -387,6 +404,40 @@ export default function SystemComponentChecker() {
                                 </div>
                             </div>
                         </div>
+
+                        {/* Detailed Breakdown for Major Mastery */}
+                        {poolType === 'major-mastery' && (
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
+                                <div className="glass" style={{ padding: '1rem', borderRadius: '0.75rem' }}>
+                                    <h4 style={{ margin: '0 0 0.5rem', opacity: 0.8 }}>Number → Word</h4>
+                                    {(() => {
+                                        const subset = responses.filter(r => r.question.category === 'major-image');
+                                        const avg = subset.length ? subset.reduce((a, b) => a + b.duration, 0) / subset.length : 0;
+                                        const acc = subset.length ? (subset.filter(r => r.isCorrect).length / subset.length) * 100 : 0;
+                                        return (
+                                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                                <span>Avg: <b>{avg.toFixed(2)}s</b></span>
+                                                <span>Acc: <b>{Math.round(acc)}%</b></span>
+                                            </div>
+                                        );
+                                    })()}
+                                </div>
+                                <div className="glass" style={{ padding: '1rem', borderRadius: '0.75rem' }}>
+                                    <h4 style={{ margin: '0 0 0.5rem', opacity: 0.8 }}>Word → Number</h4>
+                                    {(() => {
+                                        const subset = responses.filter(r => r.question.category === 'major-reverse');
+                                        const avg = subset.length ? subset.reduce((a, b) => a + b.duration, 0) / subset.length : 0;
+                                        const acc = subset.length ? (subset.filter(r => r.isCorrect).length / subset.length) * 100 : 0;
+                                        return (
+                                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                                <span>Avg: <b>{avg.toFixed(2)}s</b></span>
+                                                <span>Acc: <b>{Math.round(acc)}%</b></span>
+                                            </div>
+                                        );
+                                    })()}
+                                </div>
+                            </div>
+                        )}
 
                         <div style={{ maxHeight: '320px', overflowY: 'auto', marginBottom: '1.5rem' }}>
                             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>

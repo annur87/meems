@@ -20,6 +20,10 @@ interface RealMapProps {
     markers: MarkerData[];
     onMarkerClick?: (id: string | number) => void;
     onMapClick?: (lat: number, lng: number) => void;
+    drawingMode?: boolean;
+    drawnRectangles?: any[];
+    onRectangleDrawn?: (rectangle: any) => void;
+    onRectangleDeleted?: (index: number) => void;
 }
 
 declare global {
@@ -28,12 +32,13 @@ declare global {
     }
 }
 
-export default function RealMap({ center, zoom, markers, onMarkerClick, onMapClick }: RealMapProps) {
+export default function RealMap({ center, zoom, markers, onMarkerClick, onMapClick, drawingMode = false, drawnRectangles = [], onRectangleDrawn, onRectangleDeleted }: RealMapProps) {
     const mapContainerRef = useRef<HTMLDivElement>(null);
     const mapInstanceRef = useRef<any>(null);
     const markersRef = useRef<{ [key: string]: any }>({});
     const [isScriptLoaded, setIsScriptLoaded] = useState(false);
     const prevCenterRef = useRef<[number, number]>(center);
+    const drawnItemsRef = useRef<any>(null);
 
     // Initialize Map
     useEffect(() => {
@@ -62,6 +67,32 @@ export default function RealMap({ center, zoom, markers, onMarkerClick, onMapCli
             setTimeout(() => {
                 map.invalidateSize();
             }, 100);
+            
+            // Add drawing layer
+            if (window.L.FeatureGroup) {
+                drawnItemsRef.current = new window.L.FeatureGroup();
+                map.addLayer(drawnItemsRef.current);
+                
+                // Listen for draw events
+                map.on(window.L.Draw.Event.CREATED, (e: any) => {
+                    const layer = e.layer;
+                    drawnItemsRef.current.addLayer(layer);
+                    if (onRectangleDrawn) {
+                        onRectangleDrawn(layer.toGeoJSON());
+                    }
+                });
+                
+                map.on(window.L.Draw.Event.DELETED, (e: any) => {
+                    const layers = e.layers;
+                    let index = 0;
+                    layers.eachLayer(() => {
+                        if (onRectangleDeleted) {
+                            onRectangleDeleted(index);
+                        }
+                        index++;
+                    });
+                });
+            }
         } else {
             // Only update view if center actually changed
             const [prevLat, prevLng] = prevCenterRef.current;
@@ -184,6 +215,65 @@ export default function RealMap({ center, zoom, markers, onMarkerClick, onMapCli
             }
         });
     }, [markers, onMarkerClick]);
+    
+    // Handle Drawing Mode
+    useEffect(() => {
+        if (!mapInstanceRef.current || !window.L || !window.L.Control || !window.L.Control.Draw) return;
+        
+        const map = mapInstanceRef.current;
+        
+        if (drawingMode && !map._drawControl) {
+            // Add drawing controls
+            const drawControl = new window.L.Control.Draw({
+                draw: {
+                    rectangle: {
+                        shapeOptions: {
+                            color: '#3b82f6',
+                            weight: 2,
+                            fillOpacity: 0.2
+                        }
+                    },
+                    polygon: false,
+                    circle: false,
+                    marker: false,
+                    polyline: false,
+                    circlemarker: false
+                },
+                edit: {
+                    featureGroup: drawnItemsRef.current,
+                    remove: true
+                }
+            });
+            map.addControl(drawControl);
+            map._drawControl = drawControl;
+        } else if (!drawingMode && map._drawControl) {
+            // Remove drawing controls
+            map.removeControl(map._drawControl);
+            delete map._drawControl;
+        }
+    }, [drawingMode]);
+    
+    // Render persistent rectangles
+    useEffect(() => {
+        if (!mapInstanceRef.current || !window.L || !drawnItemsRef.current) return;
+        
+        // Clear existing rectangles
+        drawnItemsRef.current.clearLayers();
+        
+        // Add all rectangles from state
+        drawnRectangles.forEach(rectData => {
+            if (rectData && rectData.geometry) {
+                const layer = window.L.geoJSON(rectData, {
+                    style: {
+                        color: '#3b82f6',
+                        weight: 2,
+                        fillOpacity: 0.2
+                    }
+                });
+                drawnItemsRef.current.addLayer(layer);
+            }
+        });
+    }, [drawnRectangles]);
 
     // Handle Resize
     useEffect(() => {
@@ -210,12 +300,21 @@ export default function RealMap({ center, zoom, markers, onMarkerClick, onMapCli
                 integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
                 crossOrigin=""
             />
+            <link 
+                rel="stylesheet" 
+                href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css"
+                crossOrigin=""
+            />
             <Script 
                 src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
                 integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
                 crossOrigin=""
                 onLoad={() => setIsScriptLoaded(true)}
                 onReady={() => setIsScriptLoaded(true)}
+            />
+            <Script 
+                src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"
+                crossOrigin=""
             />
             <div 
                 ref={mapContainerRef} 

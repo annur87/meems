@@ -50,6 +50,7 @@ export interface Palace {
 export interface Landmark {
     id: string;
     name: string;
+    type: string; // e.g., "school", "hospital", "restaurant", etc.
     lat: number;
     lng: number;
     createdAt: number;

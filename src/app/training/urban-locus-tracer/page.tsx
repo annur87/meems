@@ -30,7 +30,10 @@ export default function UrbanLocusTracerPage() {
     
     // Add Mode State
     const [newLandmarkName, setNewLandmarkName] = useState('');
+    const [newLandmarkType, setNewLandmarkType] = useState('school');
     const [pendingLocation, setPendingLocation] = useState<{ lat: number; lng: number } | null>(null);
+    const [isDrawingMode, setIsDrawingMode] = useState(false);
+    const [drawnRectangles, setDrawnRectangles] = useState<any[]>([]);
     
     // Recall Mode State
     const [recallQueue, setRecallQueue] = useState<Landmark[]>([]);
@@ -66,11 +69,13 @@ export default function UrbanLocusTracerPage() {
         try {
             await saveLandmark(USER_ID, {
                 name: newLandmarkName.trim(),
+                type: newLandmarkType,
                 lat: pendingLocation.lat,
                 lng: pendingLocation.lng,
                 createdAt: Date.now()
             });
             setNewLandmarkName('');
+            setNewLandmarkType('school');
             setPendingLocation(null);
             await loadLandmarks();
         } catch (error) {
@@ -170,13 +175,17 @@ export default function UrbanLocusTracerPage() {
             </div>
             
             {/* Main Content */}
-            <div style={{ display: 'flex', gap: '1rem', height: '600px' }}>
+            <div style={{ display: 'flex', gap: '1rem', height: 'calc(100vh - 250px)', minHeight: '600px' }}>
                 
                 {/* Map Area */}
                 <div style={{ flex: 1, position: 'relative' }}>
                     <RealMap 
                         center={cityCenter}
                         zoom={cityZoom}
+                        drawingMode={isDrawingMode && phase === 'add'}
+                        drawnRectangles={drawnRectangles}
+                        onRectangleDrawn={(rect) => setDrawnRectangles([...drawnRectangles, rect])}
+                        onRectangleDeleted={(index) => setDrawnRectangles(drawnRectangles.filter((_, i) => i !== index))}
                         markers={
                             phase === 'add' 
                                 ? [
@@ -213,14 +222,32 @@ export default function UrbanLocusTracerPage() {
                     />
                     
                     {phase === 'add' && pendingLocation && (
-                        <div className="glass card" style={{ position: 'absolute', bottom: '20px', left: '50%', transform: 'translateX(-50%)', padding: '1rem', zIndex: 1000 }}>
+                        <div className="glass card" style={{ position: 'absolute', bottom: '20px', left: '50%', transform: 'translateX(-50%)', padding: '1rem', zIndex: 1000, minWidth: '300px' }}>
+                            <div style={{ marginBottom: '0.5rem' }}>
+                                <label style={{ display: 'block', fontSize: '0.8rem', marginBottom: '0.25rem', opacity: 0.7 }}>Type</label>
+                                <select 
+                                    value={newLandmarkType}
+                                    onChange={(e) => setNewLandmarkType(e.target.value)}
+                                    style={{ width: '100%', marginBottom: '0.5rem' }}
+                                >
+                                    <option value="school">School</option>
+                                    <option value="university">University</option>
+                                    <option value="hospital">Hospital</option>
+                                    <option value="restaurant">Restaurant</option>
+                                    <option value="shopping">Shopping Mall</option>
+                                    <option value="park">Park</option>
+                                    <option value="mosque">Mosque</option>
+                                    <option value="government">Government Building</option>
+                                    <option value="other">Other</option>
+                                </select>
+                            </div>
                             <input 
                                 type="text"
                                 placeholder="Enter landmark name..."
                                 value={newLandmarkName}
                                 onChange={(e) => setNewLandmarkName(e.target.value)}
                                 onKeyPress={(e) => e.key === 'Enter' && handleSaveLandmark()}
-                                style={{ marginBottom: '0.5rem', width: '250px' }}
+                                style={{ marginBottom: '0.5rem', width: '100%' }}
                                 autoFocus
                             />
                             <div style={{ display: 'flex', gap: '0.5rem' }}>
@@ -237,7 +264,7 @@ export default function UrbanLocusTracerPage() {
                     {phase === 'recall' && currentLandmark && (
                         <div className="glass card" style={{ position: 'absolute', top: '20px', left: '50%', transform: 'translateX(-50%)', padding: '1rem', zIndex: 1000, textAlign: 'center' }}>
                             <div style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>
-                                What is this location?
+                                {currentLandmark.type ? `What ${currentLandmark.type} is this?` : 'What is this location?'}
                             </div>
                             <div style={{ fontSize: '0.9rem', opacity: 0.7, marginTop: '0.5rem' }}>
                                 {recallResults.length + 1} / {recallQueue.length + recallResults.length}
@@ -247,13 +274,20 @@ export default function UrbanLocusTracerPage() {
                 </div>
                 
                 {/* Right Panel */}
-                <div className="glass card" style={{ width: '350px', padding: '1.5rem', overflowY: 'auto' }}>
+                <div className="glass card" style={{ width: '280px', padding: '1.5rem', overflowY: 'auto' }}>
                     {phase === 'add' && (
                         <>
                             <h3 style={{ marginBottom: '1rem' }}>Your Landmarks</h3>
-                            <p style={{ fontSize: '0.9rem', opacity: 0.7, marginBottom: '1rem' }}>
+                            <p style={{ fontSize: '0.9rem', opacity: 0.7, marginBottom: '0.5rem' }}>
                                 Click anywhere on the map to add a new landmark.
                             </p>
+                            <button 
+                                className={`btn ${isDrawingMode ? 'btn-primary' : 'btn-secondary'}`}
+                                style={{ width: '100%', marginBottom: '1rem', fontSize: '0.85rem' }}
+                                onClick={() => setIsDrawingMode(!isDrawingMode)}
+                            >
+                                {isDrawingMode ? '🟦 Drawing Mode ON' : '⬜ Drawing Mode OFF'}
+                            </button>
                             
                             {landmarks.length === 0 ? (
                                 <div style={{ textAlign: 'center', opacity: 0.5, padding: '2rem' }}>
@@ -264,17 +298,17 @@ export default function UrbanLocusTracerPage() {
                                     {landmarks.map(landmark => (
                                         <div key={landmark.id} className="glass" style={{ padding: '0.75rem', borderRadius: '0.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                             <div>
-                                                <div style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>{landmark.name}</div>
-                                                <div style={{ fontSize: '0.75rem', opacity: 0.6 }}>
-                                                    {landmark.lat.toFixed(4)}, {landmark.lng.toFixed(4)}
+                                                <div style={{ fontWeight: 'bold', fontSize: '0.85rem' }}>{landmark.name}</div>
+                                                <div style={{ fontSize: '0.7rem', opacity: 0.6 }}>
+                                                    {landmark.type} • {landmark.lat.toFixed(4)}, {landmark.lng.toFixed(4)}
                                                 </div>
                                             </div>
                                             <button 
                                                 className="btn btn-secondary" 
-                                                style={{ padding: '0.25rem 0.5rem', fontSize: '0.8rem' }}
+                                                style={{ padding: '0.25rem 0.5rem', fontSize: '0.7rem' }}
                                                 onClick={() => handleDeleteLandmark(landmark.id)}
                                             >
-                                                Delete
+                                                Del
                                             </button>
                                         </div>
                                     ))}

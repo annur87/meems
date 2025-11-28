@@ -87,7 +87,9 @@ export default function SystemComponentChecker() {
     const [majorSystem, setMajorSystem] = useState<MajorEntry[]>([]);
     const [paoSystem, setPaoSystem] = useState<PaoEntry[]>([]);
 
-    const [poolType, setPoolType] = useState<PoolType>('mixed');
+    const [poolType, setPoolType] = useState<PoolType>('major-mastery'); // Default to major-mastery as per recent context
+    const [majorSubMode, setMajorSubMode] = useState<'mixed' | 'num-to-word' | 'word-to-num'>('mixed');
+    const [isTimed, setIsTimed] = useState(false);
     const [questionCount, setQuestionCount] = useState(25);
     const [timeLimit, setTimeLimit] = useState(60);
 
@@ -150,18 +152,25 @@ export default function SystemComponentChecker() {
 
     useEffect(() => {
         if (gameState !== 'running') return;
-        setTimer(timeLimit);
-        if (timerRef.current) clearInterval(timerRef.current);
-        timerRef.current = setInterval(() => {
-            setTimer((prev) => {
-                if (prev <= 1) {
-                    clearInterval(timerRef.current!);
-                    finalizeSession();
-                    return 0;
-                }
-                return prev - 1;
-            });
-        }, 1000);
+        
+        if (isTimed) {
+            setTimer(timeLimit);
+            if (timerRef.current) clearInterval(timerRef.current);
+            timerRef.current = setInterval(() => {
+                setTimer((prev) => {
+                    if (prev <= 1) {
+                        clearInterval(timerRef.current!);
+                        finalizeSession();
+                        return 0;
+                    }
+                    return prev - 1;
+                });
+            }, 1000);
+        } else {
+            // Untimed mode: just track elapsed time for final stats
+            // We can use sessionStartRef to calculate total time at the end
+            setTimer(0); // Optional: use timer to show elapsed time if desired
+        }
 
         return () => {
             if (timerRef.current) clearInterval(timerRef.current);
@@ -179,7 +188,11 @@ export default function SystemComponentChecker() {
                 : poolType === 'numbers'
                     ? ['major-image']
                     : poolType === 'major-mastery'
-                        ? ['major-image', 'major-reverse']
+                        ? majorSubMode === 'mixed' 
+                            ? ['major-image', 'major-reverse']
+                            : majorSubMode === 'num-to-word'
+                                ? ['major-image']
+                                : ['major-reverse']
                         : ['pao-person', 'pao-action', 'pao-object'];
 
         for (let i = 0; i < questionCount; i++) {
@@ -218,7 +231,8 @@ export default function SystemComponentChecker() {
         responsesRef.current = [];
         setAnswer('');
         setStats(null);
-        setTimer(timeLimit);
+        setStats(null);
+        setTimer(isTimed ? timeLimit : 0);
         setGameState('running');
         questionStartRef.current = Date.now();
         sessionStartRef.current = Date.now();
@@ -300,28 +314,50 @@ export default function SystemComponentChecker() {
                             </div>
 
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem' }}>
+                                {poolType === 'major-mastery' && (
+                                    <div>
+                                        <label style={{ display: 'block', marginBottom: '0.5rem', color: '#cbd5e1' }}>Direction</label>
+                                        <select className="input-field" value={majorSubMode} onChange={(e) => setMajorSubMode(e.target.value as any)}>
+                                            <option value="mixed">Mixed (Both Ways)</option>
+                                            <option value="num-to-word">Number → Word</option>
+                                            <option value="word-to-num">Word → Number</option>
+                                        </select>
+                                    </div>
+                                )}
+                                
                                 <div>
                                     <label style={{ display: 'block', marginBottom: '0.5rem', color: '#cbd5e1' }}>Questions</label>
                                     <input
                                         type="number"
                                         min={10}
-                                        max={100}
+                                        max={200}
                                         className="input-field"
                                         value={questionCount}
                                         onChange={(e) => setQuestionCount(Math.max(10, Math.min(200, parseInt(e.target.value, 10) || 10)))}
                                     />
                                 </div>
+
                                 <div>
-                                    <label style={{ display: 'block', marginBottom: '0.5rem', color: '#cbd5e1' }}>Time Limit (seconds)</label>
-                                    <input
-                                        type="number"
-                                        min={30}
-                                        max={600}
-                                        className="input-field"
-                                        value={timeLimit}
-                                        onChange={(e) => setTimeLimit(Math.max(30, Math.min(600, parseInt(e.target.value, 10) || 60)))}
-                                    />
+                                    <label style={{ display: 'block', marginBottom: '0.5rem', color: '#cbd5e1' }}>Timer Mode</label>
+                                    <select className="input-field" value={isTimed ? 'timed' : 'untimed'} onChange={(e) => setIsTimed(e.target.value === 'timed')}>
+                                        <option value="untimed">Untimed (Stress Free)</option>
+                                        <option value="timed">Timed Challenge</option>
+                                    </select>
                                 </div>
+
+                                {isTimed && (
+                                    <div>
+                                        <label style={{ display: 'block', marginBottom: '0.5rem', color: '#cbd5e1' }}>Time Limit (s)</label>
+                                        <input
+                                            type="number"
+                                            min={30}
+                                            max={600}
+                                            className="input-field"
+                                            value={timeLimit}
+                                            onChange={(e) => setTimeLimit(Math.max(30, Math.min(600, parseInt(e.target.value, 10) || 60)))}
+                                        />
+                                    </div>
+                                )}
                             </div>
 
                             <div style={{ background: 'rgba(15,23,42,0.6)', padding: '1rem', borderRadius: '0.75rem' }}>
@@ -347,9 +383,9 @@ export default function SystemComponentChecker() {
                                 </div>
                             </div>
                             <div>
-                                <div style={{ fontSize: '0.85rem', opacity: 0.7 }}>Timer</div>
-                                <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: timer <= 10 ? 'var(--error)' : 'var(--success)' }}>
-                                    {timer}s
+                                <div style={{ fontSize: '0.85rem', opacity: 0.7 }}>{isTimed ? 'Timer' : 'Mode'}</div>
+                                <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: isTimed && timer <= 10 ? 'var(--error)' : 'var(--success)' }}>
+                                    {isTimed ? `${timer}s` : 'Untimed'}
                                 </div>
                             </div>
                         </div>

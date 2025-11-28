@@ -48,11 +48,19 @@ const IconAnalytics = () => (
     </svg>
 );
 
+const IconLatency = () => (
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="10" />
+        <polyline points="12 6 12 12 16 14" />
+    </svg>
+);
+
 const navLinks = [
     { href: '/training', label: 'Training', icon: <IconTraining /> },
     { href: '/digits', label: 'Digits', icon: <IconDigits /> },
     { href: '/words', label: 'Words', icon: <IconWords /> },
     { href: '/training/card-sequence', label: 'Sequence', icon: <IconSequence /> },
+    { href: '/training/visualization-latency', label: 'Latency', icon: <IconLatency /> },
     { href: '/analytics', label: 'Analytics', icon: <IconAnalytics /> },
 ];
 

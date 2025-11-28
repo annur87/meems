@@ -126,6 +126,23 @@ export default function RealMap({ center, zoom, markers, onMarkerClick, onMapCli
         });
     }, [markers, onMarkerClick]);
 
+    // Handle Resize
+    useEffect(() => {
+        if (!mapContainerRef.current || !mapInstanceRef.current) return;
+
+        const resizeObserver = new ResizeObserver(() => {
+            if (mapInstanceRef.current) {
+                mapInstanceRef.current.invalidateSize();
+            }
+        });
+
+        resizeObserver.observe(mapContainerRef.current);
+
+        return () => {
+            resizeObserver.disconnect();
+        };
+    }, [isScriptLoaded]);
+
     return (
         <>
             <link 
@@ -139,11 +156,11 @@ export default function RealMap({ center, zoom, markers, onMarkerClick, onMapCli
                 integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
                 crossOrigin=""
                 onLoad={() => setIsScriptLoaded(true)}
-                onReady={() => setIsScriptLoaded(true)} // Handle case where script is already loaded
+                onReady={() => setIsScriptLoaded(true)}
             />
             <div 
                 ref={mapContainerRef} 
-                style={{ height: '100%', width: '100%', borderRadius: '1rem', zIndex: 0 }} 
+                style={{ height: '100%', width: '100%', borderRadius: '1rem', zIndex: 0, position: 'relative', overflow: 'hidden' }} 
             />
         </>
     );

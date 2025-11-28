@@ -143,6 +143,16 @@ export const deleteLandmark = async (userId: string, landmarkId: string) => {
     }
 };
 
+export const updateLandmark = async (userId: string, landmarkId: string, updates: Partial<Omit<Landmark, 'id'>>) => {
+    try {
+        const landmarkRef = doc(db, 'landmarks', userId, 'entries', landmarkId);
+        await setDoc(landmarkRef, updates, { merge: true });
+    } catch (error) {
+        console.error('Error updating landmark:', error);
+        throw error;
+    }
+};
+
 // Image Vault Functions
 const USER_ID = 'default_user'; // In a real app, this would be the authenticated user's ID
 

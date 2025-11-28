@@ -10,8 +10,27 @@ type GamePhase = 'add' | 'recall' | 'result';
 interface RecallResult {
     landmarkId: string;
     correctName: string;
-    selectedName: string;
-    isCorrect: boolean;
+    correctLat: number;
+    correctLng: number;
+    selectedLat: number;
+    selectedLng: number;
+    distanceError: number; // in meters
+}
+
+// Haversine formula to calculate distance between two lat/lng points in meters
+function calculateDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
+    const R = 6371000; // Earth's radius in meters
+    const φ1 = lat1 * Math.PI / 180;
+    const φ2 = lat2 * Math.PI / 180;
+    const Δφ = (lat2 - lat1) * Math.PI / 180;
+    const Δλ = (lng2 - lng1) * Math.PI / 180;
+
+    const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+              Math.cos(φ1) * Math.cos(φ2) *
+              Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+    return R * c; // Distance in meters
 }
 
 // Hardcoded user ID for now (in production, use actual auth)
@@ -40,6 +59,16 @@ export default function UrbanLocusTracerPage() {
     const [currentLandmark, setCurrentLandmark] = useState<Landmark | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [recallResults, setRecallResults] = useState<RecallResult[]>([]);
+    const [pendingRecallClick, setPendingRecallClick] = useState(false);
+    
+    // Edit Mode State
+    const [editingLandmark, setEditingLandmark] = useState<Landmark | null>(null);
+    const [editName, setEditName] = useState('');
+    const [editType, setEditType] = useState('');
+    const [editLat, setEditLat] = useState('');
+    const [editLng, setEditLng] = useState('');
+    const [editMode, setEditMode] = useState<'map' | 'manual'>('map');
+    const [pendingEditLocation, setPendingEditLocation] = useState<{ lat: number; lng: number } | null>(null);
     
     // Load landmarks on mount
     useEffect(() => {
@@ -60,6 +89,41 @@ export default function UrbanLocusTracerPage() {
     const handleMapClick = (lat: number, lng: number) => {
         if (phase === 'add') {
             setPendingLocation({ lat, lng });
+        } else if (phase === 'recall' && pendingRecallClick && currentLandmark) {
+            // Calculate distance
+            const distance = calculateDistance(
+                currentLandmark.lat,
+                currentLandmark.lng,
+                lat,
+                lng
+            );
+            
+            const newResult: RecallResult = {
+                landmarkId: currentLandmark.id,
+                correctName: currentLandmark.name,
+                correctLat: currentLandmark.lat,
+                correctLng: currentLandmark.lng,
+                selectedLat: lat,
+                selectedLng: lng,
+                distanceError: distance
+            };
+            
+            const newResults = [...recallResults, newResult];
+            setRecallResults(newResults);
+            setPendingRecallClick(false);
+            
+            // Move to next
+            const remaining = recallQueue.slice(1);
+            if (remaining.length > 0) {
+                setCurrentLandmark(remaining[0]);
+                setRecallQueue(remaining);
+                setCityCenter([23.8103, 90.4125]); // Reset to Dhaka center
+                setCityZoom(14);
+            } else {
+                setPhase('result');
+            }
+        } else if (editingLandmark && editMode === 'map') {
+            setPendingEditLocation({ lat, lng });
         }
     };
     
@@ -104,37 +168,12 @@ export default function UrbanLocusTracerPage() {
         setCurrentLandmark(shuffled[0]);
         setRecallResults([]);
         setSearchQuery('');
+        setPendingRecallClick(true);
         setPhase('recall');
         
-        // Center on first landmark
-        setCityCenter([shuffled[0].lat, shuffled[0].lng]);
-        setCityZoom(17); // Zoom in close
-    };
-    
-    const handleSelectAnswer = (selectedLandmark: Landmark) => {
-        if (!currentLandmark) return;
-        
-        const isCorrect = selectedLandmark.id === currentLandmark.id;
-        const newResult: RecallResult = {
-            landmarkId: currentLandmark.id,
-            correctName: currentLandmark.name,
-            selectedName: selectedLandmark.name,
-            isCorrect
-        };
-        
-        const newResults = [...recallResults, newResult];
-        setRecallResults(newResults);
-        
-        // Move to next
-        const remaining = recallQueue.slice(1);
-        if (remaining.length > 0) {
-            setCurrentLandmark(remaining[0]);
-            setRecallQueue(remaining);
-            setSearchQuery('');
-            setCityCenter([remaining[0].lat, remaining[0].lng]);
-        } else {
-            setPhase('result');
-        }
+        // Reset to Dhaka center
+        setCityCenter([23.8103, 90.4125]);
+        setCityZoom(14);
     };
     
     const resetGame = () => {
@@ -320,36 +359,18 @@ export default function UrbanLocusTracerPage() {
                     
                     {phase === 'recall' && (
                         <>
-                            <h3 style={{ marginBottom: '1rem' }}>Select Location</h3>
-                            <input 
-                                type="text"
-                                placeholder="Search landmarks..."
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                style={{ marginBottom: '1rem', width: '100%' }}
-                            />
+                            <h3 style={{ marginBottom: '1rem' }}>Instructions</h3>
+                            <div className="glass" style={{ padding: '1rem', borderRadius: '0.5rem', marginBottom: '1rem' }}>
+                                <p style={{ fontSize: '0.9rem', marginBottom: '0.5rem' }}>
+                                    <strong>Click on the map</strong> where you think <strong>{currentLandmark?.name}</strong> is located.
+                                </p>
+                                <p style={{ fontSize: '0.8rem', opacity: 0.7 }}>
+                                    Your accuracy will be measured in meters.
+                                </p>
+                            </div>
                             
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                                {filteredLandmarks.map(landmark => (
-                                    <button
-                                        key={landmark.id}
-                                        className="glass"
-                                        style={{ 
-                                            padding: '0.75rem', 
-                                            borderRadius: '0.5rem', 
-                                            textAlign: 'left',
-                                            cursor: 'pointer',
-                                            border: 'none',
-                                            background: 'rgba(255,255,255,0.05)',
-                                            transition: 'all 0.2s'
-                                        }}
-                                        onClick={() => handleSelectAnswer(landmark)}
-                                        onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(59, 130, 246, 0.2)'}
-                                        onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
-                                    >
-                                        <div style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>{landmark.name}</div>
-                                    </button>
-                                ))}
+                            <div style={{ fontSize: '0.9rem', opacity: 0.7, textAlign: 'center' }}>
+                                Progress: {recallResults.length} / {recallQueue.length + recallResults.length}
                             </div>
                         </>
                     )}
@@ -358,26 +379,33 @@ export default function UrbanLocusTracerPage() {
                         <>
                             <h3 style={{ marginBottom: '1rem' }}>Results</h3>
                             <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-                                <div style={{ fontSize: '3rem', fontWeight: 'bold' }}>
-                                    {Math.round((recallResults.filter(r => r.isCorrect).length / recallResults.length) * 100)}%
+                                <div style={{ fontSize: '2.5rem', fontWeight: 'bold' }}>
+                                    {Math.round(recallResults.reduce((sum, r) => sum + r.distanceError, 0) / recallResults.length)}m
                                 </div>
                                 <div style={{ opacity: 0.7 }}>
-                                    {recallResults.filter(r => r.isCorrect).length} / {recallResults.length} correct
+                                    Average Error
                                 </div>
                             </div>
                             
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '1rem' }}>
                                 {recallResults.map((result, i) => (
                                     <div key={i} className="glass" style={{ padding: '0.75rem', borderRadius: '0.5rem' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
-                                            <span style={{ fontSize: '1.2rem' }}>{result.isCorrect ? '✅' : '❌'}</span>
-                                            <span style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>{result.correctName}</span>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
+                                            <span style={{ fontWeight: 'bold', fontSize: '0.85rem' }}>{result.correctName}</span>
+                                            <span style={{ 
+                                                fontSize: '0.9rem', 
+                                                fontWeight: 'bold',
+                                                color: result.distanceError < 100 ? '#22c55e' : result.distanceError < 500 ? '#f59e0b' : '#ef4444'
+                                            }}>
+                                                {Math.round(result.distanceError)}m
+                                            </span>
                                         </div>
-                                        {!result.isCorrect && (
-                                            <div style={{ fontSize: '0.8rem', opacity: 0.6, marginLeft: '1.7rem' }}>
-                                                You selected: {result.selectedName}
-                                            </div>
-                                        )}
+                                        <div style={{ fontSize: '0.7rem', opacity: 0.6 }}>
+                                            Actual: {result.correctLat.toFixed(4)}, {result.correctLng.toFixed(4)}
+                                        </div>
+                                        <div style={{ fontSize: '0.7rem', opacity: 0.6 }}>
+                                            Your guess: {result.selectedLat.toFixed(4)}, {result.selectedLng.toFixed(4)}
+                                        </div>
                                     </div>
                                 ))}
                             </div>

@@ -328,7 +328,7 @@ export default function UrbanLocusTracerPage() {
 
     const filteredLandmarks = landmarks.filter(l => 
         l.name.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+    ).sort((a, b) => a.name.localeCompare(b.name));
     const remainingToAnswer = recallQueue.length + (currentLandmark ? 1 : 0);
     const totalRecallTargets = recallResults.length + remainingToAnswer;
     const totalRecallTimeMs = recallDurationMs ?? recallResults.reduce((sum, r) => sum + r.timeTakenMs, 0);

@@ -167,6 +167,10 @@ export default function RealMap({ center, zoom, markers, lines = [], onMarkerCli
                 
                 // If label status changed, we might need to recreate the icon
                 // For simplicity, let's just update the icon if it's a marker
+                if (existing.setLatLng) {
+                    existing.setLatLng([marker.lat, marker.lng]);
+                }
+
                 if (marker.label) {
                     const icon = window.L.divIcon({
                         className: 'custom-label-icon',

@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useAuth } from '@/contexts/AuthContext';
 import { saveLandmark, getLandmarks, deleteLandmark, type Landmark } from '@/lib/firebase';
 import RealMap from '@/components/RealMap';
 
@@ -15,8 +14,10 @@ interface RecallResult {
     isCorrect: boolean;
 }
 
+// Hardcoded user ID for now (in production, use actual auth)
+const USER_ID = 'default_user';
+
 export default function UrbanLocusTracerPage() {
-    const { user } = useAuth();
     
     // Game State
     const [phase, setPhase] = useState<GamePhase>('add');
@@ -39,16 +40,13 @@ export default function UrbanLocusTracerPage() {
     
     // Load landmarks on mount
     useEffect(() => {
-        if (user) {
-            loadLandmarks();
-        }
-    }, [user]);
+        loadLandmarks();
+    }, []);
     
     const loadLandmarks = async () => {
-        if (!user) return;
         setIsLoading(true);
         try {
-            const data = await getLandmarks(user.uid);
+            const data = await getLandmarks(USER_ID);
             setLandmarks(data);
         } catch (error) {
             console.error('Error loading landmarks:', error);
@@ -63,10 +61,10 @@ export default function UrbanLocusTracerPage() {
     };
     
     const handleSaveLandmark = async () => {
-        if (!user || !pendingLocation || !newLandmarkName.trim()) return;
+        if (!pendingLocation || !newLandmarkName.trim()) return;
         
         try {
-            await saveLandmark(user.uid, {
+            await saveLandmark(USER_ID, {
                 name: newLandmarkName.trim(),
                 lat: pendingLocation.lat,
                 lng: pendingLocation.lng,
@@ -81,9 +79,8 @@ export default function UrbanLocusTracerPage() {
     };
     
     const handleDeleteLandmark = async (landmarkId: string) => {
-        if (!user) return;
         try {
-            await deleteLandmark(user.uid, landmarkId);
+            await deleteLandmark(USER_ID, landmarkId);
             await loadLandmarks();
         } catch (error) {
             console.error('Error deleting landmark:', error);
@@ -146,15 +143,6 @@ export default function UrbanLocusTracerPage() {
     const filteredLandmarks = landmarks.filter(l => 
         l.name.toLowerCase().includes(searchQuery.toLowerCase())
     );
-    
-    if (!user) {
-        return (
-            <div className="container" style={{ padding: '2rem', textAlign: 'center' }}>
-                <h1>Urban Locus Tracer</h1>
-                <p>Please sign in to use this feature.</p>
-            </div>
-        );
-    }
     
     return (
         <div className="container" style={{ padding: '2rem' }}>

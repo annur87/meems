@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import Script from 'next/script';
 
 interface MarkerData {
-    id: number;
+    id: string | number;
     lat: number;
     lng: number;
     title?: string;
@@ -18,7 +18,7 @@ interface RealMapProps {
     center: [number, number];
     zoom: number;
     markers: MarkerData[];
-    onMarkerClick?: (id: number) => void;
+    onMarkerClick?: (id: string | number) => void;
     onMapClick?: (lat: number, lng: number) => void;
 }
 
@@ -31,7 +31,7 @@ declare global {
 export default function RealMap({ center, zoom, markers, onMarkerClick, onMapClick }: RealMapProps) {
     const mapContainerRef = useRef<HTMLDivElement>(null);
     const mapInstanceRef = useRef<any>(null);
-    const markersRef = useRef<{ [key: number]: any }>({});
+    const markersRef = useRef<{ [key: string]: any }>({});
     const [isScriptLoaded, setIsScriptLoaded] = useState(false);
     const prevCenterRef = useRef<[number, number]>(center);
 
@@ -99,8 +99,7 @@ export default function RealMap({ center, zoom, markers, onMarkerClick, onMapCli
         const newIds = new Set(markers.map(m => m.id));
 
         // Remove old
-        Object.keys(markersRef.current).forEach(idStr => {
-            const id = parseInt(idStr);
+        Object.keys(markersRef.current).forEach(id => {
             if (!newIds.has(id)) {
                 map.removeLayer(markersRef.current[id]);
                 delete markersRef.current[id];

@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { saveGameResult } from '@/lib/firebase';
 import wordList from '@/data/words.json';
 import RealMap from '@/components/RealMap';
+import { dhakaLandmarks } from '@/data/dhaka-landmarks';
 
 // --- Types ---
 
@@ -125,9 +126,9 @@ export default function UrbanLocusTracer() {
     const [gameMode, setGameMode] = useState<GameMode>('standard');
     
     // Real Map Settings
-    const [cityQuery, setCityQuery] = useState('New York');
-    const [cityCenter, setCityCenter] = useState<[number, number]>([40.7128, -74.0060]);
-    const [cityZoom, setCityZoom] = useState(13);
+    const [cityQuery, setCityQuery] = useState('Dhaka');
+    const [cityCenter, setCityCenter] = useState<[number, number]>([23.8103, 90.4125]); // Dhaka center
+    const [cityZoom, setCityZoom] = useState(12);
     const [isLoadingCity, setIsLoadingCity] = useState(false);
     const [realLandmarks, setRealLandmarks] = useState<any[]>([]);
 
@@ -162,10 +163,26 @@ export default function UrbanLocusTracer() {
 
     // --- Real Map Logic ---
 
-    const searchCity = async () => {
-        setIsLoadingCity(true);
+    const searchCity = async () => {        setIsLoadingCity(true);
         try {
-            // 1. Get City Bounds
+            // Use hardcoded Dhaka landmarks
+            if (cityQuery.toLowerCase().includes('dhaka') || cityQuery.toLowerCase().includes('bangladesh')) {
+                setCityCenter([23.8103, 90.4125]);
+                setCityZoom(12);
+                
+                // Convert Dhaka landmarks to the format expected by the game
+                const formattedLandmarks = dhakaLandmarks.map(landmark => ({
+                    lat: landmark.lat,
+                    lon: landmark.lng,
+                    tags: { name: landmark.name }
+                }));
+                
+                setRealLandmarks(formattedLandmarks);
+                setIsLoadingCity(false);
+                return;
+            }
+            
+            // Fallback to Nominatim + Overpass for other cities
             const nomRes = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(cityQuery)}&format=json&limit=1`);
             const nomData = await nomRes.json();
             

@@ -1,7 +1,11 @@
 "use client";
 
+import { useEffect } from 'react';
 import Header from '@/components/Header';
 import Link from 'next/link';
+import { bootstrapDigitPaoSystem, bootstrapCardPaoSystem } from '@/lib/firebase';
+import { digitPaoList } from '@/data/digit-pao';
+import { cardPaoList } from '@/data/card-pao';
 
 const games = [
     {
@@ -191,6 +195,28 @@ const games = [
 ];
 
 export default function TrainingHub() {
+    useEffect(() => {
+        // Bootstrap Digit PAO system if needed
+        const initDigitPao = async () => {
+            const paoEntries = digitPaoList.map(p => ({
+                id: p.number,
+                ...p
+            }));
+            await bootstrapDigitPaoSystem(paoEntries);
+        };
+        
+        const initCardPao = async () => {
+            const paoEntries = cardPaoList.map(p => ({
+                id: p.card,
+                ...p
+            }));
+            await bootstrapCardPaoSystem(paoEntries);
+        };
+
+        initDigitPao();
+        initCardPao();
+    }, []);
+
     return (
         <>
             <Header />

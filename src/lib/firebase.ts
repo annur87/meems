@@ -60,8 +60,17 @@ export interface Landmark {
 export interface ImageVaultData {
     majorSystem: MajorEntry[];
     paoSystem: PaoEntry[];
+    digitPaoSystem: DigitPaoEntry[];
     palaces: Palace[];
     lastUpdated: number;
+}
+
+export interface DigitPaoEntry {
+    id: string;
+    number: string;
+    person: string;
+    action: string;
+    object: string;
 }
 
 // Game Results Functions
@@ -169,11 +178,12 @@ export const saveImageVaultData = async (data: Partial<ImageVaultData>) => {
         const existingDoc = await getDoc(docRef);
 
         const updatedData: ImageVaultData = {
-            majorSystem: data.majorSystem || [],
-            paoSystem: data.paoSystem || [],
-            palaces: data.palaces || [],
+            majorSystem: [],
+            paoSystem: [],
+            digitPaoSystem: [],
+            palaces: [],
             lastUpdated: Date.now(),
-            ...(existingDoc.exists() ? existingDoc.data() : {}),
+            ...(existingDoc.exists() ? existingDoc.data() as ImageVaultData : {}),
             ...data
         };
 
@@ -195,11 +205,53 @@ export const getImageVaultData = async (): Promise<ImageVaultData | null> => {
         const docSnap = await getDoc(docRef);
 
         if (docSnap.exists()) {
-            return docSnap.data() as ImageVaultData;
+            const data = docSnap.data() as ImageVaultData;
+            return {
+                majorSystem: data.majorSystem || [],
+                paoSystem: data.paoSystem || [],
+                digitPaoSystem: data.digitPaoSystem || [],
+                palaces: data.palaces || [],
+                lastUpdated: data.lastUpdated
+            };
+        } else {
+            return null;
         }
-        return null;
     } catch (e) {
         console.error("Error getting Image Vault data: ", e);
         return null;
+    }
+};
+
+export const bootstrapDigitPaoSystem = async (defaultData: DigitPaoEntry[]) => {
+    try {
+        const currentData = await getImageVaultData();
+        if (currentData && (!currentData.digitPaoSystem || currentData.digitPaoSystem.length === 0)) {
+            await saveImageVaultData({
+                digitPaoSystem: defaultData
+            });
+            console.log("Digit PAO system bootstrapped successfully.");
+            return true;
+        }
+        return false;
+    } catch (e) {
+        console.error("Error bootstrapping Digit PAO system:", e);
+        return false;
+    }
+};
+
+export const bootstrapCardPaoSystem = async (defaultData: PaoEntry[]) => {
+    try {
+        const currentData = await getImageVaultData();
+        if (currentData && (!currentData.paoSystem || currentData.paoSystem.length === 0)) {
+            await saveImageVaultData({
+                paoSystem: defaultData
+            });
+            console.log("Card PAO system bootstrapped successfully.");
+            return true;
+        }
+        return false;
+    } catch (e) {
+        console.error("Error bootstrapping Card PAO system:", e);
+        return false;
     }
 };

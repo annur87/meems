@@ -36,9 +36,14 @@ export default function RealMap({ center, zoom, markers, onMarkerClick, onMapCli
     const mapContainerRef = useRef<HTMLDivElement>(null);
     const mapInstanceRef = useRef<any>(null);
     const markersRef = useRef<{ [key: string]: any }>({});
+    const latestMapClickRef = useRef<RealMapProps['onMapClick']>();
     const [isScriptLoaded, setIsScriptLoaded] = useState(false);
     const prevCenterRef = useRef<[number, number]>(center);
     const drawnItemsRef = useRef<any>(null);
+
+    useEffect(() => {
+        latestMapClickRef.current = onMapClick;
+    }, [onMapClick]);
 
     // Initialize Map
     useEffect(() => {
@@ -56,12 +61,13 @@ export default function RealMap({ center, zoom, markers, onMarkerClick, onMapCli
                 maxZoom: 19
             }).addTo(map);
 
-            // Click Handler
-            map.on('click', (e: any) => {
-                if (onMapClick) {
-                    onMapClick(e.latlng.lat, e.latlng.lng);
+            const handleLeafletClick = (e: any) => {
+                if (latestMapClickRef.current) {
+                    latestMapClickRef.current(e.latlng.lat, e.latlng.lng);
                 }
-            });
+            };
+            map.on('click', handleLeafletClick);
+            (map as any)._handleLeafletClick = handleLeafletClick;
 
             // Force resize calculation to fix "grey map" issue
             setTimeout(() => {
@@ -118,7 +124,12 @@ export default function RealMap({ center, zoom, markers, onMarkerClick, onMapCli
     useEffect(() => {
         return () => {
             if (mapInstanceRef.current) {
-                mapInstanceRef.current.remove();
+                const map = mapInstanceRef.current as any;
+                if (map._handleLeafletClick) {
+                    map.off('click', map._handleLeafletClick);
+                    delete map._handleLeafletClick;
+                }
+                map.remove();
                 mapInstanceRef.current = null;
             }
         };

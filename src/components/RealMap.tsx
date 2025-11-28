@@ -11,7 +11,6 @@ interface MarkerData {
     color?: string;
     popup?: string;
     label?: string;
-    icon?: string;
     isBlurred?: boolean;
 }
 
@@ -34,6 +33,7 @@ interface RealMapProps {
     drawnRectangles?: any[];
     onRectangleDrawn?: (rectangle: any) => void;
     onRectangleDeleted?: (index: number) => void;
+    hideLabels?: boolean;
 }
 
 declare global {
@@ -42,12 +42,13 @@ declare global {
     }
 }
 
-export default function RealMap({ center, zoom, markers, lines = [], onMarkerClick, onMapClick, drawingMode = false, drawnRectangles = [], onRectangleDrawn, onRectangleDeleted }: RealMapProps) {
+export default function RealMap({ center, zoom, markers, lines = [], onMarkerClick, onMapClick, drawingMode = false, drawnRectangles = [], onRectangleDrawn, onRectangleDeleted, hideLabels = false }: RealMapProps) {
     const mapContainerRef = useRef<HTMLDivElement>(null);
     const mapInstanceRef = useRef<any>(null);
     const markersRef = useRef<{ [key: string]: any }>({});
     const linesRef = useRef<{ [key: string]: any }>({});
     const latestMapClickRef = useRef<RealMapProps['onMapClick'] | null>(null);
+    const tileLayerRef = useRef<any>(null);
     const [isScriptLoaded, setIsScriptLoaded] = useState(false);
     const prevCenterRef = useRef<[number, number]>(center);
     const drawnItemsRef = useRef<any>(null);
@@ -66,9 +67,17 @@ export default function RealMap({ center, zoom, markers, lines = [], onMarkerCli
             mapInstanceRef.current = map;
             prevCenterRef.current = center;
 
-            // Add Tiles (Esri World Street Map)
-            window.L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
-                attribution: 'Tiles &copy; Esri &mdash; Source: Esri, DeLorme, NAVTEQ, USGS, Intermap, iPC, NRCAN, Esri Japan, METI, Esri China (Hong Kong), Esri (Thailand), TomTom, 2012',
+            // Add Tiles - use different layer based on hideLabels prop
+            const tileUrl = hideLabels 
+                ? 'https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png' // No labels
+                : 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}'; // With labels
+            
+            const attribution = hideLabels
+                ? '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+                : 'Tiles &copy; Esri &mdash; Source: Esri, DeLorme, NAVTEQ, USGS, Intermap, iPC, NRCAN, Esri Japan, METI, Esri China (Hong Kong), Esri (Thailand), TomTom, 2012';
+            
+            tileLayerRef.current = window.L.tileLayer(tileUrl, {
+                attribution,
                 maxZoom: 19
             }).addTo(map);
 
@@ -219,25 +228,6 @@ export default function RealMap({ center, zoom, markers, lines = [], onMarkerCli
                         ">${marker.label}</div>`,
                         iconSize: null,
                         iconAnchor: [10, 20]
-                    });
-                    layer = window.L.marker([marker.lat, marker.lng], { icon }).addTo(map);
-                } else if (marker.icon) {
-                    const icon = window.L.divIcon({
-                        className: 'custom-icon-marker',
-                        html: `<div style="
-                            background: white;
-                            width: 24px;
-                            height: 24px;
-                            border-radius: 50%;
-                            display: flex;
-                            align-items: center;
-                            justify-content: center;
-                            border: 2px solid ${marker.color || '#3b82f6'};
-                            font-size: 14px;
-                            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-                        ">${marker.icon}</div>`,
-                        iconSize: [24, 24],
-                        iconAnchor: [12, 12]
                     });
                     layer = window.L.marker([marker.lat, marker.lng], { icon }).addTo(map);
                 } else {

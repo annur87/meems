@@ -81,11 +81,6 @@ const typeIconMap: Record<string, string> = {
     graveyard: '🪦',
     church: '⛪',
     lake: '🌊',
-    residential_field: '⚽',
-    playground: '🛝',
-    gym: '🏋️',
-    temple: '🛕',
-    court: '🎾',
     other: '📍'
 };
 
@@ -114,6 +109,8 @@ export default function UrbanLocusTracerPage() {
     const [recallQueue, setRecallQueue] = useState<Landmark[]>([]);
     const [currentLandmark, setCurrentLandmark] = useState<Landmark | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
+    const [filterTypes, setFilterTypes] = useState<string[]>([]);
+    const [filterVerified, setFilterVerified] = useState<'all' | 'verified' | 'unverified'>('all');
     const [recallResults, setRecallResults] = useState<RecallResult[]>([]);
     const [pendingRecallClick, setPendingRecallClick] = useState(false);
     const [feedbackResult, setFeedbackResult] = useState<RecallResult | null>(null);
@@ -123,6 +120,8 @@ export default function UrbanLocusTracerPage() {
     const [recallCount, setRecallCount] = useState(5);
     const [recallOrder, setRecallOrder] = useState<'random' | 'sequential'>('random');
     const [isRecallConfigOpen, setIsRecallConfigOpen] = useState(false);
+    const [recallFilterTypes, setRecallFilterTypes] = useState<string[]>([]);
+    const [recallFilterVerified, setRecallFilterVerified] = useState<'all' | 'verified' | 'unverified'>('verified');
     
     // Edit Mode State
     const [editingLandmark, setEditingLandmark] = useState<Landmark | null>(null);
@@ -263,13 +262,24 @@ export default function UrbanLocusTracerPage() {
     };
 
     const startRecall = () => {
-        if (verifiedLandmarks.length < 2) {
-            alert('Verify at least 2 landmarks before starting recall!');
+        // Apply filters to get candidates
+        let candidates = landmarks.filter(l => {
+            // Verification filter
+            if (recallFilterVerified === 'verified' && !l.verified) return false;
+            if (recallFilterVerified === 'unverified' && l.verified) return false;
+            
+            // Type filter
+            if (recallFilterTypes.length > 0 && !recallFilterTypes.includes(l.type)) return false;
+            
+            return true;
+        });
+
+        if (candidates.length < 2) {
+            alert('Not enough landmarks match your filters. Please adjust filters or verify more landmarks!');
             return;
         }
 
-        const cappedCount = Math.max(1, Math.min(recallCount, verifiedLandmarks.length));
-        let candidates = [...verifiedLandmarks];
+        const cappedCount = Math.max(1, Math.min(recallCount, candidates.length));
         if (recallOrder === 'random') {
             candidates = candidates.sort(() => Math.random() - 0.5);
         } else {
@@ -372,9 +382,19 @@ export default function UrbanLocusTracerPage() {
         ? Math.min(recallCount, verifiedLandmarks.length)
         : Math.min(recallCount, maxRecallSelectable);
 
-    const filteredLandmarks = landmarks.filter(l => 
-        l.name.toLowerCase().includes(searchQuery.toLowerCase())
-    ).sort((a, b) => a.name.localeCompare(b.name));
+    const filteredLandmarks = landmarks.filter(l => {
+        // Search query filter
+        if (!l.name.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+        
+        // Verification filter
+        if (filterVerified === 'verified' && !l.verified) return false;
+        if (filterVerified === 'unverified' && l.verified) return false;
+        
+        // Type filter
+        if (filterTypes.length > 0 && !filterTypes.includes(l.type)) return false;
+        
+        return true;
+    }).sort((a, b) => a.name.localeCompare(b.name));
     const remainingToAnswer = recallQueue.length + (currentLandmark ? 1 : 0);
     const totalRecallTargets = recallResults.length + remainingToAnswer;
     const totalRecallTimeMs = recallDurationMs ?? recallResults.reduce((sum, r) => sum + r.timeTakenMs, 0);
@@ -418,6 +438,7 @@ export default function UrbanLocusTracerPage() {
                     <RealMap 
                         center={cityCenter}
                         zoom={cityZoom}
+                        hideLabels={phase === 'recall'}
                         drawingMode={isDrawingMode && phase === 'add'}
                         drawnRectangles={drawnRectangles}
                         onRectangleDrawn={(rect) => setDrawnRectangles([...drawnRectangles, rect])}
@@ -441,8 +462,7 @@ export default function UrbanLocusTracerPage() {
                                             lng: l.lng,
                                             title: `${l.name} • ${formatType(l.type)}`,
                                             color: l.verified ? '#22c55e' : '#3b82f6',
-                                            popup: `${l.name} (${formatType(l.type)})${l.verified ? ' • Verified' : ''}`,
-                                            icon: getTypeIcon(l.type)
+                                            popup: `${l.name} (${formatType(l.type)})${l.verified ? ' • Verified' : ''}`
                                     })),
                                     ...(pendingLocation
                                         ? [{
@@ -580,11 +600,6 @@ export default function UrbanLocusTracerPage() {
                                     <option value="graveyard">Graveyard</option>
                                     <option value="church">Church</option>
                                     <option value="lake">Lake</option>
-                                    <option value="residential_field">Residential Field</option>
-                                    <option value="playground">Playground</option>
-                                    <option value="gym">Gym</option>
-                                    <option value="temple">Temple</option>
-                                    <option value="court">Court</option>
                                     <option value="other">Other</option>
                                 </select>
                             </div>
@@ -663,8 +678,72 @@ export default function UrbanLocusTracerPage() {
                                 placeholder="Search landmarks..."
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                style={{ width: '100%', padding: '0.5rem 0.75rem', borderRadius: '0.5rem', border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(0,0,0,0.2)', color: 'white', marginBottom: '1rem' }}
+                                style={{ width: '100%', padding: '0.5rem 0.75rem', borderRadius: '0.5rem', border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(0,0,0,0.2)', color: 'white', marginBottom: '0.5rem' }}
                             />
+                            
+                            {/* Verification Filter */}
+                            <div style={{ marginBottom: '0.5rem' }}>
+                                <label style={{ display: 'block', fontSize: '0.75rem', marginBottom: '0.25rem', opacity: 0.7 }}>Verification Status</label>
+                                <select 
+                                    value={filterVerified}
+                                    onChange={(e) => setFilterVerified(e.target.value as 'all' | 'verified' | 'unverified')}
+                                    style={{ width: '100%', padding: '0.4rem 0.5rem', borderRadius: '0.5rem', border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(0,0,0,0.2)', color: 'white', fontSize: '0.85rem' }}
+                                >
+                                    <option value="all">All</option>
+                                    <option value="verified">Verified Only</option>
+                                    <option value="unverified">Unverified Only</option>
+                                </select>
+                            </div>
+                            
+                            {/* Place Type Filter */}
+                            <div style={{ marginBottom: '1rem' }}>
+                                <label style={{ display: 'block', fontSize: '0.75rem', marginBottom: '0.25rem', opacity: 0.7 }}>Place Types</label>
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.25rem', maxHeight: '120px', overflowY: 'auto', padding: '0.5rem', background: 'rgba(0,0,0,0.2)', borderRadius: '0.5rem', border: '1px solid rgba(255,255,255,0.2)' }}>
+                                    {Array.from(new Set(landmarks.map(l => l.type))).sort().map(type => (
+                                        <button
+                                            key={type}
+                                            onClick={() => {
+                                                if (filterTypes.includes(type)) {
+                                                    setFilterTypes(filterTypes.filter(t => t !== type));
+                                                } else {
+                                                    setFilterTypes([...filterTypes, type]);
+                                                }
+                                            }}
+                                            style={{
+                                                padding: '0.25rem 0.5rem',
+                                                fontSize: '0.7rem',
+                                                borderRadius: '0.25rem',
+                                                border: 'none',
+                                                background: filterTypes.includes(type) ? '#3b82f6' : 'rgba(255,255,255,0.1)',
+                                                color: 'white',
+                                                cursor: 'pointer',
+                                                transition: 'all 0.2s'
+                                            }}
+                                        >
+                                            {getTypeIcon(type)} {formatType(type)}
+                                        </button>
+                                    ))}
+                                </div>
+                                {filterTypes.length > 0 && (
+                                    <button
+                                        onClick={() => setFilterTypes([])}
+                                        style={{
+                                            marginTop: '0.25rem',
+                                            padding: '0.25rem 0.5rem',
+                                            fontSize: '0.7rem',
+                                            borderRadius: '0.25rem',
+                                            border: 'none',
+                                            background: 'rgba(255,255,255,0.1)',
+                                            color: 'white',
+                                            cursor: 'pointer',
+                                            width: '100%'
+                                        }}
+                                    >
+                                        Clear ({filterTypes.length} selected)
+                                    </button>
+                                )}
+                            </div>
+                            
                             <button 
                                 className={`btn ${isDrawingMode ? 'btn-primary' : 'btn-secondary'}`}
                                 style={{ width: '100%', marginBottom: '1rem', fontSize: '0.85rem' }}
@@ -736,32 +815,31 @@ export default function UrbanLocusTracerPage() {
                                         >
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                                                 <div>
-                                                <div>
-                                                    <div style={{ fontWeight: 'bold', fontSize: '0.8rem', display: 'flex', alignItems: 'center' }}>
+                                                    <div style={{ fontWeight: 'bold', fontSize: '0.9rem', display: 'flex', alignItems: 'center' }}>
                                                         <div style={{ 
-                                                            width: '20px', 
-                                                            height: '20px', 
+                                                            width: '24px', 
+                                                            height: '24px', 
                                                             borderRadius: '50%', 
                                                             background: 'rgba(255,255,255,0.1)', 
                                                             display: 'flex', 
                                                             alignItems: 'center', 
                                                             justifyContent: 'center',
-                                                            fontSize: '0.7rem',
-                                                            marginRight: '0.4rem',
+                                                            fontSize: '0.75rem',
+                                                            marginRight: '0.5rem',
                                                             flexShrink: 0
                                                         }}>
                                                             {getTypeIcon(landmark.type)}
                                                         </div>
                                                         {landmark.name}
                                                         {landmark.verified && (
-                                                            <span style={{ color: '#22c55e', marginLeft: '0.3rem', display: 'flex', alignItems: 'center' }}>
-                                                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                                            <span style={{ color: '#22c55e', marginLeft: '0.4rem', display: 'flex', alignItems: 'center' }}>
+                                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                                                                     <polyline points="20 6 9 17 4 12"></polyline>
                                                                 </svg>
                                                             </span>
                                                         )}
                                                     </div>
-                                                    <div style={{ fontSize: '0.7rem', opacity: 0.7, display: 'flex', alignItems: 'center', gap: '0.3rem', marginLeft: '1.65rem' }}>
+                                                    <div style={{ fontSize: '0.75rem', opacity: 0.7, display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
                                                         <span>{formatType(landmark.type)}</span>
                                                     </div>
                                                 </div>
@@ -1022,11 +1100,6 @@ export default function UrbanLocusTracerPage() {
                                 <option value="graveyard">Graveyard</option>
                                 <option value="church">Church</option>
                                 <option value="lake">Lake</option>
-                                <option value="residential_field">Residential Field</option>
-                                <option value="playground">Playground</option>
-                                <option value="gym">Gym</option>
-                                <option value="temple">Temple</option>
-                                <option value="court">Court</option>
                                 <option value="other">Other</option>
                             </select>
                         </div>
@@ -1085,7 +1158,7 @@ export default function UrbanLocusTracerPage() {
                                 Verified available: {verifiedLandmarks.length}
                             </div>
                         </div>
-                        <div style={{ marginBottom: '1.5rem' }}>
+                        <div style={{ marginBottom: '1rem' }}>
                             <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.35rem' }}>
                                 Order
                             </label>
@@ -1097,6 +1170,73 @@ export default function UrbanLocusTracerPage() {
                                 <option value="random">Randomized</option>
                                 <option value="sequential">Alphabetical</option>
                             </select>
+                        </div>
+                        
+                        {/* Verification Filter */}
+                        <div style={{ marginBottom: '1rem' }}>
+                            <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.35rem' }}>
+                                Verification Status
+                            </label>
+                            <select 
+                                value={recallFilterVerified}
+                                onChange={(e) => setRecallFilterVerified(e.target.value as 'all' | 'verified' | 'unverified')}
+                                style={{ width: '100%' }}
+                            >
+                                <option value="all">All</option>
+                                <option value="verified">Verified Only</option>
+                                <option value="unverified">Unverified Only</option>
+                            </select>
+                        </div>
+                        
+                        {/* Place Type Filter */}
+                        <div style={{ marginBottom: '1.5rem' }}>
+                            <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.35rem' }}>
+                                Place Types
+                            </label>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', maxHeight: '150px', overflowY: 'auto', padding: '0.75rem', background: 'rgba(0,0,0,0.2)', borderRadius: '0.5rem', border: '1px solid rgba(255,255,255,0.2)' }}>
+                                {Array.from(new Set(landmarks.map(l => l.type))).sort().map(type => (
+                                    <button
+                                        key={type}
+                                        onClick={() => {
+                                            if (recallFilterTypes.includes(type)) {
+                                                setRecallFilterTypes(recallFilterTypes.filter(t => t !== type));
+                                            } else {
+                                                setRecallFilterTypes([...recallFilterTypes, type]);
+                                            }
+                                        }}
+                                        style={{
+                                            padding: '0.35rem 0.6rem',
+                                            fontSize: '0.75rem',
+                                            borderRadius: '0.35rem',
+                                            border: 'none',
+                                            background: recallFilterTypes.includes(type) ? '#3b82f6' : 'rgba(255,255,255,0.1)',
+                                            color: 'white',
+                                            cursor: 'pointer',
+                                            transition: 'all 0.2s'
+                                        }}
+                                    >
+                                        {getTypeIcon(type)} {formatType(type)}
+                                    </button>
+                                ))}
+                            </div>
+                            {recallFilterTypes.length > 0 && (
+                                <button
+                                    onClick={() => setRecallFilterTypes([])}
+                                    style={{
+                                        marginTop: '0.5rem',
+                                        padding: '0.35rem 0.6rem',
+                                        fontSize: '0.75rem',
+                                        borderRadius: '0.35rem',
+                                        border: 'none',
+                                        background: 'rgba(255,255,255,0.1)',
+                                        color: 'white',
+                                        cursor: 'pointer',
+                                        width: '100%'
+                                    }}
+                                >
+                                    Clear All ({recallFilterTypes.length} selected)
+                                </button>
+                            )}
                         </div>
                         <div style={{ display: 'flex', gap: '0.75rem' }}>
                             <button 

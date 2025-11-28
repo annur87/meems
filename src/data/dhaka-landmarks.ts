@@ -43,12 +43,7 @@ export interface DhakaLandmark {
         | 'river'
         | 'graveyard'
         | 'church'
-        | 'lake'
-        | 'residential_field'
-        | 'playground'
-        | 'gym'
-        | 'temple'
-        | 'court';
+        | 'lake';
 }
 
 export const dhakaLandmarks: DhakaLandmark[] = [

@@ -92,7 +92,7 @@ export default function UrbanLocusTracerPage() {
     const handleMapClick = (lat: number, lng: number) => {
         if (phase === 'add') {
             setPendingLocation({ lat, lng });
-        } else if (phase === 'recall' && pendingRecallClick && currentLandmark) {
+        } else if (phase === 'recall' && currentLandmark && pendingRecallClick) {
             // Calculate distance
             const distance = calculateDistance(
                 currentLandmark.lat,
@@ -122,6 +122,7 @@ export default function UrbanLocusTracerPage() {
                 setRecallQueue(remaining);
                 setCityCenter([23.8103, 90.4125]); // Reset to Dhaka center
                 setCityZoom(14);
+                setPendingRecallClick(true);
             } else {
                 setPhase('result');
             }

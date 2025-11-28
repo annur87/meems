@@ -73,25 +73,27 @@ export default function RealMap({ center, zoom, markers, onMarkerClick, onMapCli
                 drawnItemsRef.current = new window.L.FeatureGroup();
                 map.addLayer(drawnItemsRef.current);
                 
-                // Listen for draw events
-                map.on(window.L.Draw.Event.CREATED, (e: any) => {
-                    const layer = e.layer;
-                    drawnItemsRef.current.addLayer(layer);
-                    if (onRectangleDrawn) {
-                        onRectangleDrawn(layer.toGeoJSON());
-                    }
-                });
-                
-                map.on(window.L.Draw.Event.DELETED, (e: any) => {
-                    const layers = e.layers;
-                    let index = 0;
-                    layers.eachLayer(() => {
-                        if (onRectangleDeleted) {
-                            onRectangleDeleted(index);
+                // Listen for draw events (only if Leaflet.draw is loaded)
+                if (window.L.Draw && window.L.Draw.Event) {
+                    map.on(window.L.Draw.Event.CREATED, (e: any) => {
+                        const layer = e.layer;
+                        drawnItemsRef.current.addLayer(layer);
+                        if (onRectangleDrawn) {
+                            onRectangleDrawn(layer.toGeoJSON());
                         }
-                        index++;
                     });
-                });
+                    
+                    map.on(window.L.Draw.Event.DELETED, (e: any) => {
+                        const layers = e.layers;
+                        let index = 0;
+                        layers.eachLayer(() => {
+                            if (onRectangleDeleted) {
+                                onRectangleDeleted(index);
+                            }
+                            index++;
+                        });
+                    });
+                }
             }
         } else {
             // Only update view if center actually changed

@@ -47,6 +47,14 @@ export interface Palace {
     locations: string[];
 }
 
+export interface Landmark {
+    id: string;
+    name: string;
+    lat: number;
+    lng: number;
+    createdAt: number;
+}
+
 export interface ImageVaultData {
     majorSystem: MajorEntry[];
     paoSystem: PaoEntry[];
@@ -90,6 +98,47 @@ export const getGameResults = async () => {
     } catch (e) {
         console.error("Error getting documents: ", e);
         return [];
+    }
+};
+
+// ===== LANDMARKS =====
+
+export const saveLandmark = async (userId: string, landmark: Omit<Landmark, 'id'>) => {
+    try {
+        const landmarksRef = collection(db, 'landmarks', userId, 'entries');
+        const docRef = await addDoc(landmarksRef, {
+            ...landmark,
+            createdAt: Date.now()
+        });
+        return docRef.id;
+    } catch (error) {
+        console.error('Error saving landmark:', error);
+        throw error;
+    }
+};
+
+export const getLandmarks = async (userId: string): Promise<Landmark[]> => {
+    try {
+        const landmarksRef = collection(db, 'landmarks', userId, 'entries');
+        const q = query(landmarksRef, orderBy('createdAt', 'asc'));
+        const snapshot = await getDocs(q);
+        return snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+        } as Landmark));
+    } catch (error) {
+        console.error('Error getting landmarks:', error);
+        throw error;
+    }
+};
+
+export const deleteLandmark = async (userId: string, landmarkId: string) => {
+    try {
+        const landmarkRef = doc(db, 'landmarks', userId, 'entries', landmarkId);
+        await deleteDoc(landmarkRef);
+    } catch (error) {
+        console.error('Error deleting landmark:', error);
+        throw error;
     }
 };
 

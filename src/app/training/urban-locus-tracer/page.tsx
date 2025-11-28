@@ -70,6 +70,9 @@ export default function UrbanLocusTracerPage() {
     const [editMode, setEditMode] = useState<'map' | 'manual'>('map');
     const [pendingEditLocation, setPendingEditLocation] = useState<{ lat: number; lng: number } | null>(null);
     
+    // Selected landmark for map/sidebar sync
+    const [selectedLandmarkId, setSelectedLandmarkId] = useState<string | null>(null);
+    
     // Load landmarks on mount
     useEffect(() => {
         loadLandmarks();
@@ -264,7 +267,7 @@ export default function UrbanLocusTracerPage() {
                                         lat: l.lat,
                                         lng: l.lng,
                                         title: l.name,
-                                        color: '#3b82f6',
+                                        color: selectedLandmarkId === l.id ? '#22c55e' : '#3b82f6',
                                         popup: l.name
                                     })),
                                     ...(pendingLocation ? [{
@@ -288,7 +291,16 @@ export default function UrbanLocusTracerPage() {
                                     : []
                         }
                         onMapClick={handleMapClick}
-                        onMarkerClick={() => {}}
+                        onMarkerClick={(id) => {
+                            if (phase === 'add') {
+                                setSelectedLandmarkId(id as string);
+                                // Scroll to landmark in sidebar
+                                const element = document.getElementById(`landmark-${id}`);
+                                if (element) {
+                                    element.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                                }
+                            }
+                        }}
                     />
                     
                     {phase === 'add' && pendingLocation && (
@@ -399,7 +411,26 @@ export default function UrbanLocusTracerPage() {
                             ) : (
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                                     {landmarks.map(landmark => (
-                                        <div key={landmark.id} className="glass" style={{ padding: '0.75rem', borderRadius: '0.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <div 
+                                            key={landmark.id} 
+                                            id={`landmark-${landmark.id}`}
+                                            className="glass" 
+                                            style={{ 
+                                                padding: '0.75rem', 
+                                                borderRadius: '0.5rem', 
+                                                display: 'flex', 
+                                                justifyContent: 'space-between', 
+                                                alignItems: 'center',
+                                                cursor: 'pointer',
+                                                border: selectedLandmarkId === landmark.id ? '2px solid #22c55e' : '2px solid transparent',
+                                                background: selectedLandmarkId === landmark.id ? 'rgba(34, 197, 94, 0.1)' : 'rgba(255,255,255,0.05)'
+                                            }}
+                                            onClick={() => {
+                                                setSelectedLandmarkId(landmark.id);
+                                                setCityCenter([landmark.lat, landmark.lng]);
+                                                setCityZoom(16);
+                                            }}
+                                        >
                                             <div>
                                                 <div style={{ fontWeight: 'bold', fontSize: '0.85rem' }}>{landmark.name}</div>
                                                 <div style={{ fontSize: '0.7rem', opacity: 0.6 }}>
@@ -410,7 +441,8 @@ export default function UrbanLocusTracerPage() {
                                                 <button 
                                                     className="btn btn-secondary" 
                                                     style={{ padding: '0.25rem 0.5rem', fontSize: '0.7rem' }}
-                                                    onClick={() => {
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
                                                         setEditingLandmark(landmark);
                                                         setEditName(landmark.name);
                                                         setEditType(landmark.type);
@@ -425,7 +457,10 @@ export default function UrbanLocusTracerPage() {
                                                 <button 
                                                     className="btn btn-secondary" 
                                                     style={{ padding: '0.25rem 0.5rem', fontSize: '0.7rem' }}
-                                                    onClick={() => handleDeleteLandmark(landmark.id)}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleDeleteLandmark(landmark.id);
+                                                    }}
                                                 >
                                                     Del
                                                 </button>

@@ -14,10 +14,19 @@ interface MarkerData {
     isBlurred?: boolean;
 }
 
+interface PolylineData {
+    id: string | number;
+    points: [number, number][];
+    color?: string;
+    weight?: number;
+    dashArray?: string;
+}
+
 interface RealMapProps {
     center: [number, number];
     zoom: number;
     markers: MarkerData[];
+    lines?: PolylineData[];
     onMarkerClick?: (id: string | number) => void;
     onMapClick?: (lat: number, lng: number) => void;
     drawingMode?: boolean;
@@ -32,10 +41,11 @@ declare global {
     }
 }
 
-export default function RealMap({ center, zoom, markers, onMarkerClick, onMapClick, drawingMode = false, drawnRectangles = [], onRectangleDrawn, onRectangleDeleted }: RealMapProps) {
+export default function RealMap({ center, zoom, markers, lines = [], onMarkerClick, onMapClick, drawingMode = false, drawnRectangles = [], onRectangleDrawn, onRectangleDeleted }: RealMapProps) {
     const mapContainerRef = useRef<HTMLDivElement>(null);
     const mapInstanceRef = useRef<any>(null);
     const markersRef = useRef<{ [key: string]: any }>({});
+    const linesRef = useRef<{ [key: string]: any }>({});
     const latestMapClickRef = useRef<RealMapProps['onMapClick'] | null>(null);
     const [isScriptLoaded, setIsScriptLoaded] = useState(false);
     const prevCenterRef = useRef<[number, number]>(center);
@@ -228,6 +238,39 @@ export default function RealMap({ center, zoom, markers, onMarkerClick, onMapCli
             }
         });
     }, [markers, onMarkerClick]);
+
+    // Update polylines
+    useEffect(() => {
+        if (!mapInstanceRef.current || !window.L) return;
+
+        const map = mapInstanceRef.current;
+        const newIds = new Set((lines || []).map(line => line.id));
+
+        Object.keys(linesRef.current).forEach(id => {
+            if (!newIds.has(id)) {
+                map.removeLayer(linesRef.current[id]);
+                delete linesRef.current[id];
+            }
+        });
+
+        (lines || []).forEach(line => {
+            if (linesRef.current[line.id]) {
+                linesRef.current[line.id].setLatLngs(line.points);
+                linesRef.current[line.id].setStyle({
+                    color: line.color || '#f97316',
+                    weight: line.weight || 3,
+                    dashArray: line.dashArray
+                });
+            } else {
+                const polyline = window.L.polyline(line.points, {
+                    color: line.color || '#f97316',
+                    weight: line.weight || 3,
+                    dashArray: line.dashArray
+                }).addTo(map);
+                linesRef.current[line.id] = polyline;
+            }
+        });
+    }, [lines]);
     
     // Handle Drawing Mode
     useEffect(() => {

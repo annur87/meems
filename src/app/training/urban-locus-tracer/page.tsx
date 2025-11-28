@@ -321,6 +321,16 @@ export default function UrbanLocusTracerPage() {
                         drawnRectangles={drawnRectangles}
                         onRectangleDrawn={(rect) => setDrawnRectangles([...drawnRectangles, rect])}
                         onRectangleDeleted={(index) => setDrawnRectangles(drawnRectangles.filter((_, i) => i !== index))}
+                        lines={phase === 'recall' && feedbackResult ? [{
+                            id: `${feedbackResult.landmarkId}-line`,
+                            points: [
+                                [feedbackResult.selectedLat, feedbackResult.selectedLng],
+                                [feedbackResult.correctLat, feedbackResult.correctLng]
+                            ],
+                            color: '#f97316',
+                            weight: 3,
+                            dashArray: '6 4'
+                        }] : []}
                         markers={(() => {
                             if (phase === 'add') {
                                 return [
@@ -367,16 +377,7 @@ export default function UrbanLocusTracerPage() {
                                     ];
                                 }
 
-                                if (currentLandmark && pendingRecallClick) {
-                                    return [{
-                                        id: currentLandmark.id,
-                                        lat: currentLandmark.lat,
-                                        lng: currentLandmark.lng,
-                                        title: '???',
-                                        color: '#ef4444',
-                                        popup: undefined
-                                    }];
-                                }
+                                return [];
                             }
 
                             return [];

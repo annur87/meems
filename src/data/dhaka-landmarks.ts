@@ -32,9 +32,23 @@ export interface DhakaLandmark {
         | 'college'
         | 'road_arterial'
         | 'road_highway_start'
-        | 'area' 
-        | 'dncc' 
+        | 'area'
+        | 'dncc'
         | 'dscc'
+        | 'factory'
+        | 'bus_stand'
+        | 'shopping_complex'
+        | 'mall'
+        | 'road'
+        | 'river'
+        | 'graveyard'
+        | 'church'
+        | 'lake'
+        | 'residential_field'
+        | 'playground'
+        | 'gym'
+        | 'temple'
+        | 'court';
 }
 
 export const dhakaLandmarks: DhakaLandmark[] = [

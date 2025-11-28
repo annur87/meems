@@ -48,18 +48,49 @@ const USER_ID = 'default_user';
 
 const typeIconMap: Record<string, string> = {
     school: '🏫',
+    school_college: '🏫',
+    college: '🏫',
     university: '🎓',
     hospital: '🏥',
     restaurant: '🍽️',
+    cafe: '☕',
     shopping: '🛍️',
+    food_market: '🛒',
     park: '🌳',
+    museum: '🏛️',
+    historical: '🏺',
     mosque: '🕌',
-    government: '🏛️',
+    stadium: '🏟️',
+    government: '🏢',
+    power_gas: '⚡',
+    police: '🚓',
+    post_office: '📮',
+    bank: '🏦',
+    hotel: '🏨',
+    road_arterial: '🛣️',
+    road_highway_start: '🛣️',
+    area: '🗺️',
+    dncc: '🏙️',
+    dscc: '🏙️',
+    factory: '🏭',
+    bus_stand: '🚌',
+    shopping_complex: '🏬',
+    mall: '🛍️',
+    road: '🛣️',
+    river: '🌊',
+    graveyard: '🪦',
+    church: '⛪',
+    lake: '🌊',
+    residential_field: '⚽',
+    playground: '🛝',
+    gym: '🏋️',
+    temple: '🛕',
+    court: '🎾',
     other: '📍'
 };
 
 const getTypeIcon = (type: string) => typeIconMap[type] || '📍';
-const formatType = (type: string) => type.charAt(0).toUpperCase() + type.slice(1);
+const formatType = (type: string) => type.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
 
 export default function UrbanLocusTracerPage() {
     
@@ -203,7 +234,7 @@ export default function UrbanLocusTracerPage() {
                 lat: pendingLocation.lat,
                 lng: pendingLocation.lng,
                 createdAt: Date.now(),
-                verified: false
+                verified: true
             });
             setNewLandmarkName('');
             setNewLandmarkType('school');
@@ -410,7 +441,8 @@ export default function UrbanLocusTracerPage() {
                                             lng: l.lng,
                                             title: `${l.name} • ${formatType(l.type)}`,
                                             color: l.verified ? '#22c55e' : '#3b82f6',
-                                            popup: `${l.name} (${formatType(l.type)})${l.verified ? ' • Verified' : ''}`
+                                            popup: `${l.name} (${formatType(l.type)})${l.verified ? ' • Verified' : ''}`,
+                                            icon: getTypeIcon(l.type)
                                     })),
                                     ...(pendingLocation
                                         ? [{
@@ -515,16 +547,44 @@ export default function UrbanLocusTracerPage() {
                                     style={{ width: '100%', marginBottom: '0.5rem' }}
                                 >
                                     <option value="school">School</option>
+                                    <option value="school_college">School & College</option>
+                                    <option value="college">College</option>
                                     <option value="university">University</option>
                                     <option value="hospital">Hospital</option>
                                     <option value="restaurant">Restaurant</option>
+                                    <option value="cafe">Cafe</option>
                                     <option value="shopping">Shopping Mall</option>
+                                    <option value="food_market">Food Market</option>
                                     <option value="park">Park</option>
                                     <option value="mosque">Mosque</option>
+                                    <option value="museum">Museum</option>
+                                    <option value="historical">Historical</option>
+                                    <option value="stadium">Stadium</option>
                                     <option value="government">Government Building</option>
+                                    <option value="power_gas">Power/Gas</option>
+                                    <option value="police">Police Station</option>
+                                    <option value="post_office">Post Office</option>
+                                    <option value="bank">Bank</option>
+                                    <option value="hotel">Hotel</option>
+                                    <option value="road_arterial">Road (Arterial)</option>
+                                    <option value="road_highway_start">Road (Highway Start)</option>
                                     <option value="area">Area</option>
                                     <option value="dncc">DNCC</option>
                                     <option value="dscc">DSCC</option>
+                                    <option value="factory">Factory</option>
+                                    <option value="bus_stand">Bus Stand</option>
+                                    <option value="shopping_complex">Shopping Complex</option>
+                                    <option value="mall">Mall</option>
+                                    <option value="road">Road</option>
+                                    <option value="river">River</option>
+                                    <option value="graveyard">Graveyard</option>
+                                    <option value="church">Church</option>
+                                    <option value="lake">Lake</option>
+                                    <option value="residential_field">Residential Field</option>
+                                    <option value="playground">Playground</option>
+                                    <option value="gym">Gym</option>
+                                    <option value="temple">Temple</option>
+                                    <option value="court">Court</option>
                                     <option value="other">Other</option>
                                 </select>
                             </div>
@@ -676,13 +736,32 @@ export default function UrbanLocusTracerPage() {
                                         >
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                                                 <div>
-                                                    <div style={{ fontWeight: 'bold', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                                                        {getTypeIcon(landmark.type)} {landmark.name}
+                                                <div>
+                                                    <div style={{ fontWeight: 'bold', fontSize: '0.8rem', display: 'flex', alignItems: 'center' }}>
+                                                        <div style={{ 
+                                                            width: '20px', 
+                                                            height: '20px', 
+                                                            borderRadius: '50%', 
+                                                            background: 'rgba(255,255,255,0.1)', 
+                                                            display: 'flex', 
+                                                            alignItems: 'center', 
+                                                            justifyContent: 'center',
+                                                            fontSize: '0.7rem',
+                                                            marginRight: '0.4rem',
+                                                            flexShrink: 0
+                                                        }}>
+                                                            {getTypeIcon(landmark.type)}
+                                                        </div>
+                                                        {landmark.name}
                                                         {landmark.verified && (
-                                                            <span style={{ fontSize: '0.9rem', color: '#22c55e' }}>✓</span>
+                                                            <span style={{ color: '#22c55e', marginLeft: '0.3rem', display: 'flex', alignItems: 'center' }}>
+                                                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                                                    <polyline points="20 6 9 17 4 12"></polyline>
+                                                                </svg>
+                                                            </span>
                                                         )}
                                                     </div>
-                                                    <div style={{ fontSize: '0.75rem', opacity: 0.7, display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                                                    <div style={{ fontSize: '0.7rem', opacity: 0.7, display: 'flex', alignItems: 'center', gap: '0.3rem', marginLeft: '1.65rem' }}>
                                                         <span>{formatType(landmark.type)}</span>
                                                     </div>
                                                 </div>
@@ -697,7 +776,15 @@ export default function UrbanLocusTracerPage() {
                                                     }}
                                                     style={{ padding: '0.25rem', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                                                 >
-                                                    {landmark.verified ? '★' : '☆'}
+                                                    {landmark.verified ? (
+                                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+                                                            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                                                        </svg>
+                                                    ) : (
+                                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                                                        </svg>
+                                                    )}
                                                 </button>
                                                 <button
                                                     className="btn btn-secondary"
@@ -708,7 +795,14 @@ export default function UrbanLocusTracerPage() {
                                                     }}
                                                     style={{ padding: '0.25rem', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                                                 >
-                                                    ↕️
+                                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                        <polyline points="5 9 2 12 5 15"></polyline>
+                                                        <polyline points="9 5 12 2 15 5"></polyline>
+                                                        <polyline points="15 19 12 22 9 19"></polyline>
+                                                        <polyline points="19 9 22 12 19 15"></polyline>
+                                                        <line x1="2" y1="12" x2="22" y2="12"></line>
+                                                        <line x1="12" y1="2" x2="12" y2="22"></line>
+                                                    </svg>
                                                 </button>
                                                 <button
                                                     className="btn btn-secondary"
@@ -721,7 +815,10 @@ export default function UrbanLocusTracerPage() {
                                                     }}
                                                     style={{ padding: '0.25rem', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                                                 >
-                                                    ✏️
+                                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                                                    </svg>
                                                 </button>
                                                 <button
                                                     className="btn btn-secondary"
@@ -732,7 +829,10 @@ export default function UrbanLocusTracerPage() {
                                                     }}
                                                     style={{ padding: '0.25rem', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                                                 >
-                                                    🗑️
+                                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                        <polyline points="3 6 5 6 21 6"></polyline>
+                                                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                                    </svg>
                                                 </button>
                                             </div>
                                         </div>
@@ -889,16 +989,44 @@ export default function UrbanLocusTracerPage() {
                                 style={{ width: '100%' }}
                             >
                                 <option value="school">School</option>
+                                <option value="school_college">School & College</option>
+                                <option value="college">College</option>
                                 <option value="university">University</option>
                                 <option value="hospital">Hospital</option>
                                 <option value="restaurant">Restaurant</option>
+                                <option value="cafe">Cafe</option>
                                 <option value="shopping">Shopping Mall</option>
+                                <option value="food_market">Food Market</option>
                                 <option value="park">Park</option>
                                 <option value="mosque">Mosque</option>
+                                <option value="museum">Museum</option>
+                                <option value="historical">Historical</option>
+                                <option value="stadium">Stadium</option>
                                 <option value="government">Government Building</option>
+                                <option value="power_gas">Power/Gas</option>
+                                <option value="police">Police Station</option>
+                                <option value="post_office">Post Office</option>
+                                <option value="bank">Bank</option>
+                                <option value="hotel">Hotel</option>
+                                <option value="road_arterial">Road (Arterial)</option>
+                                <option value="road_highway_start">Road (Highway Start)</option>
                                 <option value="area">Area</option>
                                 <option value="dncc">DNCC</option>
                                 <option value="dscc">DSCC</option>
+                                <option value="factory">Factory</option>
+                                <option value="bus_stand">Bus Stand</option>
+                                <option value="shopping_complex">Shopping Complex</option>
+                                <option value="mall">Mall</option>
+                                <option value="road">Road</option>
+                                <option value="river">River</option>
+                                <option value="graveyard">Graveyard</option>
+                                <option value="church">Church</option>
+                                <option value="lake">Lake</option>
+                                <option value="residential_field">Residential Field</option>
+                                <option value="playground">Playground</option>
+                                <option value="gym">Gym</option>
+                                <option value="temple">Temple</option>
+                                <option value="court">Court</option>
                                 <option value="other">Other</option>
                             </select>
                         </div>

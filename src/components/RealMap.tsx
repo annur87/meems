@@ -11,6 +11,7 @@ interface MarkerData {
     color?: string;
     popup?: string;
     label?: string;
+    icon?: string;
     isBlurred?: boolean;
 }
 
@@ -220,14 +221,33 @@ export default function RealMap({ center, zoom, markers, lines = [], onMarkerCli
                         iconAnchor: [10, 20]
                     });
                     layer = window.L.marker([marker.lat, marker.lng], { icon }).addTo(map);
+                } else if (marker.icon) {
+                    const icon = window.L.divIcon({
+                        className: 'custom-icon-marker',
+                        html: `<div style="
+                            background: white;
+                            width: 24px;
+                            height: 24px;
+                            border-radius: 50%;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            border: 2px solid ${marker.color || '#3b82f6'};
+                            font-size: 14px;
+                            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+                        ">${marker.icon}</div>`,
+                        iconSize: [24, 24],
+                        iconAnchor: [12, 12]
+                    });
+                    layer = window.L.marker([marker.lat, marker.lng], { icon }).addTo(map);
                 } else {
                     layer = window.L.circleMarker([marker.lat, marker.lng], {
-                        radius: 5, // Reduced from 8 to 5 for smaller markers
+                        radius: 4, // Slightly smaller for precision
                         fillColor: marker.color || '#3b82f6',
                         color: '#fff',
-                        weight: 1.5, // Reduced from 2 to 1.5 for thinner border
+                        weight: 1, // Thinner border
                         opacity: 1,
-                        fillOpacity: 0.8
+                        fillOpacity: 1 // Solid fill
                     }).addTo(map);
                 }
 

@@ -148,24 +148,27 @@ export default function UrbanLocusTracer() {
             setCityCenter([lat, lon]);
 
             // 2. Fetch Landmarks (Overpass)
-            // Query for tourism=attraction, amenity=place_of_worship, historic=memorial, etc.
-            // Around the center point (radius 5000m)
+            // Optimized query: smaller radius (1500m), timeout, limit 20
             const overpassQuery = `
-                [out:json];
+                [out:json][timeout:10];
                 (
-                  node["tourism"="attraction"](around:3000,${lat},${lon});
-                  node["historic"="memorial"](around:3000,${lat},${lon});
-                  node["amenity"="place_of_worship"](around:3000,${lat},${lon});
-                  node["leisure"="park"](around:3000,${lat},${lon});
+                  node["tourism"="attraction"](around:1500,${lat},${lon});
+                  node["amenity"="place_of_worship"](around:1500,${lat},${lon});
+                  node["historic"="memorial"](around:1500,${lat},${lon});
+                  node["leisure"="park"](around:1500,${lat},${lon});
                 );
-                out body 50;
+                out body 20;
             `;
             
             const overpassRes = await fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(overpassQuery)}`);
             const overpassData = await overpassRes.json();
             
-            if (overpassData.elements) {
+            if (overpassData.elements && overpassData.elements.length > 0) {
                 setRealLandmarks(overpassData.elements.filter((e: any) => e.tags && e.tags.name));
+            } else {
+                // Fallback if no landmarks found
+                setRealLandmarks([]);
+                alert("No automatic landmarks found. You can click on the map to add them manually.");
             }
 
         } catch (e) {
@@ -306,6 +309,18 @@ export default function UrbanLocusTracer() {
 
         if (phase === 'encode') setSelectedLocusId(clickedId);
         else if (phase === 'recall-select' && clickedId !== null) handleRecallSelection(clickedId);
+    };
+
+    const handleRealMapClick = (lat: number, lng: number) => {
+        if (phase === 'setup' && mapMode === 'real') {
+            // Allow manual addition in setup phase
+            const newLandmark = {
+                lat,
+                lon: lng,
+                tags: { name: `Custom Location ${realLandmarks.length + 1}` }
+            };
+            setRealLandmarks(prev => [...prev, newLandmark]);
+        }
     };
 
     const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -515,6 +530,9 @@ export default function UrbanLocusTracer() {
                                         {realLandmarks.length} landmarks found.
                                     </div>
                                 )}
+                                <div style={{ fontSize: '0.8rem', opacity: 0.7, marginTop: '0.5rem' }}>
+                                    Tip: Click on the map to manually add more locations.
+                                </div>
                             </div>
                         )}
                         
@@ -609,6 +627,7 @@ export default function UrbanLocusTracer() {
                                         handleRecallSelection(id);
                                     }
                                 }}
+                                onMapClick={handleRealMapClick}
                             />
                         )}
                         

@@ -322,14 +322,15 @@ export default function ImageVault() {
                                     if (confirm('This will overwrite your current data with the default sets. Are you sure?')) {
                                         const { digitPaoList } = await import('@/data/digit-pao');
                                         const { cardPaoList } = await import('@/data/card-pao');
+                                        const { majorSystemList } = await import('@/data/major-system');
                                         
                                         const digitEntries = digitPaoList.map(p => ({ id: p.number, ...p }));
                                         const cardEntries = cardPaoList.map(p => ({ id: p.card, ...p }));
                                         
-                                        const majorEntries = digitEntries.map(entry => ({
-                                            id: entry.number,
-                                            number: entry.number,
-                                            images: [entry.person, entry.action, entry.object].filter(Boolean)
+                                        const majorEntries = majorSystemList.map(m => ({
+                                            id: m.number,
+                                            number: m.number,
+                                            images: [m.word]
                                         }));
 
                                         await saveImageVaultData({

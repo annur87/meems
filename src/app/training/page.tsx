@@ -3,9 +3,10 @@
 import { useEffect } from 'react';
 import Header from '@/components/Header';
 import Link from 'next/link';
-import { bootstrapDigitPaoSystem, bootstrapCardPaoSystem } from '@/lib/firebase';
+import { bootstrapDigitPaoSystem, bootstrapCardPaoSystem, bootstrapMajorSystem } from '@/lib/firebase';
 import { digitPaoList } from '@/data/digit-pao';
 import { cardPaoList } from '@/data/card-pao';
+import { majorSystemList } from '@/data/major-system';
 
 const games = [
     {
@@ -213,8 +214,18 @@ export default function TrainingHub() {
             await bootstrapCardPaoSystem(paoEntries);
         };
 
+        const initMajorSystem = async () => {
+            const majorEntries = majorSystemList.map(m => ({
+                id: m.number,
+                number: m.number,
+                images: [m.word]
+            }));
+            await bootstrapMajorSystem(majorEntries);
+        };
+
         initDigitPao();
         initCardPao();
+        initMajorSystem();
     }, []);
 
     return (

@@ -235,25 +235,14 @@ export const bootstrapDigitPaoSystem = async (defaultData: DigitPaoEntry[]) => {
             needsUpdate = true;
         }
 
-        // Bootstrap Major System from Digit PAO if missing
-        if (!currentData || !currentData.majorSystem || currentData.majorSystem.length === 0) {
-            const majorEntries: MajorEntry[] = defaultData.map(entry => ({
-                id: entry.number,
-                number: entry.number,
-                images: [entry.person, entry.action, entry.object].filter(Boolean)
-            }));
-            updates.majorSystem = majorEntries;
-            needsUpdate = true;
-        }
-
         if (needsUpdate) {
             await saveImageVaultData(updates);
-            console.log("Digit PAO and Major System bootstrapped successfully.");
+            console.log("Digit PAO system bootstrapped successfully.");
             return true;
         }
         return false;
     } catch (e) {
-        console.error("Error bootstrapping Digit PAO/Major system:", e);
+        console.error("Error bootstrapping Digit PAO system:", e);
         return false;
     }
 };
@@ -272,6 +261,24 @@ export const bootstrapCardPaoSystem = async (defaultData: PaoEntry[]) => {
         return false;
     } catch (e) {
         console.error("Error bootstrapping Card PAO system:", e);
+        return false;
+    }
+};
+
+export const bootstrapMajorSystem = async (defaultData: MajorEntry[]) => {
+    try {
+        const currentData = await getImageVaultData();
+        // If no data exists, or if majorSystem is empty/missing, we bootstrap
+        if (!currentData || !currentData.majorSystem || currentData.majorSystem.length === 0) {
+            await saveImageVaultData({
+                majorSystem: defaultData
+            });
+            console.log("Major System bootstrapped successfully.");
+            return true;
+        }
+        return false;
+    } catch (e) {
+        console.error("Error bootstrapping Major System:", e);
         return false;
     }
 };

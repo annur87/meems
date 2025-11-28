@@ -313,10 +313,45 @@ export default function ImageVault() {
                             <p style={{ opacity: 0.7, marginTop: '0.5rem' }}>Manage and organize your mnemonic systems</p>
                         </div>
                         <div style={{ textAlign: 'right', fontSize: '0.85rem', opacity: 0.7 }}>
-                            <div style={{ color: 'var(--success)' }}>
-                                <span style={{ marginRight: '0.5rem' }}>✓</span>
-                                Local Storage Active
+                            <div style={{ color: 'var(--success)', marginBottom: '0.5rem' }}>
+                                <span style={{ marginRight: '0.5rem' }}>☁️</span>
+                                Cloud Storage Active
                             </div>
+                            <button 
+                                onClick={async () => {
+                                    if (confirm('This will overwrite your current data with the default sets. Are you sure?')) {
+                                        const { digitPaoList } = await import('@/data/digit-pao');
+                                        const { cardPaoList } = await import('@/data/card-pao');
+                                        
+                                        const digitEntries = digitPaoList.map(p => ({ id: p.number, ...p }));
+                                        const cardEntries = cardPaoList.map(p => ({ id: p.card, ...p }));
+                                        
+                                        await saveImageVaultData({
+                                            digitPaoSystem: digitEntries,
+                                            paoSystem: cardEntries
+                                        });
+                                        
+                                        // Reload
+                                        const data = await getImageVaultData();
+                                        if (data) {
+                                            setDigitPaoSystem(data.digitPaoSystem || []);
+                                            setCardPaoSystem(data.paoSystem || []);
+                                        }
+                                        alert('Data reset to defaults!');
+                                    }
+                                }}
+                                style={{
+                                    background: 'none',
+                                    border: '1px solid rgba(255,255,255,0.2)',
+                                    padding: '0.25rem 0.5rem',
+                                    borderRadius: '0.25rem',
+                                    color: 'var(--foreground)',
+                                    cursor: 'pointer',
+                                    fontSize: '0.75rem'
+                                }}
+                            >
+                                ↺ Reset Defaults
+                            </button>
                         </div>
                     </div>
                 </div>

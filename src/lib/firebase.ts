@@ -225,7 +225,8 @@ export const getImageVaultData = async (): Promise<ImageVaultData | null> => {
 export const bootstrapDigitPaoSystem = async (defaultData: DigitPaoEntry[]) => {
     try {
         const currentData = await getImageVaultData();
-        if (currentData && (!currentData.digitPaoSystem || currentData.digitPaoSystem.length === 0)) {
+        // If no data exists, or if digitPaoSystem is empty/missing, we bootstrap
+        if (!currentData || !currentData.digitPaoSystem || currentData.digitPaoSystem.length === 0) {
             await saveImageVaultData({
                 digitPaoSystem: defaultData
             });
@@ -242,7 +243,8 @@ export const bootstrapDigitPaoSystem = async (defaultData: DigitPaoEntry[]) => {
 export const bootstrapCardPaoSystem = async (defaultData: PaoEntry[]) => {
     try {
         const currentData = await getImageVaultData();
-        if (currentData && (!currentData.paoSystem || currentData.paoSystem.length === 0)) {
+        // If no data exists, or if paoSystem is empty/missing, we bootstrap
+        if (!currentData || !currentData.paoSystem || currentData.paoSystem.length === 0) {
             await saveImageVaultData({
                 paoSystem: defaultData
             });

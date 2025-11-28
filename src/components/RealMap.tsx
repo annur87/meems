@@ -36,7 +36,7 @@ export default function RealMap({ center, zoom, markers, onMarkerClick, onMapCli
     const mapContainerRef = useRef<HTMLDivElement>(null);
     const mapInstanceRef = useRef<any>(null);
     const markersRef = useRef<{ [key: string]: any }>({});
-    const latestMapClickRef = useRef<RealMapProps['onMapClick']>();
+    const latestMapClickRef = useRef<RealMapProps['onMapClick'] | null>(null);
     const [isScriptLoaded, setIsScriptLoaded] = useState(false);
     const prevCenterRef = useRef<[number, number]>(center);
     const drawnItemsRef = useRef<any>(null);

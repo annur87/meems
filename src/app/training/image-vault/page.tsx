@@ -326,9 +326,17 @@ export default function ImageVault() {
                                         const digitEntries = digitPaoList.map(p => ({ id: p.number, ...p }));
                                         const cardEntries = cardPaoList.map(p => ({ id: p.card, ...p }));
                                         
+                                        const majorEntries = digitEntries.map(entry => ({
+                                            id: entry.number,
+                                            number: entry.number,
+                                            images: [entry.person, entry.action, entry.object].filter(Boolean)
+                                        }));
+
                                         await saveImageVaultData({
                                             digitPaoSystem: digitEntries,
-                                            paoSystem: cardEntries
+                                            paoSystem: cardEntries,
+                                            majorSystem: majorEntries,
+                                            palaces: [] // Keep palaces empty but initialized
                                         });
                                         
                                         // Reload
@@ -336,6 +344,8 @@ export default function ImageVault() {
                                         if (data) {
                                             setDigitPaoSystem(data.digitPaoSystem || []);
                                             setCardPaoSystem(data.paoSystem || []);
+                                            setMajorSystem(data.majorSystem || []);
+                                            setPalaces(data.palaces || []);
                                         }
                                         alert('Data reset to defaults!');
                                     }

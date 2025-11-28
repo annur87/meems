@@ -225,17 +225,35 @@ export const getImageVaultData = async (): Promise<ImageVaultData | null> => {
 export const bootstrapDigitPaoSystem = async (defaultData: DigitPaoEntry[]) => {
     try {
         const currentData = await getImageVaultData();
-        // If no data exists, or if digitPaoSystem is empty/missing, we bootstrap
+        
+        const updates: Partial<ImageVaultData> = {};
+        let needsUpdate = false;
+
+        // Bootstrap Digit PAO if missing
         if (!currentData || !currentData.digitPaoSystem || currentData.digitPaoSystem.length === 0) {
-            await saveImageVaultData({
-                digitPaoSystem: defaultData
-            });
-            console.log("Digit PAO system bootstrapped successfully.");
+            updates.digitPaoSystem = defaultData;
+            needsUpdate = true;
+        }
+
+        // Bootstrap Major System from Digit PAO if missing
+        if (!currentData || !currentData.majorSystem || currentData.majorSystem.length === 0) {
+            const majorEntries: MajorEntry[] = defaultData.map(entry => ({
+                id: entry.number,
+                number: entry.number,
+                images: [entry.person, entry.action, entry.object].filter(Boolean)
+            }));
+            updates.majorSystem = majorEntries;
+            needsUpdate = true;
+        }
+
+        if (needsUpdate) {
+            await saveImageVaultData(updates);
+            console.log("Digit PAO and Major System bootstrapped successfully.");
             return true;
         }
         return false;
     } catch (e) {
-        console.error("Error bootstrapping Digit PAO system:", e);
+        console.error("Error bootstrapping Digit PAO/Major system:", e);
         return false;
     }
 };

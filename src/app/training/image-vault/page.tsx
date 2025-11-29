@@ -417,7 +417,7 @@ export default function ImageVault() {
                 setQuizQueue(newQueue);
                 nextQuizCard(newQueue);
                 setTimeout(() => inputRef.current?.focus(), 100);
-            }, 1000);
+            }, 300);
         } else {
             setQuizFeedback({ 
                 status: 'wrong', 
@@ -430,7 +430,7 @@ export default function ImageVault() {
                 setQuizQueue(newQueue);
                 nextQuizCard(newQueue);
                 setTimeout(() => inputRef.current?.focus(), 100);
-            }, 2500);
+            }, 1000);
         }
     };
 

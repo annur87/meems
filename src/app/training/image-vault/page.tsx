@@ -672,14 +672,27 @@ export default function ImageVault() {
                                 <div style={{ 
                                     fontSize: '4rem', 
                                     fontWeight: 'bold', 
-                                    marginBottom: '2rem',
+                                    marginBottom: '1rem',
                                     color: 'var(--primary)',
                                     minHeight: '120px',
                                     display: 'flex',
+                                    flexDirection: 'column',
                                     alignItems: 'center',
-                                    justifyContent: 'center'
+                                    justifyContent: 'center',
+                                    gap: '0.5rem'
                                 }}>
-                                {quizQuestionType === 'digits' ? currentQuizCard.number : (currentQuizCard.images?.[0] || '???')}
+                                    <div>
+                                        {quizQuestionType === 'digits' ? currentQuizCard.number : (currentQuizCard.images?.[0] || '???')}
+                                    </div>
+                                    {quizFeedback.status === 'wrong' && (
+                                        <div className="animate-fade-in" style={{ 
+                                            fontSize: '1.5rem', 
+                                            color: 'var(--error)',
+                                            fontWeight: 'normal'
+                                        }}>
+                                            → {quizQuestionType === 'digits' ? (currentQuizCard.images?.[0] || '???') : currentQuizCard.number}
+                                        </div>
+                                    )}
                                 </div>
 
                                 <form onSubmit={handleQuizSubmit} style={{ width: '100%', maxWidth: '350px' }}>
@@ -711,41 +724,12 @@ export default function ImageVault() {
 
                                 {quizFeedback.status && (
                                     <div className="animate-fade-in" style={{ 
-                                        marginTop: '2rem',
-                                        display: 'flex',
-                                        flexDirection: 'column',
-                                        gap: '1rem',
-                                        alignItems: 'center'
+                                        marginTop: '1.5rem',
+                                        fontSize: '1.2rem', 
+                                        fontWeight: 'bold',
+                                        color: quizFeedback.status === 'correct' ? 'var(--success)' : 'var(--error)'
                                     }}>
-                                        <div style={{ 
-                                            fontSize: '1.2rem', 
-                                            fontWeight: 'bold',
-                                            color: quizFeedback.status === 'correct' ? 'var(--success)' : 'var(--error)'
-                                        }}>
-                                            {quizFeedback.status === 'correct' ? '✓ Correct!' : '✗ Wrong!'}
-                                        </div>
-                                        
-                                        {quizFeedback.status === 'wrong' && currentQuizCard && (
-                                            <div className="glass" style={{ 
-                                                padding: '1.5rem 2rem',
-                                                borderRadius: '1rem',
-                                                background: 'rgba(239, 68, 68, 0.1)',
-                                                border: '2px solid var(--error)',
-                                                display: 'flex',
-                                                flexDirection: 'column',
-                                                gap: '1rem',
-                                                alignItems: 'center',
-                                                minWidth: '300px'
-                                            }}>
-                                                <div style={{ fontSize: '3rem', fontWeight: 'bold', color: 'var(--primary)' }}>
-                                                    {currentQuizCard.number}
-                                                </div>
-                                                <div style={{ fontSize: '1rem', opacity: 0.7 }}>↕</div>
-                                                <div style={{ fontSize: '2.5rem', fontWeight: 'bold', color: 'white' }}>
-                                                    {currentQuizCard.images?.[0] || '???'}
-                                                </div>
-                                            </div>
-                                        )}
+                                        {quizFeedback.status === 'correct' ? '✓ Correct!' : '✗ Wrong!'}
                                     </div>
                                 )}
                             </div>

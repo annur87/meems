@@ -376,6 +376,8 @@ export default function ImageVault() {
         if (!currentQuizCard || quizFeedback.status) return;
 
         const answer = quizInput.trim().toLowerCase();
+        if (!answer) return; // Don't submit if input is empty
+        
         let isCorrect = false;
         const targetNumber = currentQuizCard.number;
         // Use first image as primary, but check against all

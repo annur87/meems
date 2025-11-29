@@ -64,11 +64,6 @@ const IconTracer = () => (
 
 const navLinks = [
     { href: '/training', label: 'Training', icon: <IconTraining /> },
-    { href: '/digits', label: 'Digits', icon: <IconDigits /> },
-    { href: '/words', label: 'Words', icon: <IconWords /> },
-    { href: '/training/card-sequence', label: 'Sequence', icon: <IconSequence /> },
-    { href: '/training/visualization-latency', label: 'Latency', icon: <IconLatency /> },
-    { href: '/training/urban-locus-tracer', label: 'Tracer', icon: <IconTracer /> },
     { href: '/analytics', label: 'Analytics', icon: <IconAnalytics /> },
 ];
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import Header from '@/components/Header';
 import Link from 'next/link';
 import { bootstrapDigitPaoSystem, bootstrapCardPaoSystem, bootstrapMajorSystem } from '@/lib/firebase';
@@ -10,12 +10,31 @@ import { majorSystemList } from '@/data/major-system';
 
 const games = [
     {
+        id: 'digits',
+        title: 'Digit Memorization',
+        description: 'Memorize sequences of random digits.',
+        week: 'Foundational',
+        href: '/digits',
+        color: 'from-blue-600 to-indigo-600',
+        date: '2023-11-01'
+    },
+    {
+        id: 'words',
+        title: 'Word Memorization',
+        description: 'Memorize random words in order.',
+        week: 'Foundational',
+        href: '/words',
+        color: 'from-emerald-600 to-teal-600',
+        date: '2023-11-02'
+    },
+    {
         id: 'number-wall',
         title: 'The Number Wall',
         description: 'Test capacity and speed in encoding long sequences of abstract digits.',
         week: 'Week 1 Focus',
         href: '/training/number-wall',
-        color: 'from-blue-500 to-cyan-500' // Placeholder for gradient logic
+        color: 'from-blue-500 to-cyan-500',
+        date: '2023-10-01'
     },
     {
         id: 'card-blitz',
@@ -23,7 +42,8 @@ const games = [
         description: 'Train instant, reflexive conversion of playing cards into mnemonic images.',
         week: 'Week 2 Focus',
         href: '/training/card-blitz',
-        color: 'from-red-500 to-orange-500'
+        color: 'from-red-500 to-orange-500',
+        date: '2023-10-02'
     },
     {
         id: 'names-gauntlet',
@@ -31,7 +51,8 @@ const games = [
         description: 'Practice associating arbitrary names with distinct facial features.',
         week: 'Week 3 Focus',
         href: '/training/names-gauntlet',
-        color: 'from-green-500 to-emerald-500'
+        color: 'from-green-500 to-emerald-500',
+        date: '2023-10-03'
     },
     {
         id: 'binary-surge',
@@ -39,7 +60,8 @@ const games = [
         description: 'High-intensity conversion of non-decimal data (0s and 1s).',
         week: 'Week 4 Focus',
         href: '/training/binary-surge',
-        color: 'from-purple-500 to-pink-500'
+        color: 'from-purple-500 to-pink-500',
+        date: '2023-10-04'
     },
     {
         id: 'spoken-numbers',
@@ -47,7 +69,8 @@ const games = [
         description: 'Ultimate test of concentration with sequentially presented auditory digits.',
         week: 'Week 5 Focus',
         href: '/training/spoken-numbers',
-        color: 'from-yellow-500 to-amber-500'
+        color: 'from-yellow-500 to-amber-500',
+        date: '2023-10-05'
     },
     {
         id: 'decathlon',
@@ -55,7 +78,8 @@ const games = [
         description: 'Test mental stamina with a sequential simulation of multiple disciplines.',
         week: 'Week 6 Focus',
         href: '/training/decathlon',
-        color: 'from-slate-500 to-gray-500'
+        color: 'from-slate-500 to-gray-500',
+        date: '2023-10-06'
     },
     {
         id: 'abstract-matrix',
@@ -63,7 +87,8 @@ const games = [
         description: 'Visual-spatial overload: Link abstract patterns to coordinates and numbers.',
         week: 'Week 7 - Extreme',
         href: '/training/abstract-matrix',
-        color: 'from-cyan-500 to-teal-500'
+        color: 'from-cyan-500 to-teal-500',
+        date: '2023-10-07'
     },
     {
         id: 'multilingual-list',
@@ -71,7 +96,8 @@ const games = [
         description: 'Phonetic bridge training with foreign language vocabulary.',
         week: 'Week 8 - Extreme',
         href: '/training/multilingual-list',
-        color: 'from-orange-500 to-red-500'
+        color: 'from-orange-500 to-red-500',
+        date: '2023-10-08'
     },
     {
         id: 'word-palace',
@@ -79,7 +105,8 @@ const games = [
         description: 'Practice the Phonetic Link or Visual Conversion technique for words.',
         week: 'Supplementary',
         href: '/training/word-palace',
-        color: 'from-indigo-500 to-violet-500'
+        color: 'from-indigo-500 to-violet-500',
+        date: '2023-10-09'
     },
     {
         id: 'image-vault',
@@ -87,7 +114,8 @@ const games = [
         description: 'Manage and drill your mnemonic systems (Major, PAO, Palaces).',
         week: 'Foundational',
         href: '/training/image-vault',
-        color: 'from-rose-500 to-pink-500'
+        color: 'from-rose-500 to-pink-500',
+        date: '2023-10-10'
     },
     {
         id: 'instant-visualization',
@@ -95,7 +123,8 @@ const games = [
         description: 'Explosive image creation speed drill for digits and words.',
         week: 'Foundational Drill',
         href: '/training/instant-visualization',
-        color: 'from-teal-500 to-cyan-500'
+        color: 'from-teal-500 to-cyan-500',
+        date: '2023-10-11'
     },
     {
         id: 'sensory-walkthrough',
@@ -103,7 +132,8 @@ const games = [
         description: 'Force deeper palace immersion with guided sensory prompts.',
         week: 'Foundational Drill',
         href: '/training/sensory-walkthrough',
-        color: 'from-emerald-500 to-green-500'
+        color: 'from-emerald-500 to-green-500',
+        date: '2023-10-12'
     },
     {
         id: 'system-checker',
@@ -111,7 +141,8 @@ const games = [
         description: 'Rapid-fire integrity test for Major and PAO mappings.',
         week: 'Foundational Drill',
         href: '/training/system-component-checker',
-        color: 'from-slate-500 to-slate-700'
+        color: 'from-slate-500 to-slate-700',
+        date: '2023-10-13'
     },
     {
         id: 'names-international',
@@ -119,7 +150,8 @@ const games = [
         description: 'Memorize names and faces from diverse international backgrounds.',
         week: 'Week 3 Focus',
         href: '/training/names-international',
-        color: 'from-green-600 to-teal-600'
+        color: 'from-green-600 to-teal-600',
+        date: '2023-10-14'
     },
     {
         id: 'image-sequence',
@@ -127,7 +159,8 @@ const games = [
         description: 'Rapid-fire visual memory test with high-speed image presentation.',
         week: 'Week 4 Focus',
         href: '/training/image-sequence',
-        color: 'from-pink-500 to-rose-500'
+        color: 'from-pink-500 to-rose-500',
+        date: '2023-10-15'
     },
     {
         id: 'n-back',
@@ -135,7 +168,8 @@ const games = [
         description: 'Classic working memory training. Match current position with N steps back.',
         week: 'Cognitive Drill',
         href: '/training/n-back',
-        color: 'from-violet-500 to-purple-500'
+        color: 'from-violet-500 to-purple-500',
+        date: '2023-10-16'
     },
     {
         id: 'quick-math',
@@ -143,7 +177,8 @@ const games = [
         description: 'High-speed arithmetic drills to improve mental calculation speed.',
         week: 'Cognitive Drill',
         href: '/training/quick-math',
-        color: 'from-yellow-500 to-orange-500'
+        color: 'from-yellow-500 to-orange-500',
+        date: '2023-10-17'
     },
     {
         id: 'philosophical-attribution',
@@ -151,7 +186,8 @@ const games = [
         description: 'Memorize quotes verbatim and nail the speaker + source on demand.',
         week: 'Foundational Drill',
         href: '/training/philosophical-attribution',
-        color: 'from-lime-500 to-emerald-500'
+        color: 'from-lime-500 to-emerald-500',
+        date: '2023-10-18'
     },
     {
         id: 'focus-shifter',
@@ -159,7 +195,8 @@ const games = [
         description: 'Rapidly switch between processing numbers and visual-spatial information.',
         week: 'Concentration Drill',
         href: '/training/focus-shifter',
-        color: 'from-fuchsia-500 to-purple-500'
+        color: 'from-fuchsia-500 to-purple-500',
+        date: '2023-10-19'
     },
     {
         id: 'urban-locus-tracer',
@@ -167,7 +204,8 @@ const games = [
         description: 'Build and test your memory palace using real-world map locations.',
         week: 'Spatial Memory',
         href: '/training/urban-locus-tracer',
-        color: 'from-blue-500 to-indigo-500'
+        color: 'from-blue-500 to-indigo-500',
+        date: '2023-10-20'
     },
     {
         id: 'visualization-latency',
@@ -175,7 +213,8 @@ const games = [
         description: 'Measure and improve your image creation speed with precision timing.',
         week: 'Speed Drill',
         href: '/training/visualization-latency',
-        color: 'from-red-500 to-pink-500'
+        color: 'from-red-500 to-pink-500',
+        date: '2023-10-21'
     },
     {
         id: 'card-sequence',
@@ -183,7 +222,8 @@ const games = [
         description: 'Memorize sequences of playing cards with speed and accuracy.',
         week: 'Week 2 Focus',
         href: '/training/card-sequence',
-        color: 'from-amber-500 to-yellow-500'
+        color: 'from-amber-500 to-yellow-500',
+        date: '2023-10-22'
     },
     {
         id: 'chain-reaction',
@@ -191,12 +231,22 @@ const games = [
         description: 'Measure transition speed between consecutive mnemonic images in a chain.',
         week: 'System Fluidity',
         href: '/training/chain-reaction',
-        color: 'from-cyan-500 to-blue-500'
+        color: 'from-cyan-500 to-blue-500',
+        date: '2023-10-23'
     }
 ];
 
 export default function TrainingHub() {
+    const [favorites, setFavorites] = useState<string[]>([]);
+    const [mounted, setMounted] = useState(false);
+
     useEffect(() => {
+        setMounted(true);
+        const savedFavorites = localStorage.getItem('training_favorites');
+        if (savedFavorites) {
+            setFavorites(JSON.parse(savedFavorites));
+        }
+
         // Bootstrap Digit PAO system if needed
         const initDigitPao = async () => {
             const paoEntries = digitPaoList.map(p => ({
@@ -228,6 +278,31 @@ export default function TrainingHub() {
         initMajorSystem();
     }, []);
 
+    const toggleFavorite = (e: React.MouseEvent, id: string) => {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        const newFavorites = favorites.includes(id) 
+            ? favorites.filter(fav => fav !== id)
+            : [...favorites, id];
+        
+        setFavorites(newFavorites);
+        localStorage.setItem('training_favorites', JSON.stringify(newFavorites));
+    };
+
+    const sortedGames = [...games].sort((a, b) => {
+        const aFav = favorites.includes(a.id);
+        const bFav = favorites.includes(b.id);
+        
+        if (aFav && !bFav) return -1;
+        if (!aFav && bFav) return 1;
+        
+        // Sort by date descending (newest first)
+        return new Date(b.date).getTime() - new Date(a.date).getTime();
+    });
+
+    if (!mounted) return null;
+
     return (
         <>
             <Header />
@@ -247,14 +322,15 @@ export default function TrainingHub() {
                     gap: '1.5rem',
                     paddingBottom: '2rem'
                 }}>
-                    {games.map((game) => (
-                        <Link href={game.href} key={game.id} style={{ display: 'block' }}>
+                    {sortedGames.map((game) => (
+                        <Link href={game.href} key={game.id} style={{ display: 'block', position: 'relative' }}>
                             <div className="glass card" style={{
                                 height: '100%',
                                 display: 'flex',
                                 flexDirection: 'column',
                                 transition: 'transform 0.2s, box-shadow 0.2s',
-                                cursor: 'pointer'
+                                cursor: 'pointer',
+                                position: 'relative'
                             }}
                                 onMouseEnter={(e) => {
                                     e.currentTarget.style.transform = 'translateY(-5px)';
@@ -265,6 +341,27 @@ export default function TrainingHub() {
                                     e.currentTarget.style.boxShadow = 'none';
                                 }}
                             >
+                                <button
+                                    onClick={(e) => toggleFavorite(e, game.id)}
+                                    style={{
+                                        position: 'absolute',
+                                        top: '1rem',
+                                        right: '1rem',
+                                        background: 'none',
+                                        border: 'none',
+                                        cursor: 'pointer',
+                                        color: favorites.includes(game.id) ? '#fbbf24' : 'rgba(255,255,255,0.2)',
+                                        transition: 'color 0.2s',
+                                        zIndex: 10,
+                                        padding: '0.25rem'
+                                    }}
+                                    aria-label={favorites.includes(game.id) ? "Remove from favorites" : "Add to favorites"}
+                                >
+                                    <svg viewBox="0 0 24 24" width="24" height="24" fill={favorites.includes(game.id) ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                                    </svg>
+                                </button>
+
                                 <div style={{
                                     fontSize: '0.75rem',
                                     textTransform: 'uppercase',
@@ -275,7 +372,7 @@ export default function TrainingHub() {
                                 }}>
                                     {game.week}
                                 </div>
-                                <h3 style={{ fontSize: '1.25rem', fontWeight: 'bold', marginBottom: '0.75rem' }}>
+                                <h3 style={{ fontSize: '1.25rem', fontWeight: 'bold', marginBottom: '0.75rem', paddingRight: '2rem' }}>
                                     {game.title}
                                 </h3>
                                 <p style={{ fontSize: '0.9rem', color: '#cbd5e1', lineHeight: '1.5', flex: 1 }}>

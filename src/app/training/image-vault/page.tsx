@@ -51,6 +51,17 @@ export default function ImageVault() {
     const [draggedItem, setDraggedItem] = useState<{ palaceId: string, index: number } | null>(null);
     const [dragOverItem, setDragOverItem] = useState<{ palaceId: string, index: number } | null>(null);
 
+    // Quiz State
+    const [quizMode, setQuizMode] = useState<'config' | 'active' | 'result' | null>(null);
+    const [quizConfig, setQuizConfig] = useState({ count: 10, type: 'mixed' as 'digits' | 'words' | 'mixed', mode: 'untimed' as 'timed' | 'untimed' });
+    const [quizQueue, setQuizQueue] = useState<MajorEntry[]>([]);
+    const [currentQuizCard, setCurrentQuizCard] = useState<MajorEntry | null>(null);
+    const [quizQuestionType, setQuizQuestionType] = useState<'digits' | 'words'>('digits');
+    const [quizInput, setQuizInput] = useState('');
+    const [quizStats, setQuizStats] = useState({ correct: 0, wrong: 0, startTime: 0, endTime: 0 });
+    const [quizFeedback, setQuizFeedback] = useState<{ status: 'correct' | 'wrong' | null, message: string }>({ status: null, message: '' });
+    const [flippedCards, setFlippedCards] = useState<Set<string>>(new Set());
+
     // Load from Firestore on mount
     useEffect(() => {
         const loadData = async () => {
@@ -298,6 +309,89 @@ export default function ImageVault() {
         p.locations.some(l => l.toLowerCase().includes(searchQuery.toLowerCase()))
     );
 
+    // Quiz Functions
+    const toggleCardFlip = (id: string) => {
+        const newFlipped = new Set(flippedCards);
+        if (newFlipped.has(id)) newFlipped.delete(id);
+        else newFlipped.add(id);
+        setFlippedCards(newFlipped);
+    };
+
+    const startQuiz = () => {
+        let pool = [...majorSystem];
+        if (quizConfig.count < pool.length) {
+            pool = pool.sort(() => 0.5 - Math.random()).slice(0, quizConfig.count);
+        } else {
+            pool = pool.sort(() => 0.5 - Math.random());
+        }
+        
+        setQuizQueue(pool);
+        setQuizStats({ correct: 0, wrong: 0, startTime: Date.now(), endTime: 0 });
+        setQuizMode('active');
+        nextQuizCard(pool);
+    };
+
+    const nextQuizCard = (queue: MajorEntry[]) => {
+        if (queue.length === 0) {
+            setQuizStats(prev => ({ ...prev, endTime: Date.now() }));
+            setQuizMode('result');
+            return;
+        }
+        
+        const nextCard = queue[0];
+        setCurrentQuizCard(nextCard);
+        setQuizInput('');
+        setQuizFeedback({ status: null, message: '' });
+        
+        if (quizConfig.type === 'mixed') {
+            setQuizQuestionType(Math.random() > 0.5 ? 'digits' : 'words');
+        } else {
+            setQuizQuestionType(quizConfig.type);
+        }
+    };
+
+    const handleQuizSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!currentQuizCard || quizFeedback.status) return;
+
+        const answer = quizInput.trim().toLowerCase();
+        let isCorrect = false;
+        const targetNumber = currentQuizCard.number;
+        // Use first image as primary, but check against all
+        const targetWord = currentQuizCard.images?.[0] || '???'; 
+
+        if (quizQuestionType === 'digits') {
+            // Showed Digits, expect Word
+            if (currentQuizCard.images?.some(img => img.toLowerCase() === answer)) isCorrect = true;
+        } else {
+            // Showed Word, expect Digits
+            if (answer === targetNumber) isCorrect = true;
+        }
+
+        if (isCorrect) {
+            setQuizFeedback({ status: 'correct', message: 'Correct!' });
+            setQuizStats(prev => ({ ...prev, correct: prev.correct + 1 }));
+            
+            setTimeout(() => {
+                const newQueue = quizQueue.slice(1);
+                setQuizQueue(newQueue);
+                nextQuizCard(newQueue);
+            }, 1000);
+        } else {
+            setQuizFeedback({ 
+                status: 'wrong', 
+                message: `Wrong! It was ${quizQuestionType === 'digits' ? targetWord : targetNumber}` 
+            });
+            setQuizStats(prev => ({ ...prev, wrong: prev.wrong + 1 }));
+            
+            setTimeout(() => {
+                const newQueue = [...quizQueue.slice(1), currentQuizCard];
+                setQuizQueue(newQueue);
+                nextQuizCard(newQueue);
+            }, 2500);
+        }
+    };
+
     return (
         <>
             <Header />
@@ -446,161 +540,279 @@ export default function ImageVault() {
                 {/* Major System Tab */}
                 {activeTab === 'major' && (
                     <div className="animate-fade-in">
-                        {/* Add New Entry */}
-                        <div className="glass card" style={{ marginBottom: '2rem' }}>
-                            <h3 style={{ fontSize: '1.1rem', marginBottom: '1rem' }}>Add Entry</h3>
-                            <div style={{ display: 'grid', gridTemplateColumns: '100px 1fr auto', gap: '1rem', alignItems: 'end' }}>
-                                <div>
-                                    <label style={{ display: 'block', fontSize: '0.8rem', marginBottom: '0.5rem', opacity: 0.7 }}>Number</label>
-                                    <input
-                                        type="text"
-                                        className="input-field"
-                                        placeholder="00"
-                                        value={newMajorNumber}
-                                        onChange={(e) => setNewMajorNumber(e.target.value.replace(/\D/g, '').slice(0, 2))}
-                                        maxLength={2}
-                                    />
-                                </div>
-                                <div>
-                                    <label style={{ display: 'block', fontSize: '0.8rem', marginBottom: '0.5rem', opacity: 0.7 }}>Image</label>
-                                    <input
-                                        type="text"
-                                        className="input-field"
-                                        placeholder="Sauce"
-                                        value={newMajorImage}
-                                        onChange={(e) => setNewMajorImage(e.target.value)}
-                                        onKeyPress={(e) => e.key === 'Enter' && addMajorEntry()}
-                                    />
-                                </div>
-                                <button className="btn btn-primary" onClick={addMajorEntry}>
-                                    Add
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* Entries List */}
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1rem' }}>
-                            {filteredMajor.length === 0 ? (
-                                <div className="glass-panel" style={{ padding: '2rem', textAlign: 'center', opacity: 0.5, gridColumn: '1 / -1' }}>
-                                    {searchQuery ? 'No results found' : 'No entries yet. Add your first one above!'}
-                                </div>
-                            ) : (
-                                filteredMajor.map((entry) => (
-                                    <div key={entry.id} className="glass-panel" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                            <div style={{
-                                                fontSize: '2.5rem',
-                                                fontWeight: 'bold',
-                                                color: 'var(--primary)',
-                                                background: 'linear-gradient(135deg, var(--primary), var(--accent))',
-                                                WebkitBackgroundClip: 'text',
-                                                WebkitTextFillColor: 'transparent',
-                                                backgroundClip: 'text'
-                                            }}>
-                                                {entry.number}
-                                            </div>
-                                            <button
-                                                onClick={() => deleteMajorEntry(entry.id)}
-                                                style={{
-                                                    background: 'rgba(239, 68, 68, 0.1)',
-                                                    border: '1px solid rgba(239, 68, 68, 0.3)',
-                                                    borderRadius: '0.5rem',
-                                                    padding: '0.5rem 1rem',
-                                                    color: 'var(--error)',
-                                                    cursor: 'pointer',
-                                                    fontSize: '0.85rem',
-                                                    fontWeight: '500',
-                                                    transition: 'all 0.2s'
-                                                }}
-                                                onMouseEnter={(e) => {
-                                                    e.currentTarget.style.background = 'rgba(239, 68, 68, 0.2)';
-                                                    e.currentTarget.style.borderColor = 'var(--error)';
-                                                }}
-                                                onMouseLeave={(e) => {
-                                                    e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)';
-                                                    e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.3)';
-                                                }}
+                        {/* Quiz Mode Overlay */}
+                        {quizMode === 'config' && (
+                            <div className="glass-panel" style={{ marginBottom: '2rem', padding: '2rem', textAlign: 'center' }}>
+                                <h2 style={{ fontSize: '1.5rem', marginBottom: '1.5rem' }}>Major System Hardcore Quiz</h2>
+                                
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '2rem', maxWidth: '800px', margin: '0 auto 2rem' }}>
+                                    <div>
+                                        <label style={{ display: 'block', marginBottom: '0.5rem', color: '#cbd5e1' }}>Card Count</label>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                            {[5, 10, 50, 100, 200].map(n => (
+                                                <button 
+                                                    key={n}
+                                                    onClick={() => setQuizConfig(c => ({ ...c, count: n }))}
+                                                    className={`btn ${quizConfig.count === n ? 'btn-primary' : ''}`}
+                                                    style={{ padding: '0.5rem', opacity: quizConfig.count === n ? 1 : 0.6 }}
+                                                >
+                                                    {n} Cards
+                                                </button>
+                                            ))}
+                                            <button 
+                                                onClick={() => setQuizConfig(c => ({ ...c, count: 999 }))}
+                                                className={`btn ${quizConfig.count === 999 ? 'btn-primary' : ''}`}
+                                                style={{ padding: '0.5rem', opacity: quizConfig.count === 999 ? 1 : 0.6 }}
                                             >
-                                                Delete All
+                                                All Cards
                                             </button>
                                         </div>
-                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', minHeight: '40px' }}>
-                                            {entry.images.map((image, idx) => (
-                                                <div
-                                                    key={idx}
-                                                    style={{
-                                                        background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.15), rgba(139, 92, 246, 0.15))',
-                                                        border: '1px solid rgba(99, 102, 241, 0.3)',
-                                                        padding: '0.6rem 1rem',
-                                                        borderRadius: '2rem',
-                                                        display: 'inline-flex',
-                                                        alignItems: 'center',
-                                                        gap: '0.75rem',
-                                                        fontSize: '0.95rem',
-                                                        fontWeight: '500',
-                                                        color: 'var(--foreground)',
-                                                        transition: 'all 0.2s',
-                                                        cursor: 'default',
-                                                        boxShadow: '0 2px 8px rgba(99, 102, 241, 0.1)'
-                                                    }}
-                                                    onMouseEnter={(e) => {
-                                                        e.currentTarget.style.transform = 'translateY(-2px)';
-                                                        e.currentTarget.style.boxShadow = '0 4px 12px rgba(99, 102, 241, 0.2)';
-                                                        e.currentTarget.style.borderColor = 'var(--primary)';
-                                                    }}
-                                                    onMouseLeave={(e) => {
-                                                        e.currentTarget.style.transform = 'translateY(0)';
-                                                        e.currentTarget.style.boxShadow = '0 2px 8px rgba(99, 102, 241, 0.1)';
-                                                        e.currentTarget.style.borderColor = 'rgba(99, 102, 241, 0.3)';
-                                                    }}
-                                                >
-                                                    <span>{image}</span>
-                                                    <button
-                                                        onClick={() => deleteMajorImage(entry.number, image)}
-                                                        style={{
-                                                            background: 'rgba(239, 68, 68, 0.2)',
-                                                            border: 'none',
-                                                            borderRadius: '50%',
-                                                            width: '20px',
-                                                            height: '20px',
-                                                            display: 'flex',
-                                                            alignItems: 'center',
-                                                            justifyContent: 'center',
-                                                            color: 'var(--error)',
-                                                            cursor: 'pointer',
-                                                            fontSize: '1.1rem',
-                                                            lineHeight: '1',
-                                                            padding: 0,
-                                                            transition: 'all 0.2s'
-                                                        }}
-                                                        onMouseEnter={(e) => {
-                                                            e.currentTarget.style.background = 'var(--error)';
-                                                            e.currentTarget.style.color = 'white';
-                                                            e.currentTarget.style.transform = 'scale(1.1)';
-                                                        }}
-                                                        onMouseLeave={(e) => {
-                                                            e.currentTarget.style.background = 'rgba(239, 68, 68, 0.2)';
-                                                            e.currentTarget.style.color = 'var(--error)';
-                                                            e.currentTarget.style.transform = 'scale(1)';
-                                                        }}
-                                                    >
-                                                        ×
-                                                    </button>
-                                                </div>
-                                            ))}
-                                        </div>
-                                        <div style={{
-                                            fontSize: '0.75rem',
-                                            opacity: 0.5,
-                                            marginTop: '0.5rem',
-                                            textAlign: 'right'
-                                        }}>
-                                            {entry.images.length} image{entry.images.length !== 1 ? 's' : ''}
+                                    </div>
+
+                                    <div>
+                                        <label style={{ display: 'block', marginBottom: '0.5rem', color: '#cbd5e1' }}>Question Type</label>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                            <button 
+                                                onClick={() => setQuizConfig(c => ({ ...c, type: 'digits' }))}
+                                                className={`btn ${quizConfig.type === 'digits' ? 'btn-primary' : ''}`}
+                                                style={{ padding: '0.5rem', opacity: quizConfig.type === 'digits' ? 1 : 0.6 }}
+                                            >
+                                                Digits → Word
+                                            </button>
+                                            <button 
+                                                onClick={() => setQuizConfig(c => ({ ...c, type: 'words' }))}
+                                                className={`btn ${quizConfig.type === 'words' ? 'btn-primary' : ''}`}
+                                                style={{ padding: '0.5rem', opacity: quizConfig.type === 'words' ? 1 : 0.6 }}
+                                            >
+                                                Word → Digits
+                                            </button>
+                                            <button 
+                                                onClick={() => setQuizConfig(c => ({ ...c, type: 'mixed' }))}
+                                                className={`btn ${quizConfig.type === 'mixed' ? 'btn-primary' : ''}`}
+                                                style={{ padding: '0.5rem', opacity: quizConfig.type === 'mixed' ? 1 : 0.6 }}
+                                            >
+                                                Mixed
+                                            </button>
                                         </div>
                                     </div>
-                                ))
-                            )}
-                        </div>
+
+                                    <div>
+                                        <label style={{ display: 'block', marginBottom: '0.5rem', color: '#cbd5e1' }}>Mode</label>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                            <button 
+                                                onClick={() => setQuizConfig(c => ({ ...c, mode: 'untimed' }))}
+                                                className={`btn ${quizConfig.mode === 'untimed' ? 'btn-primary' : ''}`}
+                                                style={{ padding: '0.5rem', opacity: quizConfig.mode === 'untimed' ? 1 : 0.6 }}
+                                            >
+                                                Untimed
+                                            </button>
+                                            <button 
+                                                onClick={() => setQuizConfig(c => ({ ...c, mode: 'timed' }))}
+                                                className={`btn ${quizConfig.mode === 'timed' ? 'btn-primary' : ''}`}
+                                                style={{ padding: '0.5rem', opacity: quizConfig.mode === 'timed' ? 1 : 0.6 }}
+                                            >
+                                                Timed
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
+                                    <button onClick={() => setQuizMode(null)} className="btn" style={{ background: 'rgba(255,255,255,0.1)' }}>Cancel</button>
+                                    <button onClick={startQuiz} className="btn btn-primary" style={{ padding: '0.75rem 2rem', fontSize: '1.1rem' }}>Start Quiz</button>
+                                </div>
+                            </div>
+                        )}
+
+                        {quizMode === 'active' && currentQuizCard && (
+                            <div className="glass-panel" style={{ marginBottom: '2rem', padding: '3rem', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                                <div style={{ marginBottom: '1rem', opacity: 0.7 }}>
+                                    Remaining: {quizQueue.length} | Wrong Attempts: {quizStats.wrong}
+                                </div>
+                                
+                                <div style={{ 
+                                    fontSize: '4rem', 
+                                    fontWeight: 'bold', 
+                                    marginBottom: '2rem',
+                                    color: 'var(--primary)',
+                                    minHeight: '120px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center'
+                                }}>
+                                {quizQuestionType === 'digits' ? currentQuizCard.number : (currentQuizCard.images?.[0] || '???')}
+                                </div>
+
+                                <form onSubmit={handleQuizSubmit} style={{ width: '100%', maxWidth: '400px' }}>
+                                    <input
+                                        type="text"
+                                        className="input-field"
+                                        placeholder={quizQuestionType === 'digits' ? "Type the word..." : "Type the digits..."}
+                                        value={quizInput}
+                                        onChange={(e) => setQuizInput(e.target.value)}
+                                        autoFocus
+                                        disabled={!!quizFeedback.status}
+                                        style={{ 
+                                            textAlign: 'center', 
+                                            fontSize: '1.5rem', 
+                                            marginBottom: '1rem',
+                                            borderColor: quizFeedback.status === 'correct' ? 'var(--success)' : quizFeedback.status === 'wrong' ? 'var(--error)' : undefined
+                                        }}
+                                    />
+                                    <button 
+                                        type="submit" 
+                                        className="btn btn-primary" 
+                                        style={{ width: '100%' }}
+                                        disabled={!!quizFeedback.status}
+                                    >
+                                        Submit
+                                    </button>
+                                </form>
+
+                                {quizFeedback.status && (
+                                    <div className="animate-fade-in" style={{ 
+                                        marginTop: '2rem',
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        gap: '1rem',
+                                        alignItems: 'center'
+                                    }}>
+                                        <div style={{ 
+                                            fontSize: '1.2rem', 
+                                            fontWeight: 'bold',
+                                            color: quizFeedback.status === 'correct' ? 'var(--success)' : 'var(--error)'
+                                        }}>
+                                            {quizFeedback.status === 'correct' ? '✓ Correct!' : '✗ Wrong!'}
+                                        </div>
+                                        
+                                        {quizFeedback.status === 'wrong' && currentQuizCard && (
+                                            <div className="glass" style={{ 
+                                                padding: '1.5rem 2rem',
+                                                borderRadius: '1rem',
+                                                background: 'rgba(239, 68, 68, 0.1)',
+                                                border: '2px solid var(--error)',
+                                                display: 'flex',
+                                                flexDirection: 'column',
+                                                gap: '1rem',
+                                                alignItems: 'center',
+                                                minWidth: '300px'
+                                            }}>
+                                                <div style={{ fontSize: '3rem', fontWeight: 'bold', color: 'var(--primary)' }}>
+                                                    {currentQuizCard.number}
+                                                </div>
+                                                <div style={{ fontSize: '1rem', opacity: 0.7 }}>↕</div>
+                                                <div style={{ fontSize: '2.5rem', fontWeight: 'bold', color: 'white' }}>
+                                                    {currentQuizCard.images?.[0] || '???'}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {quizMode === 'result' && (
+                            <div className="glass-panel" style={{ marginBottom: '2rem', padding: '2rem', textAlign: 'center' }}>
+                                <h2 style={{ fontSize: '2rem', marginBottom: '1rem', color: 'var(--success)' }}>Quiz Complete!</h2>
+                                <p style={{ fontSize: '1.2rem', marginBottom: '2rem' }}>
+                                    You successfully memorized all {quizConfig.count === 999 ? majorSystem.length : quizConfig.count} cards.
+                                </p>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', maxWidth: '400px', margin: '0 auto 2rem' }}>
+                                    <div className="glass" style={{ padding: '1rem' }}>
+                                        <div style={{ opacity: 0.7, fontSize: '0.9rem' }}>Total Time</div>
+                                        <div style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>
+                                            {((quizStats.endTime - quizStats.startTime) / 1000).toFixed(1)}s
+                                        </div>
+                                    </div>
+                                    <div className="glass" style={{ padding: '1rem' }}>
+                                        <div style={{ opacity: 0.7, fontSize: '0.9rem' }}>Mistakes</div>
+                                        <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: quizStats.wrong > 0 ? 'var(--error)' : 'var(--success)' }}>
+                                            {quizStats.wrong}
+                                        </div>
+                                    </div>
+                                </div>
+                                <button onClick={() => setQuizMode(null)} className="btn btn-primary">Back to Vault</button>
+                            </div>
+                        )}
+
+                        {/* Default View: Card Grid */}
+                        {!quizMode && (
+                            <>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                                    <h3 style={{ fontSize: '1.1rem' }}>Major System Cards</h3>
+                                    <button 
+                                        onClick={() => setQuizMode('config')}
+                                        className="btn btn-primary"
+                                        style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                                    >
+                                        <span>⚡</span> Start Hardcore Quiz
+                                    </button>
+                                </div>
+
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: '1rem' }}>
+                                    {filteredMajor.map((entry) => (
+                                        <div 
+                                            key={entry.id} 
+                                            onClick={() => toggleCardFlip(entry.id)}
+                                            className="glass"
+                                            style={{ 
+                                                aspectRatio: '3/4', 
+                                                cursor: 'pointer',
+                                                perspective: '1000px',
+                                                position: 'relative',
+                                                padding: 0,
+                                                overflow: 'visible'
+                                            }}
+                                        >
+                                            <div style={{
+                                                width: '100%', height: '100%',
+                                                transition: 'transform 0.6s',
+                                                transformStyle: 'preserve-3d',
+                                                transform: flippedCards.has(entry.id) ? 'rotateY(180deg)' : 'rotateY(0deg)',
+                                                position: 'relative',
+                                                borderRadius: '0.5rem'
+                                            }}>
+                                                {/* Front (Number) */}
+                                                <div style={{
+                                                    position: 'absolute', width: '100%', height: '100%',
+                                                    backfaceVisibility: 'hidden',
+                                                    WebkitBackfaceVisibility: 'hidden',
+                                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                    fontSize: '2.5rem', fontWeight: 'bold', color: 'var(--primary)',
+                                                    background: 'rgba(30, 41, 59, 0.6)', 
+                                                    borderRadius: '0.5rem',
+                                                    border: '1px solid rgba(255,255,255,0.1)'
+                                                }}>
+                                                    {entry.number}
+                                                </div>
+                                                {/* Back (Word) */}
+                                                <div style={{
+                                                    position: 'absolute', width: '100%', height: '100%',
+                                                    backfaceVisibility: 'hidden',
+                                                    WebkitBackfaceVisibility: 'hidden',
+                                                    transform: 'rotateY(180deg)',
+                                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                    fontSize: '1rem', fontWeight: 'bold', color: 'white',
+                                                    background: 'var(--primary)', 
+                                                    borderRadius: '0.5rem',
+                                                    padding: '0.5rem', 
+                                                    textAlign: 'center',
+                                                    wordBreak: 'break-word'
+                                                }}>
+                                                    {entry.images?.[0] || '???'}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                                
+                                {filteredMajor.length === 0 && (
+                                    <div style={{ textAlign: 'center', padding: '3rem', opacity: 0.5 }}>
+                                        No cards found.
+                                    </div>
+                                )}
+                            </>
+                        )}
                     </div>
                 )}
 

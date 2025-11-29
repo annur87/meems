@@ -61,6 +61,8 @@ export default function ImageVault() {
     const [quizStats, setQuizStats] = useState({ correct: 0, wrong: 0, startTime: 0, endTime: 0 });
     const [quizFeedback, setQuizFeedback] = useState<{ status: 'correct' | 'wrong' | null, message: string }>({ status: null, message: '' });
     const [flippedCards, setFlippedCards] = useState<Set<string>>(new Set());
+    const [cardStats, setCardStats] = useState<Map<string, { attempts: number, firstSeenTime: number, masteredTime: number }>>(new Map());
+    const [currentCardStartTime, setCurrentCardStartTime] = useState(0);
 
     // Load from Firestore on mount
     useEffect(() => {
@@ -319,7 +321,13 @@ export default function ImageVault() {
 
     const startQuiz = () => {
         let pool = [...majorSystem];
-        if (quizConfig.count < pool.length) {
+        
+        // For "All Cards" (999), we test BOTH directions: 100 cards × 2 = 200 questions
+        if (quizConfig.count === 999) {
+            // Create two copies: one for digits->words, one for words->digits
+            const shuffled = pool.sort(() => 0.5 - Math.random());
+            pool = [...shuffled, ...shuffled]; // 200 total questions
+        } else if (quizConfig.count < pool.length) {
             pool = pool.sort(() => 0.5 - Math.random()).slice(0, quizConfig.count);
         } else {
             pool = pool.sort(() => 0.5 - Math.random());
@@ -327,6 +335,7 @@ export default function ImageVault() {
         
         setQuizQueue(pool);
         setQuizStats({ correct: 0, wrong: 0, startTime: Date.now(), endTime: 0 });
+        setCardStats(new Map());
         setQuizMode('active');
         nextQuizCard(pool);
     };
@@ -342,6 +351,17 @@ export default function ImageVault() {
         setCurrentQuizCard(nextCard);
         setQuizInput('');
         setQuizFeedback({ status: null, message: '' });
+        setCurrentCardStartTime(Date.now());
+        
+        // Initialize card stats if first time seeing this card
+        const cardKey = nextCard.number;
+        if (!cardStats.has(cardKey)) {
+            setCardStats(prev => new Map(prev).set(cardKey, {
+                attempts: 0,
+                firstSeenTime: Date.now(),
+                masteredTime: 0
+            }));
+        }
         
         if (quizConfig.type === 'mixed') {
             setQuizQuestionType(Math.random() > 0.5 ? 'digits' : 'words');
@@ -368,9 +388,28 @@ export default function ImageVault() {
             if (answer === targetNumber) isCorrect = true;
         }
 
+        // Update card stats
+        const cardKey = currentQuizCard.number;
+        const stats = cardStats.get(cardKey);
+        if (stats) {
+            setCardStats(prev => new Map(prev).set(cardKey, {
+                ...stats,
+                attempts: stats.attempts + 1
+            }));
+        }
+
         if (isCorrect) {
             setQuizFeedback({ status: 'correct', message: 'Correct!' });
             setQuizStats(prev => ({ ...prev, correct: prev.correct + 1 }));
+            
+            // Mark as mastered
+            if (stats && stats.masteredTime === 0) {
+                setCardStats(prev => new Map(prev).set(cardKey, {
+                    ...stats,
+                    attempts: stats.attempts + 1,
+                    masteredTime: Date.now()
+                }));
+            }
             
             setTimeout(() => {
                 const newQueue = quizQueue.slice(1);
@@ -712,26 +751,66 @@ export default function ImageVault() {
                         )}
 
                         {quizMode === 'result' && (
-                            <div className="glass-panel" style={{ marginBottom: '2rem', padding: '2rem', textAlign: 'center' }}>
-                                <h2 style={{ fontSize: '2rem', marginBottom: '1rem', color: 'var(--success)' }}>Quiz Complete!</h2>
-                                <p style={{ fontSize: '1.2rem', marginBottom: '2rem' }}>
-                                    You successfully memorized all {quizConfig.count === 999 ? majorSystem.length : quizConfig.count} cards.
+                            <div className="glass-panel" style={{ marginBottom: '2rem', padding: '2rem' }}>
+                                <h2 style={{ fontSize: '2rem', marginBottom: '1rem', color: 'var(--success)', textAlign: 'center' }}>Quiz Complete!</h2>
+                                <p style={{ fontSize: '1.2rem', marginBottom: '2rem', textAlign: 'center' }}>
+                                    You successfully memorized {quizConfig.count === 999 ? `all ${majorSystem.length} cards (${majorSystem.length * 2} questions)` : `${quizConfig.count} cards`}.
                                 </p>
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', maxWidth: '400px', margin: '0 auto 2rem' }}>
-                                    <div className="glass" style={{ padding: '1rem' }}>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', maxWidth: '600px', margin: '0 auto 2rem' }}>
+                                    <div className="glass" style={{ padding: '1rem', textAlign: 'center' }}>
                                         <div style={{ opacity: 0.7, fontSize: '0.9rem' }}>Total Time</div>
                                         <div style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>
                                             {((quizStats.endTime - quizStats.startTime) / 1000).toFixed(1)}s
                                         </div>
                                     </div>
-                                    <div className="glass" style={{ padding: '1rem' }}>
+                                    <div className="glass" style={{ padding: '1rem', textAlign: 'center' }}>
+                                        <div style={{ opacity: 0.7, fontSize: '0.9rem' }}>Total Attempts</div>
+                                        <div style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>
+                                            {quizStats.correct + quizStats.wrong}
+                                        </div>
+                                    </div>
+                                    <div className="glass" style={{ padding: '1rem', textAlign: 'center' }}>
                                         <div style={{ opacity: 0.7, fontSize: '0.9rem' }}>Mistakes</div>
                                         <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: quizStats.wrong > 0 ? 'var(--error)' : 'var(--success)' }}>
                                             {quizStats.wrong}
                                         </div>
                                     </div>
                                 </div>
-                                <button onClick={() => setQuizMode(null)} className="btn btn-primary">Back to Vault</button>
+
+                                {/* Per-Card Stats */}
+                                <div style={{ marginBottom: '2rem' }}>
+                                    <h3 style={{ fontSize: '1.2rem', marginBottom: '1rem', textAlign: 'center' }}>Per-Card Performance</h3>
+                                    <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
+                                        <div style={{ display: 'grid', gridTemplateColumns: '80px 1fr 100px 120px', gap: '0.5rem', padding: '0.5rem', fontWeight: 'bold', borderBottom: '1px solid rgba(255,255,255,0.1)', position: 'sticky', top: 0, background: 'var(--background)', zIndex: 1 }}>
+                                            <div>Number</div>
+                                            <div>Word</div>
+                                            <div>Attempts</div>
+                                            <div>Time to Master</div>
+                                        </div>
+                                        {Array.from(cardStats.entries())
+                                            .sort((a, b) => b[1].attempts - a[1].attempts)
+                                            .map(([cardNum, stats]) => {
+                                                const card = majorSystem.find(c => c.number === cardNum);
+                                                const timeToMaster = stats.masteredTime > 0 
+                                                    ? ((stats.masteredTime - stats.firstSeenTime) / 1000).toFixed(1)
+                                                    : 'N/A';
+                                                return (
+                                                    <div key={cardNum} className="glass" style={{ display: 'grid', gridTemplateColumns: '80px 1fr 100px 120px', gap: '0.5rem', padding: '0.75rem', marginBottom: '0.5rem', alignItems: 'center' }}>
+                                                        <div style={{ fontWeight: 'bold', color: 'var(--primary)' }}>{cardNum}</div>
+                                                        <div>{card?.images?.[0] || '???'}</div>
+                                                        <div style={{ color: stats.attempts > 1 ? 'var(--error)' : 'var(--success)' }}>
+                                                            {stats.attempts}
+                                                        </div>
+                                                        <div style={{ opacity: 0.8 }}>{timeToMaster}s</div>
+                                                    </div>
+                                                );
+                                            })}
+                                    </div>
+                                </div>
+
+                                <div style={{ textAlign: 'center' }}>
+                                    <button onClick={() => setQuizMode(null)} className="btn btn-primary">Back to Vault</button>
+                                </div>
                             </div>
                         )}
 

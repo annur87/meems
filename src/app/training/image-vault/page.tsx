@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Header from '@/components/Header';
 import Link from 'next/link';
 import {
@@ -53,7 +53,7 @@ export default function ImageVault() {
 
     // Quiz State
     const [quizMode, setQuizMode] = useState<'config' | 'active' | 'result' | null>(null);
-    const [quizConfig, setQuizConfig] = useState({ count: 10, type: 'mixed' as 'digits' | 'words' | 'mixed', mode: 'untimed' as 'timed' | 'untimed' });
+    const [quizConfig, setQuizConfig] = useState({ count: 999, type: 'mixed' as 'digits' | 'words' | 'mixed', mode: 'untimed' as 'timed' | 'untimed' });
     const [quizQueue, setQuizQueue] = useState<MajorEntry[]>([]);
     const [currentQuizCard, setCurrentQuizCard] = useState<MajorEntry | null>(null);
     const [quizQuestionType, setQuizQuestionType] = useState<'digits' | 'words'>('digits');
@@ -63,6 +63,7 @@ export default function ImageVault() {
     const [flippedCards, setFlippedCards] = useState<Set<string>>(new Set());
     const [cardStats, setCardStats] = useState<Map<string, { attempts: number, firstSeenTime: number, masteredTime: number }>>(new Map());
     const [currentCardStartTime, setCurrentCardStartTime] = useState(0);
+    const inputRef = useRef<HTMLInputElement>(null);
 
     // Load from Firestore on mount
     useEffect(() => {
@@ -415,6 +416,7 @@ export default function ImageVault() {
                 const newQueue = quizQueue.slice(1);
                 setQuizQueue(newQueue);
                 nextQuizCard(newQueue);
+                setTimeout(() => inputRef.current?.focus(), 100);
             }, 1000);
         } else {
             setQuizFeedback({ 
@@ -427,6 +429,7 @@ export default function ImageVault() {
                 const newQueue = [...quizQueue.slice(1), currentQuizCard];
                 setQuizQueue(newQueue);
                 nextQuizCard(newQueue);
+                setTimeout(() => inputRef.current?.focus(), 100);
             }, 2500);
         }
     };
@@ -697,6 +700,7 @@ export default function ImageVault() {
 
                                 <form onSubmit={handleQuizSubmit} style={{ width: '100%', maxWidth: '350px' }}>
                                     <input
+                                        ref={inputRef}
                                         type="text"
                                         className="input-field"
                                         placeholder={quizQuestionType === 'digits' ? "Type the word..." : "Type the digits..."}
@@ -770,10 +774,14 @@ export default function ImageVault() {
                                             <div>Number</div>
                                             <div>Word</div>
                                             <div>Attempts</div>
-                                            <div>Time to Master</div>
+                                            <div>Time Taken</div>
                                         </div>
                                         {Array.from(cardStats.entries())
-                                            .sort((a, b) => b[1].attempts - a[1].attempts)
+                                            .sort((a, b) => {
+                                                const aTime = a[1].masteredTime > 0 ? (a[1].masteredTime - a[1].firstSeenTime) : 0;
+                                                const bTime = b[1].masteredTime > 0 ? (b[1].masteredTime - b[1].firstSeenTime) : 0;
+                                                return bTime - aTime; // Descending order
+                                            })
                                             .map(([cardNum, stats]) => {
                                                 const card = majorSystem.find(c => c.number === cardNum);
                                                 const timeToMaster = stats.masteredTime > 0 

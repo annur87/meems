@@ -682,7 +682,7 @@ export default function ImageVault() {
                                 {quizQuestionType === 'digits' ? currentQuizCard.number : (currentQuizCard.images?.[0] || '???')}
                                 </div>
 
-                                <form onSubmit={handleQuizSubmit} style={{ width: '100%', maxWidth: '400px' }}>
+                                <form onSubmit={handleQuizSubmit} style={{ width: '100%', maxWidth: '350px' }}>
                                     <input
                                         type="text"
                                         className="input-field"
@@ -693,18 +693,19 @@ export default function ImageVault() {
                                         disabled={!!quizFeedback.status}
                                         style={{ 
                                             textAlign: 'center', 
-                                            fontSize: '1.5rem', 
-                                            marginBottom: '1rem',
+                                            fontSize: '1rem', 
+                                            marginBottom: '0.75rem',
+                                            padding: '0.5rem',
                                             borderColor: quizFeedback.status === 'correct' ? 'var(--success)' : quizFeedback.status === 'wrong' ? 'var(--error)' : undefined
                                         }}
                                     />
                                     <button 
                                         type="submit" 
                                         className="btn btn-primary" 
-                                        style={{ width: '100%' }}
+                                        style={{ width: '100%', padding: '0.5rem 1rem', fontSize: '0.95rem' }}
                                         disabled={!!quizFeedback.status}
                                     >
-                                        Submit
+                                        Check
                                     </button>
                                 </form>
 
@@ -809,7 +810,7 @@ export default function ImageVault() {
                                 </div>
 
                                 <div style={{ textAlign: 'center' }}>
-                                    <button onClick={() => setQuizMode(null)} className="btn btn-primary">Back to Vault</button>
+                                    <button onClick={() => setQuizMode(null)} className="btn btn-primary">Done</button>
                                 </div>
                             </div>
                         )}

@@ -99,10 +99,12 @@ export default function SystemComponentChecker() {
     const [responses, setResponses] = useState<DrillResponse[]>([]);
     const [timer, setTimer] = useState(timeLimit);
     const [stats, setStats] = useState<{ correct: number; total: number; accuracy: number; avgTime: number } | null>(null);
+    const [isPaused, setIsPaused] = useState(false);
 
     const timerRef = useRef<NodeJS.Timeout | null>(null);
     const questionStartRef = useRef<number>(0);
     const sessionStartRef = useRef<number>(0);
+    const pauseStartRef = useRef<number>(0);
     const responsesRef = useRef<DrillResponse[]>([]);
 
     useEffect(() => {
@@ -150,12 +152,21 @@ export default function SystemComponentChecker() {
         }
     }, [questions.length]);
 
+    // Initialize timer when game starts
     useEffect(() => {
-        if (gameState !== 'running') return;
+        if (gameState === 'running' && isTimed) {
+            setTimer(timeLimit);
+        }
+    }, [gameState, isTimed, timeLimit]);
+
+    // Handle timer interval
+    useEffect(() => {
+        if (gameState !== 'running' || isPaused) {
+            if (timerRef.current) clearInterval(timerRef.current);
+            return;
+        }
         
         if (isTimed) {
-            setTimer(timeLimit);
-            if (timerRef.current) clearInterval(timerRef.current);
             timerRef.current = setInterval(() => {
                 setTimer((prev) => {
                     if (prev <= 1) {
@@ -166,16 +177,26 @@ export default function SystemComponentChecker() {
                     return prev - 1;
                 });
             }, 1000);
-        } else {
-            // Untimed mode: just track elapsed time for final stats
-            // We can use sessionStartRef to calculate total time at the end
-            setTimer(0); // Optional: use timer to show elapsed time if desired
         }
 
         return () => {
             if (timerRef.current) clearInterval(timerRef.current);
         };
-    }, [gameState, timeLimit, finalizeSession]);
+    }, [gameState, isTimed, isPaused, finalizeSession]);
+
+    const togglePause = () => {
+        if (isPaused) {
+            // Resuming
+            const pauseDuration = Date.now() - pauseStartRef.current;
+            questionStartRef.current += pauseDuration;
+            sessionStartRef.current += pauseDuration;
+            setIsPaused(false);
+        } else {
+            // Pausing
+            pauseStartRef.current = Date.now();
+            setIsPaused(true);
+        }
+    };
 
     const generateQuestions = () => {
         const generated: DrillQuestion[] = [];
@@ -461,6 +482,30 @@ export default function SystemComponentChecker() {
                             <div style={{ fontSize: '1rem', fontWeight: '600', opacity: 0.8 }}>
                                 {currentIndex + 1} / {questions.length}
                             </div>
+
+                            <button 
+                                onClick={togglePause}
+                                style={{
+                                    background: 'rgba(255,255,255,0.1)',
+                                    border: 'none',
+                                    borderRadius: '50%',
+                                    width: '40px',
+                                    height: '40px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    cursor: 'pointer',
+                                    fontSize: '1.2rem',
+                                    color: 'white',
+                                    transition: 'all 0.2s'
+                                }}
+                                onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.2)'}
+                                onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
+                                title="Pause"
+                            >
+                                ⏸
+                            </button>
+
                             <div style={{ 
                                 fontSize: '1.2rem', 
                                 fontWeight: 'bold', 
@@ -469,6 +514,37 @@ export default function SystemComponentChecker() {
                                 {isTimed ? `${timer}s` : '∞'}
                             </div>
                         </div>
+
+                        {/* Pause Overlay */}
+                        {isPaused && (
+                            <div style={{
+                                position: 'fixed',
+                                top: 0,
+                                left: 0,
+                                width: '100%',
+                                height: '100%',
+                                background: '#0f172a',
+                                zIndex: 9999,
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '2rem'
+                            }}>
+                                <h2 style={{ fontSize: '2rem', color: 'white', margin: 0 }}>Paused</h2>
+                                <button 
+                                    className="btn btn-primary" 
+                                    onClick={togglePause}
+                                    style={{ 
+                                        fontSize: '1.5rem', 
+                                        padding: '1rem 3rem',
+                                        borderRadius: '1rem'
+                                    }}
+                                >
+                                    Resume
+                                </button>
+                            </div>
+                        )}
 
                         {/* Question */}
                         <div style={{ 

@@ -458,21 +458,21 @@ const calculatePerformanceScore = (totalAttempts: number, mistakes: number, avgT
 
 export const getCardPerformanceColor = (stats: CardStats | undefined): string => {
     if (!stats || stats.totalAttempts === 0) {
-        return 'rgba(100, 116, 139, 0.1)'; // faint gray for no data
+        return 'rgba(100, 116, 139, 0.15)'; // faint gray for no data
     }
     
     const score = stats.performanceScore;
     
-    // Green: 75-100 (well memorized)
+    // Green: 75-100 (well memorized) - Emerald 500
     if (score >= 75) {
-        return 'rgba(34, 197, 94, 0.2)'; // subtle green
+        return 'rgba(16, 185, 129, 0.35)'; 
     }
-    // Yellow: 50-74 (medium)
+    // Yellow: 50-74 (medium) - Amber 500
     else if (score >= 50) {
-        return 'rgba(234, 179, 8, 0.2)'; // subtle yellow
+        return 'rgba(245, 158, 11, 0.35)'; 
     }
-    // Red: 0-49 (difficult)
+    // Red: 0-49 (difficult) - Rose 500
     else {
-        return 'rgba(239, 68, 68, 0.2)'; // subtle red
+        return 'rgba(244, 63, 94, 0.35)'; 
     }
 };

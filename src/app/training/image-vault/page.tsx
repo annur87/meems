@@ -976,14 +976,15 @@ export default function ImageVault() {
                                                         flexDirection: 'column',
                                                         alignItems: 'center', 
                                                         justifyContent: 'center',
-                                                        color: 'var(--primary)',
+                                                        color: '#ffffff', // Pure white
                                                         background: bgColor, 
                                                         borderRadius: '0.5rem',
-                                                        border: `2px solid ${bgColor !== 'rgba(100, 116, 139, 0.1)' ? bgColor.replace('0.2)', '0.6)') : 'rgba(255,255,255,0.1)'}`,
-                                                        padding: '0.5rem'
+                                                        border: `2px solid ${bgColor !== 'rgba(100, 116, 139, 0.15)' ? bgColor.replace('0.35)', '0.8)') : 'rgba(255,255,255,0.1)'}`,
+                                                        padding: '0.5rem',
+                                                        textShadow: '0 2px 4px rgba(0,0,0,0.5)' // Add shadow for better readability
                                                     }}>
                                                         <div style={{ fontSize: '2rem', fontWeight: 'bold', lineHeight: 1 }}>{entry.number}</div>
-                                                        <div style={{ fontSize: '1rem', opacity: 0.9, marginTop: '0.25rem', textAlign: 'center', wordBreak: 'break-word', lineHeight: 1.2 }}>
+                                                        <div style={{ fontSize: '1rem', opacity: 1, marginTop: '0.25rem', textAlign: 'center', wordBreak: 'break-word', lineHeight: 1.2 }}>
                                                             {entry.images?.[0] || '???'}
                                                         </div>
                                                     </div>

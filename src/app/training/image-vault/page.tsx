@@ -587,20 +587,20 @@ export default function ImageVault() {
                         {/* Quiz Mode Overlay */}
                         {quizMode === 'config' && (
                             <div className="glass-panel" style={{ marginBottom: '2rem', padding: '2rem', textAlign: 'center' }}>
-                                <h2 style={{ fontSize: '1.5rem', marginBottom: '1.5rem' }}>Major System Hardcore Quiz</h2>
+                                <h2 style={{ fontSize: '1.5rem', marginBottom: '1.5rem' }}>Major System Drill</h2>
                                 
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '2rem', maxWidth: '800px', margin: '0 auto 2rem' }}>
                                     <div>
-                                        <label style={{ display: 'block', marginBottom: '0.5rem', color: '#cbd5e1' }}>Card Count</label>
+                                        <label style={{ display: 'block', marginBottom: '0.5rem', color: '#cbd5e1' }}>Cards</label>
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                                            {[5, 10, 50, 100, 200].map(n => (
+                                            {[5, 10, 50, 100].map(n => (
                                                 <button 
                                                     key={n}
                                                     onClick={() => setQuizConfig(c => ({ ...c, count: n }))}
                                                     className={`btn ${quizConfig.count === n ? 'btn-primary' : ''}`}
                                                     style={{ padding: '0.5rem', opacity: quizConfig.count === n ? 1 : 0.6 }}
                                                 >
-                                                    {n} Cards
+                                                    {n}
                                                 </button>
                                             ))}
                                             <button 
@@ -608,34 +608,34 @@ export default function ImageVault() {
                                                 className={`btn ${quizConfig.count === 999 ? 'btn-primary' : ''}`}
                                                 style={{ padding: '0.5rem', opacity: quizConfig.count === 999 ? 1 : 0.6 }}
                                             >
-                                                All Cards
+                                                All
                                             </button>
                                         </div>
                                     </div>
 
                                     <div>
-                                        <label style={{ display: 'block', marginBottom: '0.5rem', color: '#cbd5e1' }}>Question Type</label>
+                                        <label style={{ display: 'block', marginBottom: '0.5rem', color: '#cbd5e1' }}>Drill Type</label>
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                                             <button 
                                                 onClick={() => setQuizConfig(c => ({ ...c, type: 'digits' }))}
                                                 className={`btn ${quizConfig.type === 'digits' ? 'btn-primary' : ''}`}
                                                 style={{ padding: '0.5rem', opacity: quizConfig.type === 'digits' ? 1 : 0.6 }}
                                             >
-                                                Digits → Word
+                                                Digits
                                             </button>
                                             <button 
                                                 onClick={() => setQuizConfig(c => ({ ...c, type: 'words' }))}
                                                 className={`btn ${quizConfig.type === 'words' ? 'btn-primary' : ''}`}
                                                 style={{ padding: '0.5rem', opacity: quizConfig.type === 'words' ? 1 : 0.6 }}
                                             >
-                                                Word → Digits
+                                                Words
                                             </button>
                                             <button 
                                                 onClick={() => setQuizConfig(c => ({ ...c, type: 'mixed' }))}
                                                 className={`btn ${quizConfig.type === 'mixed' ? 'btn-primary' : ''}`}
                                                 style={{ padding: '0.5rem', opacity: quizConfig.type === 'mixed' ? 1 : 0.6 }}
                                             >
-                                                Mixed
+                                                Both
                                             </button>
                                         </div>
                                     </div>
@@ -663,7 +663,7 @@ export default function ImageVault() {
 
                                 <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
                                     <button onClick={() => setQuizMode(null)} className="btn" style={{ background: 'rgba(255,255,255,0.1)' }}>Cancel</button>
-                                    <button onClick={startQuiz} className="btn btn-primary" style={{ padding: '0.75rem 2rem', fontSize: '1.1rem' }}>Start Quiz</button>
+                                    <button onClick={startQuiz} className="btn btn-primary" style={{ padding: '0.75rem 2rem', fontSize: '1.1rem' }}>Start</button>
                                 </div>
                             </div>
                         )}

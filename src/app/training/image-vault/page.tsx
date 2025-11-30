@@ -967,20 +967,28 @@ export default function ImageVault() {
                                                     position: 'relative',
                                                     borderRadius: '0.5rem'
                                                 }}>
-                                                    {/* Front (Number) */}
+                                                    {/* Front (Number + Word) */}
                                                     <div style={{
                                                         position: 'absolute', width: '100%', height: '100%',
                                                         backfaceVisibility: 'hidden',
                                                         WebkitBackfaceVisibility: 'hidden',
-                                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                                        fontSize: '2.5rem', fontWeight: 'bold', color: 'var(--primary)',
+                                                        display: 'flex', 
+                                                        flexDirection: 'column',
+                                                        alignItems: 'center', 
+                                                        justifyContent: 'center',
+                                                        color: 'var(--primary)',
                                                         background: bgColor, 
                                                         borderRadius: '0.5rem',
-                                                        border: `2px solid ${bgColor !== 'rgba(100, 116, 139, 0.1)' ? bgColor.replace('0.2)', '0.6)') : 'rgba(255,255,255,0.1)'}`
+                                                        border: `2px solid ${bgColor !== 'rgba(100, 116, 139, 0.1)' ? bgColor.replace('0.2)', '0.6)') : 'rgba(255,255,255,0.1)'}`,
+                                                        padding: '0.5rem'
                                                     }}>
-                                                        {entry.number}
+                                                        <div style={{ fontSize: '2rem', fontWeight: 'bold', lineHeight: 1 }}>{entry.number}</div>
+                                                        <div style={{ fontSize: '1rem', opacity: 0.9, marginTop: '0.25rem', textAlign: 'center', wordBreak: 'break-word', lineHeight: 1.2 }}>
+                                                            {entry.images?.[0] || '???'}
+                                                        </div>
                                                     </div>
-                                                    {/* Back (Word + Stats) */}
+
+                                                    {/* Back (Stats) */}
                                                     <div style={{
                                                         position: 'absolute', width: '100%', height: '100%',
                                                         backfaceVisibility: 'hidden',
@@ -990,27 +998,32 @@ export default function ImageVault() {
                                                         flexDirection: 'column',
                                                         alignItems: 'center', 
                                                         justifyContent: 'center',
-                                                        fontSize: '1rem', fontWeight: 'bold', color: 'white',
-                                                        background: `linear-gradient(135deg, var(--primary), ${bgColor})`, 
+                                                        fontSize: '0.9rem', 
+                                                        fontWeight: '500', 
+                                                        color: 'white',
+                                                        background: 'var(--primary)', 
                                                         borderRadius: '0.5rem',
                                                         padding: '0.5rem', 
-                                                        textAlign: 'center',
-                                                        wordBreak: 'break-word',
-                                                        gap: '0.25rem'
+                                                        textAlign: 'center'
                                                     }}>
-                                                        <div style={{ fontSize: '1.1rem', marginBottom: '0.25rem' }}>
-                                                            {entry.images?.[0] || '???'}
-                                                        </div>
-                                                        {stats && stats.totalAttempts > 0 && (
-                                                            <div style={{ 
-                                                                fontSize: '0.65rem', 
-                                                                opacity: 0.9,
-                                                                lineHeight: '1.2',
-                                                                marginTop: '0.25rem'
-                                                            }}>
-                                                                <div>{stats.totalAttempts} attempts</div>
-                                                                <div>{stats.mistakes} mistakes</div>
-                                                                <div>{(stats.averageTime / 1000).toFixed(1)}s avg</div>
+                                                        {stats && stats.totalAttempts > 0 ? (
+                                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', width: '100%' }}>
+                                                                <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', fontSize: '0.8rem' }}>
+                                                                    <span style={{ opacity: 0.8 }}>Seen:</span>
+                                                                    <b>{stats.totalAttempts}</b>
+                                                                </div>
+                                                                <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', fontSize: '0.8rem' }}>
+                                                                    <span style={{ opacity: 0.8 }}>Failed:</span>
+                                                                    <b style={{ color: stats.mistakes > 0 ? '#fca5a5' : 'inherit' }}>{stats.mistakes}</b>
+                                                                </div>
+                                                                <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', fontSize: '0.8rem' }}>
+                                                                    <span style={{ opacity: 0.8 }}>Time:</span>
+                                                                    <b>{(stats.averageTime / 1000).toFixed(1)}s</b>
+                                                                </div>
+                                                            </div>
+                                                        ) : (
+                                                            <div style={{ opacity: 0.7, fontSize: '0.85rem' }}>
+                                                                No data yet
                                                             </div>
                                                         )}
                                                     </div>

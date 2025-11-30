@@ -517,3 +517,128 @@ export const getCardPerformanceColor = (stats: CardStats | undefined): string =>
         return 'rgba(244, 63, 94, 0.35)'; 
     }
 };
+
+// ===== MEMORY PALACE STATISTICS =====
+
+export interface PalaceItemStat {
+    locationIndex: number;
+    word: string;
+    isCorrect: boolean;
+    recallTime: number; // milliseconds
+}
+
+export interface PalaceAttempt {
+    palaceId: string;
+    timestamp: number;
+    totalWords: number;
+    correctCount: number;
+    memorizeTime: number; // milliseconds
+    recallTime: number; // milliseconds
+    turns: number;
+    isTimed: boolean;
+    itemStats: PalaceItemStat[];
+}
+
+export interface PalaceLocationStat {
+    timesUsed: number;
+    timesFailed: number;
+    avgRetrievalTime: number;
+}
+
+export interface PalaceStats {
+    palaceId: string;
+    totalDrills: number;
+    avgSuccessRate: number;
+    avgRecallTime: number; // per item
+    locationStats: Record<number, PalaceLocationStat>;
+}
+
+export const savePalaceAttempt = async (attempt: PalaceAttempt, userId: string = USER_ID): Promise<boolean> => {
+    try {
+        if (!firebaseConfig.apiKey) return false;
+        
+        const attemptsRef = collection(db, 'memory_palace_attempts', userId, 'attempts');
+        await addDoc(attemptsRef, attempt);
+        return true;
+    } catch (error) {
+        console.error('Error saving palace attempt:', error);
+        return false;
+    }
+};
+
+export const getPalaceStats = async (palaceId: string, userId: string = USER_ID): Promise<PalaceStats> => {
+    try {
+        if (!firebaseConfig.apiKey) {
+            return {
+                palaceId,
+                totalDrills: 0,
+                avgSuccessRate: 0,
+                avgRecallTime: 0,
+                locationStats: {}
+            };
+        }
+
+        const attemptsRef = collection(db, 'memory_palace_attempts', userId, 'attempts');
+        const q = query(attemptsRef, where('palaceId', '==', palaceId));
+        const snapshot = await getDocs(q);
+        
+        const attempts = snapshot.docs.map(doc => doc.data() as PalaceAttempt);
+        
+        if (attempts.length === 0) {
+            return {
+                palaceId,
+                totalDrills: 0,
+                avgSuccessRate: 0,
+                avgRecallTime: 0,
+                locationStats: {}
+            };
+        }
+
+        let totalSuccessRate = 0;
+        let totalRecallTime = 0;
+        let totalItems = 0;
+        const locationStats: Record<number, PalaceLocationStat> = {};
+
+        attempts.forEach(attempt => {
+            const successRate = (attempt.correctCount / attempt.totalWords) * 100;
+            totalSuccessRate += successRate;
+            
+            attempt.itemStats.forEach(item => {
+                totalRecallTime += item.recallTime;
+                totalItems++;
+
+                if (!locationStats[item.locationIndex]) {
+                    locationStats[item.locationIndex] = {
+                        timesUsed: 0,
+                        timesFailed: 0,
+                        avgRetrievalTime: 0
+                    };
+                }
+
+                const locStat = locationStats[item.locationIndex];
+                const totalLocTime = (locStat.avgRetrievalTime * locStat.timesUsed) + item.recallTime;
+                
+                locStat.timesUsed++;
+                if (!item.isCorrect) locStat.timesFailed++;
+                locStat.avgRetrievalTime = totalLocTime / locStat.timesUsed;
+            });
+        });
+
+        return {
+            palaceId,
+            totalDrills: attempts.length,
+            avgSuccessRate: totalSuccessRate / attempts.length,
+            avgRecallTime: totalItems > 0 ? totalRecallTime / totalItems : 0,
+            locationStats
+        };
+    } catch (error) {
+        console.error('Error fetching palace stats:', error);
+        return {
+            palaceId,
+            totalDrills: 0,
+            avgSuccessRate: 0,
+            avgRecallTime: 0,
+            locationStats: {}
+        };
+    }
+};

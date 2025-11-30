@@ -1,13 +1,19 @@
+
 "use client";
 
 import { useState, useEffect, useRef } from 'react';
 import Header from '@/components/Header';
 import Link from 'next/link';
-import {
-    MajorEntry,
-    PaoEntry,
-    DigitPaoEntry,
-    Palace,
+import { 
+    saveMajorSystem, 
+    getMajorSystem, 
+    saveCardPaoSystem, 
+    getCardPaoSystem, 
+    saveDigitPaoSystem, 
+    getDigitPaoSystem,
+    savePalace,
+    getPalaces,
+    deletePalace,
     getImageVaultData,
     saveImageVaultData,
     CardStats,
@@ -15,9 +21,22 @@ import {
     saveCardAttempt,
     getCardStats,
     getCardPerformanceColor,
-    getCardHistory
+    getCardHistory,
+    savePalaceAttempt,
+    getPalaceStats,
+    type PalaceAttempt,
+    type PalaceStats,
+    type PalaceItemStat,
+    MajorEntry,
+    PaoEntry,
+    DigitPaoEntry,
+    Palace
 } from '@/lib/firebase';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, ScatterChart, Scatter, ZAxis } from 'recharts';
+import { majorSystemList } from '@/data/major-system';
+import { cardPaoList } from '@/data/card-pao';
+import { digitPaoList } from '@/data/digit-pao';
+import wordList from '@/data/words.json';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { SAMPLE_MAJOR_SYSTEM, SAMPLE_PAO_SYSTEM, SAMPLE_PALACES } from '@/data/sampleImageVault';
 
 type SystemType = 'major' | 'card-pao' | 'digit-pao' | 'palace';
@@ -27,6 +46,8 @@ const STORAGE_KEY = 'image_vault_data';
 
 export default function ImageVault() {
     const [activeTab, setActiveTab] = useState<SystemType>('major');
+    const [userId, setUserId] = useState('default_user');
+    const [drillStartTime, setDrillStartTime] = useState(0);
     const [searchQuery, setSearchQuery] = useState('');
     const [timeFilter, setTimeFilter] = useState<TimeFilter>('1w');
     const [cardPerformanceStats, setCardPerformanceStats] = useState<Map<string, CardStats>>(new Map());
@@ -41,6 +62,23 @@ export default function ImageVault() {
     const [majorViewMode, setMajorViewMode] = useState<'cards' | 'analytics'>('cards');
     const [selectedCardForStats, setSelectedCardForStats] = useState<string>('');
     const [cardHistory, setCardHistory] = useState<CardAttempt[]>([]);
+
+    // Palace Drill State
+    const [palaceDrillMode, setPalaceDrillMode] = useState<'config' | 'memorize' | 'recall' | 'result' | null>(null);
+    const [selectedPalaceForDrill, setSelectedPalaceForDrill] = useState<Palace | null>(null);
+    const [drillTurns, setDrillTurns] = useState(1);
+    const [drillIsTimed, setDrillIsTimed] = useState(false);
+    const [drillTimeLimit, setDrillTimeLimit] = useState(60); // seconds
+    const [drillWords, setDrillWords] = useState<string[]>([]);
+    const [currentDrillIndex, setCurrentDrillIndex] = useState(0);
+    const [memorizeStartTime, setMemorizeStartTime] = useState(0);
+    const [recallStartTime, setRecallStartTime] = useState(0);
+    const [itemStartTime, setItemStartTime] = useState(0);
+    const [drillItemStats, setDrillItemStats] = useState<PalaceItemStat[]>([]);
+    const [currentRecallInput, setCurrentRecallInput] = useState('');
+    const [lastRecallFeedback, setLastRecallFeedback] = useState<'correct' | 'incorrect' | null>(null);
+    const [lastRecallCorrectWord, setLastRecallCorrectWord] = useState('');
+    const [palaceStats, setPalaceStats] = useState<PalaceStats | null>(null);
 
     // Card PAO System
     const [cardPaoSystem, setCardPaoSystem] = useState<PaoEntry[]>([]);
@@ -144,6 +182,117 @@ export default function ImageVault() {
 
         return () => clearTimeout(timeoutId);
     }, [majorSystem, cardPaoSystem, digitPaoSystem, palaces]);
+
+    // ===== PALACE DRILL FUNCTIONS =====
+    
+    const startPalaceDrillConfig = (palace: Palace) => {
+        setSelectedPalaceForDrill(palace);
+        setPalaceDrillMode('config');
+        setDrillTurns(1);
+        setDrillIsTimed(false);
+        setDrillTimeLimit(60);
+    };
+
+    const startMemorizePhase = () => {
+        if (!selectedPalaceForDrill) return;
+
+        // Generate words
+        const totalWords = selectedPalaceForDrill.locations.length * drillTurns;
+        const words: string[] = [];
+        for (let i = 0; i < totalWords; i++) {
+            const randomIndex = Math.floor(Math.random() * wordList.length);
+            words.push(wordList[randomIndex]);
+        }
+
+        setDrillWords(words);
+        setCurrentDrillIndex(0);
+        setPalaceDrillMode('memorize');
+        setMemorizeStartTime(Date.now());
+        setDrillStartTime(Date.now());
+    };
+
+    const nextMemorizeItem = () => {
+        if (currentDrillIndex < drillWords.length - 1) {
+            setCurrentDrillIndex(prev => prev + 1);
+        } else {
+            startRecallPhase();
+        }
+    };
+
+    const prevMemorizeItem = () => {
+        if (currentDrillIndex > 0) {
+            setCurrentDrillIndex(prev => prev - 1);
+        }
+    };
+
+    const startRecallPhase = () => {
+        setPalaceDrillMode('recall');
+        setRecallStartTime(Date.now());
+        setCurrentDrillIndex(0);
+        setItemStartTime(Date.now());
+        setDrillItemStats([]);
+        setCurrentRecallInput('');
+        setLastRecallFeedback(null);
+    };
+
+    const submitRecallItem = () => {
+        if (!selectedPalaceForDrill) return;
+
+        const correctWord = drillWords[currentDrillIndex];
+        const isCorrect = currentRecallInput.toLowerCase().trim() === correctWord.toLowerCase().trim();
+        const recallTime = Date.now() - itemStartTime;
+
+        const locationIndex = currentDrillIndex % selectedPalaceForDrill.locations.length;
+
+        const stat: PalaceItemStat = {
+            locationIndex,
+            word: correctWord,
+            isCorrect,
+            recallTime
+        };
+
+        setDrillItemStats(prev => [...prev, stat]);
+        setLastRecallFeedback(isCorrect ? 'correct' : 'incorrect');
+        setLastRecallCorrectWord(correctWord);
+
+        // Auto-advance after delay
+        setTimeout(() => {
+            setLastRecallFeedback(null);
+            setCurrentRecallInput('');
+            if (currentDrillIndex < drillWords.length - 1) {
+                setCurrentDrillIndex(prev => prev + 1);
+                setItemStartTime(Date.now());
+            } else {
+                finishPalaceDrill([...drillItemStats, stat]);
+            }
+        }, 1500);
+    };
+
+    const finishPalaceDrill = async (finalStats: PalaceItemStat[]) => {
+        if (!selectedPalaceForDrill) return;
+
+        const endTime = Date.now();
+        const memorizeTime = recallStartTime - memorizeStartTime;
+        const recallTime = endTime - recallStartTime;
+        const correctCount = finalStats.filter(s => s.isCorrect).length;
+
+        const attempt: PalaceAttempt = {
+            palaceId: selectedPalaceForDrill.id,
+            timestamp: endTime,
+            totalWords: drillWords.length,
+            correctCount,
+            memorizeTime,
+            recallTime,
+            turns: drillTurns,
+            isTimed: drillIsTimed,
+            itemStats: finalStats
+        };
+
+        await savePalaceAttempt(attempt, userId);
+        const stats = await getPalaceStats(selectedPalaceForDrill.id, userId);
+        setPalaceStats(stats);
+        setPalaceDrillMode('result');
+    };
 
     // Major System Functions
     const addMajorEntry = () => {
@@ -1463,235 +1612,416 @@ export default function ImageVault() {
                 {/* Memory Palaces Tab */}
                 {activeTab === 'palace' && (
                     <div className="animate-fade-in">
-                        {/* Add New Palace */}
-                        <div className="glass card" style={{ marginBottom: '2rem' }}>
-                            <h3 style={{ fontSize: '1.1rem', marginBottom: '1rem' }}>Add New Palace</h3>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '1rem', alignItems: 'end' }}>
-                                <div>
-                                    <label style={{ display: 'block', fontSize: '0.8rem', marginBottom: '0.5rem', opacity: 0.7 }}>Palace Name</label>
-                                    <input
-                                        type="text"
-                                        className="input-field"
-                                        placeholder="My Memory Palace"
-                                        value={newPalaceName}
-                                        onChange={(e) => setNewPalaceName(e.target.value)}
-                                        onKeyPress={(e) => e.key === 'Enter' && addPalace()}
-                                    />
+                        {palaceDrillMode ? (
+                            <div className="glass-panel" style={{ padding: '2rem' }}>
+                                <div style={{ marginBottom: '1rem' }}>
+                                    <button onClick={() => setPalaceDrillMode(null)} className="btn btn-secondary">← Exit Drill</button>
                                 </div>
-                                <button className="btn btn-primary" onClick={addPalace}>
-                                    Create Palace
-                                </button>
-                            </div>
-                        </div>
 
-                        {/* Palaces List */}
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-                            {filteredPalaces.length === 0 ? (
-                                <div className="glass-panel" style={{ padding: '2rem', textAlign: 'center', opacity: 0.5 }}>
-                                    {searchQuery ? 'No results found' : 'No palaces yet. Create your first one above!'}
-                                </div>
-                            ) : (
-                                filteredPalaces.map((palace) => (
-                                    <div key={palace.id} className="glass-panel" style={{ padding: '1.5rem' }}>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                                            {editingPalace === palace.id ? (
-                                                <input
-                                                    type="text"
-                                                    className="input-field"
-                                                    value={palace.name}
-                                                    onChange={(e) => updatePalaceName(palace.id, e.target.value)}
-                                                    onBlur={() => setEditingPalace(null)}
-                                                    autoFocus
-                                                    style={{ fontSize: '1.1rem', fontWeight: 'bold', maxWidth: '300px' }}
-                                                />
-                                            ) : (
-                                                <h3
-                                                    style={{ fontSize: '1.1rem', color: 'var(--accent)', cursor: 'pointer' }}
-                                                    onClick={() => setEditingPalace(palace.id)}
-                                                >
-                                                    {palace.name} ({palace.locations.length} locations)
-                                                </h3>
-                                            )}
-                                            <button
-                                                onClick={() => deletePalace(palace.id)}
-                                                style={{ background: 'none', border: 'none', color: 'var(--error)', cursor: 'pointer', fontSize: '0.9rem' }}
-                                            >
-                                                Delete Palace
-                                            </button>
+                                {palaceDrillMode === 'config' && selectedPalaceForDrill && (
+                                    <div style={{ maxWidth: '500px', margin: '0 auto', textAlign: 'center' }}>
+                                        <h2 style={{ fontSize: '1.5rem', marginBottom: '1.5rem' }}>Drill: {selectedPalaceForDrill.name}</h2>
+                                        
+                                        <div style={{ marginBottom: '1.5rem', textAlign: 'left' }}>
+                                            <label style={{ display: 'block', marginBottom: '0.5rem' }}>Turns (Multiplier)</label>
+                                            <input 
+                                                type="number" 
+                                                min="1" 
+                                                max="10" 
+                                                value={drillTurns} 
+                                                onChange={(e) => setDrillTurns(parseInt(e.target.value) || 1)}
+                                                className="input-field"
+                                            />
+                                            <p style={{ fontSize: '0.8rem', opacity: 0.7, marginTop: '0.5rem' }}>
+                                                Total Words: {selectedPalaceForDrill.locations.length * drillTurns}
+                                            </p>
                                         </div>
 
-                                        {/* Add Location */}
-                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '0.5rem', marginBottom: '1rem' }}>
+                                        <div style={{ marginBottom: '1.5rem', textAlign: 'left' }}>
+                                            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                                                <input 
+                                                    type="checkbox" 
+                                                    checked={drillIsTimed} 
+                                                    onChange={(e) => setDrillIsTimed(e.target.checked)}
+                                                />
+                                                Timed Mode
+                                            </label>
+                                        </div>
+
+                                        {drillIsTimed && (
+                                            <div style={{ marginBottom: '1.5rem', textAlign: 'left' }}>
+                                                <label style={{ display: 'block', marginBottom: '0.5rem' }}>Time Limit (Seconds)</label>
+                                                <input 
+                                                    type="number" 
+                                                    min="10" 
+                                                    value={drillTimeLimit} 
+                                                    onChange={(e) => setDrillTimeLimit(parseInt(e.target.value) || 60)}
+                                                    className="input-field"
+                                                />
+                                            </div>
+                                        )}
+
+                                        <button onClick={startMemorizePhase} className="btn btn-primary" style={{ width: '100%', padding: '1rem', fontSize: '1.1rem' }}>
+                                            Start Memorization
+                                        </button>
+                                    </div>
+                                )}
+
+                                {palaceDrillMode === 'memorize' && selectedPalaceForDrill && (
+                                    <div style={{ textAlign: 'center', padding: '2rem 0' }}>
+                                        <h3 style={{ opacity: 0.7, marginBottom: '1rem' }}>Memorize Phase</h3>
+                                        <div style={{ fontSize: '1.2rem', marginBottom: '2rem', color: 'var(--accent)' }}>
+                                            Location {currentDrillIndex % selectedPalaceForDrill.locations.length + 1}: {selectedPalaceForDrill.locations[currentDrillIndex % selectedPalaceForDrill.locations.length]}
+                                        </div>
+                                        
+                                        <div className="card glass" style={{ padding: '3rem', fontSize: '2.5rem', fontWeight: 'bold', marginBottom: '2rem', display: 'inline-block', minWidth: '300px' }}>
+                                            {drillWords[currentDrillIndex]}
+                                        </div>
+
+                                        <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem' }}>
+                                            <button onClick={prevMemorizeItem} disabled={currentDrillIndex === 0} className="btn btn-secondary">Previous</button>
+                                            <button onClick={nextMemorizeItem} className="btn btn-primary">
+                                                {currentDrillIndex < drillWords.length - 1 ? 'Next Word' : 'Start Recall'}
+                                            </button>
+                                        </div>
+                                        <div style={{ marginTop: '1rem', opacity: 0.5 }}>
+                                            {currentDrillIndex + 1} / {drillWords.length}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {palaceDrillMode === 'recall' && selectedPalaceForDrill && (
+                                    <div style={{ textAlign: 'center', padding: '2rem 0' }}>
+                                        <h3 style={{ opacity: 0.7, marginBottom: '1rem' }}>Recall Phase</h3>
+                                        <div style={{ fontSize: '1.2rem', marginBottom: '2rem', color: 'var(--accent)' }}>
+                                            Location {currentDrillIndex % selectedPalaceForDrill.locations.length + 1}: {selectedPalaceForDrill.locations[currentDrillIndex % selectedPalaceForDrill.locations.length]}
+                                        </div>
+
+                                        <div style={{ marginBottom: '2rem' }}>
+                                            <input 
+                                                type="text" 
+                                                value={currentRecallInput}
+                                                onChange={(e) => setCurrentRecallInput(e.target.value)}
+                                                onKeyPress={(e) => e.key === 'Enter' && !lastRecallFeedback && submitRecallItem()}
+                                                placeholder="Type the word..."
+                                                className="input-field"
+                                                style={{ fontSize: '1.5rem', textAlign: 'center', maxWidth: '400px' }}
+                                                autoFocus
+                                                disabled={!!lastRecallFeedback}
+                                            />
+                                        </div>
+
+                                        {lastRecallFeedback && (
+                                            <div className={`animate-fade-in`} style={{ 
+                                                fontSize: '1.2rem', 
+                                                fontWeight: 'bold', 
+                                                color: lastRecallFeedback === 'correct' ? '#10b981' : '#ef4444',
+                                                marginBottom: '1rem'
+                                            }}>
+                                                {lastRecallFeedback === 'correct' ? 'Correct!' : `Wrong! It was: ${lastRecallCorrectWord}`}
+                                            </div>
+                                        )}
+
+                                        {!lastRecallFeedback && (
+                                            <button onClick={submitRecallItem} className="btn btn-primary">Submit</button>
+                                        )}
+                                        
+                                        <div style={{ marginTop: '1rem', opacity: 0.5 }}>
+                                            {currentDrillIndex + 1} / {drillWords.length}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {palaceDrillMode === 'result' && palaceStats && (
+                                    <div style={{ textAlign: 'center' }}>
+                                        <h2 style={{ fontSize: '2rem', marginBottom: '2rem' }}>Drill Complete!</h2>
+                                        
+                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
+                                            <div className="glass-panel" style={{ padding: '1.5rem' }}>
+                                                <div style={{ fontSize: '0.9rem', opacity: 0.7 }}>Success Rate</div>
+                                                <div style={{ fontSize: '2rem', fontWeight: 'bold', color: 'var(--accent)' }}>
+                                                    {((drillItemStats.filter(s => s.isCorrect).length / drillItemStats.length) * 100).toFixed(1)}%
+                                                </div>
+                                            </div>
+                                            <div className="glass-panel" style={{ padding: '1.5rem' }}>
+                                                <div style={{ fontSize: '0.9rem', opacity: 0.7 }}>Avg Recall Time</div>
+                                                <div style={{ fontSize: '2rem', fontWeight: 'bold' }}>
+                                                    {(drillItemStats.reduce((acc, curr) => acc + curr.recallTime, 0) / drillItemStats.length / 1000).toFixed(2)}s
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <h3 style={{ textAlign: 'left', marginBottom: '1rem' }}>Detailed Breakdown</h3>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', textAlign: 'left' }}>
+                                            {drillItemStats.map((stat, idx) => (
+                                                <div key={idx} className="glass-panel" style={{ 
+                                                    padding: '1rem', 
+                                                    display: 'flex', 
+                                                    justifyContent: 'space-between',
+                                                    borderLeft: `4px solid ${stat.isCorrect ? '#10b981' : '#ef4444'}`
+                                                }}>
+                                                    <div>
+                                                        <span style={{ fontWeight: 'bold', marginRight: '1rem' }}>{stat.word}</span>
+                                                        <span style={{ opacity: 0.7, fontSize: '0.9rem' }}>
+                                                            Loc: {selectedPalaceForDrill?.locations[stat.locationIndex]}
+                                                        </span>
+                                                    </div>
+                                                    <div>
+                                                        {(stat.recallTime / 1000).toFixed(2)}s
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+
+                                        <button onClick={() => setPalaceDrillMode(null)} className="btn btn-primary" style={{ marginTop: '2rem' }}>
+                                            Back to Palaces
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        ) : (
+                            <>
+                                {/* Add New Palace */}
+                                <div className="glass card" style={{ marginBottom: '2rem' }}>
+                                    <h3 style={{ fontSize: '1.1rem', marginBottom: '1rem' }}>Add New Palace</h3>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '1rem', alignItems: 'end' }}>
+                                        <div>
+                                            <label style={{ display: 'block', fontSize: '0.8rem', marginBottom: '0.5rem', opacity: 0.7 }}>Palace Name</label>
                                             <input
                                                 type="text"
                                                 className="input-field"
-                                                placeholder="Add new location..."
-                                                value={editingPalace === palace.id ? newLocation : ''}
-                                                onChange={(e) => setNewLocation(e.target.value)}
-                                                onKeyPress={(e) => e.key === 'Enter' && addLocation(palace.id)}
-                                                onFocus={() => setEditingPalace(palace.id)}
-                                                style={{ padding: '0.5rem' }}
+                                                placeholder="My Memory Palace"
+                                                value={newPalaceName}
+                                                onChange={(e) => setNewPalaceName(e.target.value)}
+                                                onKeyPress={(e) => e.key === 'Enter' && addPalace()}
                                             />
-                                            <button
-                                                className="btn btn-secondary"
-                                                onClick={() => addLocation(palace.id)}
-                                                style={{ padding: '0.5rem 1rem' }}
-                                            >
-                                                Add
-                                            </button>
                                         </div>
-
-                                        {/* Locations List */}
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                                            {palace.locations.map((location, idx) => {
-                                                const isDragging = draggedItem?.palaceId === palace.id && draggedItem?.index === idx;
-                                                const isDragOver = dragOverItem?.palaceId === palace.id && dragOverItem?.index === idx;
-
-                                                return (
-                                                    <div
-                                                        key={idx}
-                                                        draggable
-                                                        onDragStart={() => handleDragStart(palace.id, idx)}
-                                                        onDragEnter={() => handleDragEnter(palace.id, idx)}
-                                                        onDragEnd={handleDragEnd}
-                                                        onDragOver={(e) => e.preventDefault()}
-                                                        style={{
-                                                            padding: '0.75rem',
-                                                            background: isDragOver ? 'rgba(99, 102, 241, 0.2)' : 'rgba(0,0,0,0.2)',
-                                                            borderRadius: '0.5rem',
-                                                            display: 'flex',
-                                                            justifyContent: 'space-between',
-                                                            alignItems: 'center',
-                                                            cursor: 'grab',
-                                                            opacity: isDragging ? 0.5 : 1,
-                                                            border: isDragOver ? '2px solid var(--primary)' : '2px solid transparent',
-                                                            transition: 'all 0.2s',
-                                                            transform: isDragging ? 'scale(0.95)' : 'scale(1)'
-                                                        }}
-                                                        onMouseEnter={(e) => {
-                                                            if (!isDragging) {
-                                                                e.currentTarget.style.background = 'rgba(99, 102, 241, 0.1)';
-                                                            }
-                                                        }}
-                                                        onMouseLeave={(e) => {
-                                                            if (!isDragOver) {
-                                                                e.currentTarget.style.background = 'rgba(0,0,0,0.2)';
-                                                            }
-                                                        }}
-                                                    >
-                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flex: 1 }}>
-                                                            <span style={{
-                                                                opacity: 0.5,
-                                                                minWidth: '30px',
-                                                                fontSize: '0.9rem',
-                                                                fontWeight: 'bold'
-                                                            }}>
-                                                                {idx + 1}.
-                                                            </span>
-                                                            <span style={{
-                                                                fontSize: '1.6rem',
-                                                                opacity: 0.3,
-                                                                cursor: 'grab',
-                                                                userSelect: 'none'
-                                                            }}>
-                                                                ⋮⋮
-                                                            </span>
-                                                            <span style={{ flex: 1, fontSize: '1rem' }}>{location}</span>
-                                                        </div>
-                                                        <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                                            <button
-                                                                onClick={() => moveLocation(palace.id, idx, 'up')}
-                                                                disabled={idx === 0}
-                                                                style={{
-                                                                    background: idx === 0 ? 'rgba(255,255,255,0.05)' : 'rgba(99, 102, 241, 0.2)',
-                                                                    border: 'none',
-                                                                    borderRadius: '0.25rem',
-                                                                    padding: '0.25rem 0.5rem',
-                                                                    color: idx === 0 ? 'rgba(255,255,255,0.2)' : 'var(--primary)',
-                                                                    cursor: idx === 0 ? 'not-allowed' : 'pointer',
-                                                                    fontSize: '1.2rem',
-                                                                    transition: 'all 0.2s'
-                                                                }}
-                                                                onMouseEnter={(e) => {
-                                                                    if (idx !== 0) {
-                                                                        e.currentTarget.style.background = 'var(--primary)';
-                                                                        e.currentTarget.style.color = 'white';
-                                                                    }
-                                                                }}
-                                                                onMouseLeave={(e) => {
-                                                                    if (idx !== 0) {
-                                                                        e.currentTarget.style.background = 'rgba(99, 102, 241, 0.2)';
-                                                                        e.currentTarget.style.color = 'var(--primary)';
-                                                                    }
-                                                                }}
-                                                            >
-                                                                ↑
-                                                            </button>
-                                                            <button
-                                                                onClick={() => moveLocation(palace.id, idx, 'down')}
-                                                                disabled={idx === palace.locations.length - 1}
-                                                                style={{
-                                                                    background: idx === palace.locations.length - 1 ? 'rgba(255,255,255,0.05)' : 'rgba(99, 102, 241, 0.2)',
-                                                                    border: 'none',
-                                                                    borderRadius: '0.25rem',
-                                                                    padding: '0.25rem 0.5rem',
-                                                                    color: idx === palace.locations.length - 1 ? 'rgba(255,255,255,0.2)' : 'var(--primary)',
-                                                                    cursor: idx === palace.locations.length - 1 ? 'not-allowed' : 'pointer',
-                                                                    fontSize: '1.2rem',
-                                                                    transition: 'all 0.2s'
-                                                                }}
-                                                                onMouseEnter={(e) => {
-                                                                    if (idx !== palace.locations.length - 1) {
-                                                                        e.currentTarget.style.background = 'var(--primary)';
-                                                                        e.currentTarget.style.color = 'white';
-                                                                    }
-                                                                }}
-                                                                onMouseLeave={(e) => {
-                                                                    if (idx !== palace.locations.length - 1) {
-                                                                        e.currentTarget.style.background = 'rgba(99, 102, 241, 0.2)';
-                                                                        e.currentTarget.style.color = 'var(--primary)';
-                                                                    }
-                                                                }}
-                                                            >
-                                                                ↓
-                                                            </button>
-                                                            <button
-                                                                onClick={() => deleteLocation(palace.id, location)}
-                                                                style={{
-                                                                    background: 'rgba(239, 68, 68, 0.2)',
-                                                                    border: 'none',
-                                                                    borderRadius: '0.25rem',
-                                                                    padding: '0.25rem 0.5rem',
-                                                                    color: 'var(--error)',
-                                                                    cursor: 'pointer',
-                                                                    fontSize: '1.2rem',
-                                                                    transition: 'all 0.2s'
-                                                                }}
-                                                                onMouseEnter={(e) => {
-                                                                    e.currentTarget.style.background = 'var(--error)';
-                                                                    e.currentTarget.style.color = 'white';
-                                                                }}
-                                                                onMouseLeave={(e) => {
-                                                                    e.currentTarget.style.background = 'rgba(239, 68, 68, 0.2)';
-                                                                    e.currentTarget.style.color = 'var(--error)';
-                                                                }}
-                                                            >
-                                                                ×
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                );
-                                            })}
-                                            {palace.locations.length === 0 && (
-                                                <div style={{ padding: '1rem', textAlign: 'center', opacity: 0.5, fontSize: '0.9rem' }}>
-                                                    No locations yet. Add your first one above!
-                                                </div>
-                                            )}
-                                        </div>
+                                        <button className="btn btn-primary" onClick={addPalace}>
+                                            Create Palace
+                                        </button>
                                     </div>
-                                ))
-                            )}
-                        </div>
+                                </div>
+
+                                {/* Palaces List */}
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                                    {filteredPalaces.length === 0 ? (
+                                        <div className="glass-panel" style={{ padding: '2rem', textAlign: 'center', opacity: 0.5 }}>
+                                            {searchQuery ? 'No results found' : 'No palaces yet. Create your first one above!'}
+                                        </div>
+                                    ) : (
+                                        filteredPalaces.map((palace) => (
+                                            <div key={palace.id} className="glass-panel" style={{ padding: '1.5rem' }}>
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                                                        {editingPalace === palace.id ? (
+                                                            <input
+                                                                type="text"
+                                                                className="input-field"
+                                                                value={palace.name}
+                                                                onChange={(e) => updatePalaceName(palace.id, e.target.value)}
+                                                                onBlur={() => setEditingPalace(null)}
+                                                                autoFocus
+                                                                style={{ fontSize: '1.1rem', fontWeight: 'bold', maxWidth: '300px' }}
+                                                            />
+                                                        ) : (
+                                                            <h3
+                                                                style={{ fontSize: '1.1rem', color: 'var(--accent)', cursor: 'pointer' }}
+                                                                onClick={() => setEditingPalace(palace.id)}
+                                                            >
+                                                                {palace.name} ({palace.locations.length} locations)
+                                                            </h3>
+                                                        )}
+                                                        <button 
+                                                            onClick={() => startPalaceDrillConfig(palace)}
+                                                            className="btn btn-primary"
+                                                            style={{ padding: '0.25rem 0.75rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                                                            disabled={palace.locations.length === 0}
+                                                        >
+                                                            <span>⚡</span> Drill
+                                                        </button>
+                                                    </div>
+                                                    <button
+                                                        onClick={() => deletePalace(palace.id)}
+                                                        style={{ background: 'none', border: 'none', color: 'var(--error)', cursor: 'pointer', fontSize: '0.9rem' }}
+                                                    >
+                                                        Delete Palace
+                                                    </button>
+                                                </div>
+
+                                                {/* Add Location */}
+                                                <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '0.5rem', marginBottom: '1rem' }}>
+                                                    <input
+                                                        type="text"
+                                                        className="input-field"
+                                                        placeholder="Add new location..."
+                                                        value={editingPalace === palace.id ? newLocation : ''}
+                                                        onChange={(e) => setNewLocation(e.target.value)}
+                                                        onKeyPress={(e) => e.key === 'Enter' && addLocation(palace.id)}
+                                                        onFocus={() => setEditingPalace(palace.id)}
+                                                        style={{ padding: '0.5rem' }}
+                                                    />
+                                                    <button
+                                                        className="btn btn-secondary"
+                                                        onClick={() => addLocation(palace.id)}
+                                                        style={{ padding: '0.5rem 1rem' }}
+                                                    >
+                                                        Add
+                                                    </button>
+                                                </div>
+
+                                                {/* Locations List */}
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                                    {palace.locations.map((location, idx) => {
+                                                        const isDragging = draggedItem?.palaceId === palace.id && draggedItem?.index === idx;
+                                                        const isDragOver = dragOverItem?.palaceId === palace.id && dragOverItem?.index === idx;
+
+                                                        return (
+                                                            <div
+                                                                key={idx}
+                                                                draggable
+                                                                onDragStart={() => handleDragStart(palace.id, idx)}
+                                                                onDragEnter={() => handleDragEnter(palace.id, idx)}
+                                                                onDragEnd={handleDragEnd}
+                                                                onDragOver={(e) => e.preventDefault()}
+                                                                style={{
+                                                                    padding: '0.75rem',
+                                                                    background: isDragOver ? 'rgba(99, 102, 241, 0.2)' : 'rgba(0,0,0,0.2)',
+                                                                    borderRadius: '0.5rem',
+                                                                    display: 'flex',
+                                                                    justifyContent: 'space-between',
+                                                                    alignItems: 'center',
+                                                                    cursor: 'grab',
+                                                                    opacity: isDragging ? 0.5 : 1,
+                                                                    border: isDragOver ? '2px solid var(--primary)' : '2px solid transparent',
+                                                                    transition: 'all 0.2s',
+                                                                    transform: isDragging ? 'scale(0.95)' : 'scale(1)'
+                                                                }}
+                                                                onMouseEnter={(e) => {
+                                                                    if (!isDragging) {
+                                                                        e.currentTarget.style.background = 'rgba(99, 102, 241, 0.1)';
+                                                                    }
+                                                                }}
+                                                                onMouseLeave={(e) => {
+                                                                    if (!isDragOver) {
+                                                                        e.currentTarget.style.background = 'rgba(0,0,0,0.2)';
+                                                                    }
+                                                                }}
+                                                            >
+                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flex: 1 }}>
+                                                                    <span style={{
+                                                                        opacity: 0.5,
+                                                                        minWidth: '30px',
+                                                                        fontSize: '0.9rem',
+                                                                        fontWeight: 'bold'
+                                                                    }}>
+                                                                        {idx + 1}.
+                                                                    </span>
+                                                                    <span style={{
+                                                                        fontSize: '1.6rem',
+                                                                        opacity: 0.3,
+                                                                        cursor: 'grab',
+                                                                        userSelect: 'none'
+                                                                    }}>
+                                                                        ⋮⋮
+                                                                    </span>
+                                                                    <span style={{ flex: 1, fontSize: '1rem' }}>{location}</span>
+                                                                </div>
+                                                                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                                                    <button
+                                                                        onClick={() => moveLocation(palace.id, idx, 'up')}
+                                                                        disabled={idx === 0}
+                                                                        style={{
+                                                                            background: idx === 0 ? 'rgba(255,255,255,0.05)' : 'rgba(99, 102, 241, 0.2)',
+                                                                            border: 'none',
+                                                                            borderRadius: '0.25rem',
+                                                                            padding: '0.25rem 0.5rem',
+                                                                            color: idx === 0 ? 'rgba(255,255,255,0.2)' : 'var(--primary)',
+                                                                            cursor: idx === 0 ? 'not-allowed' : 'pointer',
+                                                                            fontSize: '1.2rem',
+                                                                            transition: 'all 0.2s'
+                                                                        }}
+                                                                        onMouseEnter={(e) => {
+                                                                            if (idx !== 0) {
+                                                                                e.currentTarget.style.background = 'var(--primary)';
+                                                                                e.currentTarget.style.color = 'white';
+                                                                            }
+                                                                        }}
+                                                                        onMouseLeave={(e) => {
+                                                                            if (idx !== 0) {
+                                                                                e.currentTarget.style.background = 'rgba(99, 102, 241, 0.2)';
+                                                                                e.currentTarget.style.color = 'var(--primary)';
+                                                                            }
+                                                                        }}
+                                                                    >
+                                                                        ↑
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => moveLocation(palace.id, idx, 'down')}
+                                                                        disabled={idx === palace.locations.length - 1}
+                                                                        style={{
+                                                                            background: idx === palace.locations.length - 1 ? 'rgba(255,255,255,0.05)' : 'rgba(99, 102, 241, 0.2)',
+                                                                            border: 'none',
+                                                                            borderRadius: '0.25rem',
+                                                                            padding: '0.25rem 0.5rem',
+                                                                            color: idx === palace.locations.length - 1 ? 'rgba(255,255,255,0.2)' : 'var(--primary)',
+                                                                            cursor: idx === palace.locations.length - 1 ? 'not-allowed' : 'pointer',
+                                                                            fontSize: '1.2rem',
+                                                                            transition: 'all 0.2s'
+                                                                        }}
+                                                                        onMouseEnter={(e) => {
+                                                                            if (idx !== palace.locations.length - 1) {
+                                                                                e.currentTarget.style.background = 'var(--primary)';
+                                                                                e.currentTarget.style.color = 'white';
+                                                                            }
+                                                                        }}
+                                                                        onMouseLeave={(e) => {
+                                                                            if (idx !== palace.locations.length - 1) {
+                                                                                e.currentTarget.style.background = 'rgba(99, 102, 241, 0.2)';
+                                                                                e.currentTarget.style.color = 'var(--primary)';
+                                                                            }
+                                                                        }}
+                                                                    >
+                                                                        ↓
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => deleteLocation(palace.id, location)}
+                                                                        style={{
+                                                                            background: 'rgba(239, 68, 68, 0.2)',
+                                                                            border: 'none',
+                                                                            borderRadius: '0.25rem',
+                                                                            padding: '0.25rem 0.5rem',
+                                                                            color: 'var(--error)',
+                                                                            cursor: 'pointer',
+                                                                            fontSize: '1.2rem',
+                                                                            transition: 'all 0.2s'
+                                                                        }}
+                                                                        onMouseEnter={(e) => {
+                                                                            e.currentTarget.style.background = 'var(--error)';
+                                                                            e.currentTarget.style.color = 'white';
+                                                                        }}
+                                                                        onMouseLeave={(e) => {
+                                                                            e.currentTarget.style.background = 'rgba(239, 68, 68, 0.2)';
+                                                                            e.currentTarget.style.color = 'var(--error)';
+                                                                        }}
+                                                                    >
+                                                                        ×
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                    {palace.locations.length === 0 && (
+                                                        <div style={{ padding: '1rem', textAlign: 'center', opacity: 0.5, fontSize: '0.9rem' }}>
+                                                            No locations yet. Add your first one above!
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            </>
+                        )}
                     </div>
                 )}
 

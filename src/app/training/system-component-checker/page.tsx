@@ -462,7 +462,7 @@ export default function SystemComponentChecker() {
                                 {questionLabels[currentQuestion.category]}
                             </div>
                             <div style={{ 
-                                fontSize: 'clamp(1.5rem, 5vw, 2.5rem)', 
+                                fontSize: 'clamp(1.2rem, 4vw, 2rem)', 
                                 fontWeight: 'bold',
                                 lineHeight: '1.3'
                             }}>

@@ -819,7 +819,7 @@ export default function ImageVault() {
                                         className="btn btn-primary"
                                         style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
                                     >
-                                        <span>⚡</span> Start Hardcore Quiz
+                                        <span>⚡</span> Start Drill
                                     </button>
                                 </div>
 

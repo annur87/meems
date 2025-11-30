@@ -14,8 +14,10 @@ import {
     CardAttempt,
     saveCardAttempt,
     getCardStats,
-    getCardPerformanceColor
+    getCardPerformanceColor,
+    getCardHistory
 } from '@/lib/firebase';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, ScatterChart, Scatter, ZAxis } from 'recharts';
 import { SAMPLE_MAJOR_SYSTEM, SAMPLE_PAO_SYSTEM, SAMPLE_PALACES } from '@/data/sampleImageVault';
 
 type SystemType = 'major' | 'card-pao' | 'digit-pao' | 'palace';
@@ -34,6 +36,11 @@ export default function ImageVault() {
     const [editingMajor, setEditingMajor] = useState<string | null>(null);
     const [newMajorNumber, setNewMajorNumber] = useState('');
     const [newMajorImage, setNewMajorImage] = useState('');
+    
+    // Analytics State
+    const [majorViewMode, setMajorViewMode] = useState<'cards' | 'analytics'>('cards');
+    const [selectedCardForStats, setSelectedCardForStats] = useState<string>('');
+    const [cardHistory, setCardHistory] = useState<CardAttempt[]>([]);
 
     // Card PAO System
     const [cardPaoSystem, setCardPaoSystem] = useState<PaoEntry[]>([]);
@@ -94,14 +101,35 @@ export default function ImageVault() {
                 setMajorSystem(SAMPLE_MAJOR_SYSTEM.map(entry => ({ ...entry, images: [...entry.images] })));
                 // We don't load sample PAO here to avoid overwriting the bootstrapped data potentially
             }
-            
-            // Load card performance stats
-            const stats = await getCardStats('default_user', timeFilter);
-            setCardPerformanceStats(stats);
         };
 
         loadData();
+    }, []); // Removed timeFilter, quizMode from dependencies as they are handled by separate effects
+
+    // Load card performance stats
+    useEffect(() => {
+        const loadStats = async () => {
+            const stats = await getCardStats('default_user', timeFilter);
+            setCardPerformanceStats(stats);
+        };
+        loadStats();
     }, [timeFilter, quizMode]);
+
+    // Load card history when selected
+    useEffect(() => {
+        if (majorViewMode === 'analytics') {
+            if (selectedCardForStats) {
+                const loadHistory = async () => {
+                    const history = await getCardHistory(selectedCardForStats, 'default_user', timeFilter);
+                    setCardHistory(history);
+                };
+                loadHistory();
+            } else if (majorSystem.length > 0) {
+                // Default to first card if none selected
+                setSelectedCardForStats(majorSystem[0].number);
+            }
+        }
+    }, [majorViewMode, selectedCardForStats, timeFilter, majorSystem]);
 
     // Save to Firestore whenever data changes (Debounced)
     useEffect(() => {
@@ -305,10 +333,39 @@ export default function ImageVault() {
     };
 
     // Search/Filter Functions
-    const filteredMajor = majorSystem.filter(e =>
-        e.number.includes(searchQuery) ||
-        e.images.some(img => img.toLowerCase().includes(searchQuery.toLowerCase()))
-    );
+    // Helper to get card difficulty category
+    const getCardDifficulty = (cardNumber: string): 'green' | 'yellow' | 'red' | 'unknown' => {
+        const stats = cardPerformanceStats.get(cardNumber);
+        if (!stats || stats.totalAttempts === 0) return 'unknown';
+        
+        const score = stats.performanceScore;
+        if (score >= 75) return 'green';
+        if (score >= 50) return 'yellow';
+        return 'red';
+    };
+
+    const [selectedDifficultyFilters, setSelectedDifficultyFilters] = useState<Set<string>>(new Set(['green', 'yellow', 'red', 'unknown']));
+
+    const toggleDifficultyFilter = (difficulty: string) => {
+        const newFilters = new Set(selectedDifficultyFilters);
+        if (newFilters.has(difficulty)) {
+            newFilters.delete(difficulty);
+        } else {
+            newFilters.add(difficulty);
+        }
+        setSelectedDifficultyFilters(newFilters);
+    };
+
+    // Search/Filter Functions
+    const filteredMajor = majorSystem.filter(e => {
+        const matchesSearch = e.number.includes(searchQuery) || 
+                              e.images?.some(img => img.toLowerCase().includes(searchQuery.toLowerCase()));
+        
+        if (!matchesSearch) return false;
+
+        const difficulty = getCardDifficulty(e.number);
+        return selectedDifficultyFilters.has(difficulty);
+    });
 
     const filteredCardPao = cardPaoSystem.filter(e =>
         e.card.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -337,16 +394,7 @@ export default function ImageVault() {
         setFlippedCards(newFlipped);
     };
 
-    // Helper to get card difficulty category
-    const getCardDifficulty = (cardNumber: string): 'green' | 'yellow' | 'red' | 'unknown' => {
-        const stats = cardPerformanceStats.get(cardNumber);
-        if (!stats || stats.totalAttempts === 0) return 'unknown';
-        
-        const score = stats.performanceScore;
-        if (score >= 75) return 'green';
-        if (score >= 50) return 'yellow';
-        return 'red';
-    };
+
 
     const startQuiz = () => {
         let pool = [...majorSystem];
@@ -913,8 +961,45 @@ export default function ImageVault() {
                         {/* Default View: Card Grid */}
                         {!quizMode && (
                             <>
+                                {/* View Switcher */}
+                                <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '0.5rem' }}>
+                                    <button 
+                                        onClick={() => setMajorViewMode('cards')}
+                                        style={{ 
+                                            opacity: majorViewMode === 'cards' ? 1 : 0.5, 
+                                            fontWeight: majorViewMode === 'cards' ? 'bold' : 'normal', 
+                                            background: 'none', 
+                                            border: 'none', 
+                                            color: 'white', 
+                                            cursor: 'pointer', 
+                                            padding: '0.5rem 1rem',
+                                            borderBottom: majorViewMode === 'cards' ? '2px solid var(--primary)' : '2px solid transparent',
+                                            transition: 'all 0.2s'
+                                        }}
+                                    >
+                                        Cards
+                                    </button>
+                                    <button 
+                                        onClick={() => setMajorViewMode('analytics')}
+                                        style={{ 
+                                            opacity: majorViewMode === 'analytics' ? 1 : 0.5, 
+                                            fontWeight: majorViewMode === 'analytics' ? 'bold' : 'normal', 
+                                            background: 'none', 
+                                            border: 'none', 
+                                            color: 'white', 
+                                            cursor: 'pointer', 
+                                            padding: '0.5rem 1rem',
+                                            borderBottom: majorViewMode === 'analytics' ? '2px solid var(--primary)' : '2px solid transparent',
+                                            transition: 'all 0.2s'
+                                        }}
+                                    >
+                                        Analytics
+                                    </button>
+                                </div>
+
+                                {/* Common Header (Time Filter) */}
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
-                                    <h3 style={{ fontSize: '1.1rem' }}>Major System Cards</h3>
+                                    <h3 style={{ fontSize: '1.1rem' }}>{majorViewMode === 'cards' ? 'Major System Cards' : 'Card Performance History'}</h3>
                                     <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
                                         {/* Time Filter */}
                                         <select 
@@ -930,113 +1015,238 @@ export default function ImageVault() {
                                             <option value="all">All Time</option>
                                         </select>
                                         
-                                        <button 
-                                            onClick={() => setQuizMode('config')}
-                                            className="btn btn-primary"
-                                            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
-                                        >
-                                            <span>⚡</span> Start Drill
-                                        </button>
+                                        {majorViewMode === 'cards' && (
+                                            <button 
+                                                onClick={() => setQuizMode('config')}
+                                                className="btn btn-primary"
+                                                style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                                            >
+                                                <span>⚡</span> Start Drill
+                                            </button>
+                                        )}
                                     </div>
                                 </div>
 
-                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: '1rem' }}>
-                                    {filteredMajor.map((entry) => {
-                                        const stats = cardPerformanceStats.get(entry.number);
-                                        const bgColor = getCardPerformanceColor(stats);
-                                        
-                                        return (
-                                            <div 
-                                                key={entry.id} 
-                                                onClick={() => toggleCardFlip(entry.id)}
-                                                className="glass"
-                                                style={{ 
-                                                    aspectRatio: '3/4', 
-                                                    cursor: 'pointer',
-                                                    perspective: '1000px',
-                                                    position: 'relative',
-                                                    padding: 0,
-                                                    overflow: 'visible'
-                                                }}
-                                            >
-                                                <div style={{
-                                                    width: '100%', height: '100%',
-                                                    transition: 'transform 0.6s',
-                                                    transformStyle: 'preserve-3d',
-                                                    transform: flippedCards.has(entry.id) ? 'rotateY(180deg)' : 'rotateY(0deg)',
-                                                    position: 'relative',
-                                                    borderRadius: '0.5rem'
-                                                }}>
-                                                    {/* Front (Number + Word) */}
-                                                    <div style={{
-                                                        position: 'absolute', width: '100%', height: '100%',
-                                                        backfaceVisibility: 'hidden',
-                                                        WebkitBackfaceVisibility: 'hidden',
-                                                        display: 'flex', 
-                                                        flexDirection: 'column',
-                                                        alignItems: 'center', 
-                                                        justifyContent: 'center',
-                                                        color: '#ffffff', // Pure white
-                                                        background: bgColor, 
-                                                        borderRadius: '0.5rem',
-                                                        border: `2px solid ${bgColor !== 'rgba(100, 116, 139, 0.15)' ? bgColor.replace('0.35)', '0.8)') : 'rgba(255,255,255,0.1)'}`,
-                                                        padding: '0.5rem',
-                                                        textShadow: '0 2px 4px rgba(0,0,0,0.5)' // Add shadow for better readability
-                                                    }}>
-                                                        <div style={{ fontSize: '2rem', fontWeight: 'bold', lineHeight: 1 }}>{entry.number}</div>
-                                                        <div style={{ fontSize: '1rem', opacity: 1, marginTop: '0.25rem', textAlign: 'center', wordBreak: 'break-word', lineHeight: 1.2 }}>
-                                                            {entry.images?.[0] || '???'}
+                                {majorViewMode === 'cards' ? (
+                                    <>
+                                        {/* Difficulty Filters */}
+                                        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+                                            {(['green', 'yellow', 'red', 'unknown'] as const).map(diff => (
+                                                <button
+                                                    key={diff}
+                                                    onClick={() => toggleDifficultyFilter(diff)}
+                                                    style={{
+                                                        padding: '0.4rem 1rem',
+                                                        borderRadius: '999px',
+                                                        border: '1px solid',
+                                                        borderColor: selectedDifficultyFilters.has(diff) ? 'transparent' : 'rgba(255,255,255,0.1)',
+                                                        background: selectedDifficultyFilters.has(diff) 
+                                                            ? (diff === 'green' ? 'rgba(16, 185, 129, 0.35)' : 
+                                                               diff === 'yellow' ? 'rgba(245, 158, 11, 0.35)' : 
+                                                               diff === 'red' ? 'rgba(244, 63, 94, 0.35)' : 
+                                                               'rgba(100, 116, 139, 0.35)')
+                                                            : 'rgba(255,255,255,0.03)',
+                                                        color: selectedDifficultyFilters.has(diff) ? 'white' : 'rgba(255,255,255,0.5)',
+                                                        fontSize: '0.85rem',
+                                                        cursor: 'pointer',
+                                                        transition: 'all 0.2s',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        gap: '0.4rem'
+                                                    }}
+                                                >
+                                                    <span style={{ 
+                                                        width: '8px', 
+                                                        height: '8px', 
+                                                        borderRadius: '50%', 
+                                                        background: diff === 'green' ? '#10b981' : 
+                                                                    diff === 'yellow' ? '#f59e0b' : 
+                                                                    diff === 'red' ? '#f43f5e' : 
+                                                                    '#64748b'
+                                                    }} />
+                                                    {diff === 'unknown' ? 'Unseen' : diff.charAt(0).toUpperCase() + diff.slice(1)}
+                                                </button>
+                                            ))}
+                                        </div>
+
+                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: '1rem' }}>
+                                            {filteredMajor.map((entry) => {
+                                                const stats = cardPerformanceStats.get(entry.number);
+                                                const bgColor = getCardPerformanceColor(stats);
+                                                
+                                                return (
+                                                    <div 
+                                                        key={entry.id} 
+                                                        onClick={() => toggleCardFlip(entry.id)}
+                                                        className="glass"
+                                                        style={{ 
+                                                            aspectRatio: '3/4', 
+                                                            cursor: 'pointer',
+                                                            perspective: '1000px',
+                                                            position: 'relative',
+                                                            padding: 0,
+                                                            overflow: 'visible'
+                                                        }}
+                                                    >
+                                                        <div style={{
+                                                            width: '100%', height: '100%',
+                                                            transition: 'transform 0.6s',
+                                                            transformStyle: 'preserve-3d',
+                                                            transform: flippedCards.has(entry.id) ? 'rotateY(180deg)' : 'rotateY(0deg)',
+                                                            position: 'relative',
+                                                            borderRadius: '0.5rem'
+                                                        }}>
+                                                            {/* Front (Number + Word) */}
+                                                            <div style={{
+                                                                position: 'absolute', width: '100%', height: '100%',
+                                                                backfaceVisibility: 'hidden',
+                                                                WebkitBackfaceVisibility: 'hidden',
+                                                                display: 'flex', 
+                                                                flexDirection: 'column',
+                                                                alignItems: 'center', 
+                                                                justifyContent: 'center',
+                                                                color: '#ffffff', // Pure white
+                                                                background: bgColor, 
+                                                                borderRadius: '0.5rem',
+                                                                border: `2px solid ${bgColor !== 'rgba(100, 116, 139, 0.15)' ? bgColor.replace('0.35)', '0.8)') : 'rgba(255,255,255,0.1)'}`,
+                                                                padding: '0.5rem',
+                                                                textShadow: '0 2px 4px rgba(0,0,0,0.5)' // Add shadow for better readability
+                                                            }}>
+                                                                <div style={{ fontSize: '2rem', fontWeight: 'bold', lineHeight: 1 }}>{entry.number}</div>
+                                                                <div style={{ fontSize: '1rem', opacity: 1, marginTop: '0.25rem', textAlign: 'center', wordBreak: 'break-word', lineHeight: 1.2 }}>
+                                                                    {entry.images?.[0] || '???'}
+                                                                </div>
+                                                            </div>
+
+                                                            {/* Back (Stats) */}
+                                                            <div style={{
+                                                                position: 'absolute', width: '100%', height: '100%',
+                                                                backfaceVisibility: 'hidden',
+                                                                WebkitBackfaceVisibility: 'hidden',
+                                                                transform: 'rotateY(180deg)',
+                                                                display: 'flex', 
+                                                                flexDirection: 'column',
+                                                                alignItems: 'center', 
+                                                                justifyContent: 'center',
+                                                                fontSize: '0.9rem', 
+                                                                fontWeight: '500', 
+                                                                color: 'white',
+                                                                background: 'var(--primary)', 
+                                                                borderRadius: '0.5rem',
+                                                                padding: '0.5rem', 
+                                                                textAlign: 'center'
+                                                            }}>
+                                                                {stats && stats.totalAttempts > 0 ? (
+                                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', width: '100%' }}>
+                                                                        <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', fontSize: '0.8rem' }}>
+                                                                            <span style={{ opacity: 0.8 }}>Seen:</span>
+                                                                            <b>{stats.totalAttempts}</b>
+                                                                        </div>
+                                                                        <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', fontSize: '0.8rem' }}>
+                                                                            <span style={{ opacity: 0.8 }}>Failed:</span>
+                                                                            <b style={{ color: stats.mistakes > 0 ? '#fca5a5' : 'inherit' }}>{stats.mistakes}</b>
+                                                                        </div>
+                                                                        <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', fontSize: '0.8rem' }}>
+                                                                            <span style={{ opacity: 0.8 }}>Time:</span>
+                                                                            <b>{(stats.averageTime / 1000).toFixed(1)}s</b>
+                                                                        </div>
+                                                                    </div>
+                                                                ) : (
+                                                                    <div style={{ opacity: 0.7, fontSize: '0.85rem' }}>
+                                                                        No data yet
+                                                                    </div>
+                                                                )}
+                                                            </div>
                                                         </div>
                                                     </div>
-
-                                                    {/* Back (Stats) */}
-                                                    <div style={{
-                                                        position: 'absolute', width: '100%', height: '100%',
-                                                        backfaceVisibility: 'hidden',
-                                                        WebkitBackfaceVisibility: 'hidden',
-                                                        transform: 'rotateY(180deg)',
-                                                        display: 'flex', 
-                                                        flexDirection: 'column',
-                                                        alignItems: 'center', 
-                                                        justifyContent: 'center',
-                                                        fontSize: '0.9rem', 
-                                                        fontWeight: '500', 
-                                                        color: 'white',
-                                                        background: 'var(--primary)', 
-                                                        borderRadius: '0.5rem',
-                                                        padding: '0.5rem', 
-                                                        textAlign: 'center'
-                                                    }}>
-                                                        {stats && stats.totalAttempts > 0 ? (
-                                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', width: '100%' }}>
-                                                                <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', fontSize: '0.8rem' }}>
-                                                                    <span style={{ opacity: 0.8 }}>Seen:</span>
-                                                                    <b>{stats.totalAttempts}</b>
-                                                                </div>
-                                                                <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', fontSize: '0.8rem' }}>
-                                                                    <span style={{ opacity: 0.8 }}>Failed:</span>
-                                                                    <b style={{ color: stats.mistakes > 0 ? '#fca5a5' : 'inherit' }}>{stats.mistakes}</b>
-                                                                </div>
-                                                                <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', fontSize: '0.8rem' }}>
-                                                                    <span style={{ opacity: 0.8 }}>Time:</span>
-                                                                    <b>{(stats.averageTime / 1000).toFixed(1)}s</b>
-                                                                </div>
-                                                            </div>
-                                                        ) : (
-                                                            <div style={{ opacity: 0.7, fontSize: '0.85rem' }}>
-                                                                No data yet
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                </div>
+                                                );
+                                            })}
+                                        </div>
+                                        
+                                        {filteredMajor.length === 0 && (
+                                            <div style={{ textAlign: 'center', padding: '3rem', opacity: 0.5 }}>
+                                                No cards found.
                                             </div>
-                                        );
-                                    })}
-                                </div>
-                                
-                                {filteredMajor.length === 0 && (
-                                    <div style={{ textAlign: 'center', padding: '3rem', opacity: 0.5 }}>
-                                        No cards found.
+                                        )}
+                                    </>
+                                ) : (
+                                    <div className="glass-panel" style={{ padding: '1.5rem' }}>
+                                        <div style={{ marginBottom: '2rem', display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                                            <label style={{ opacity: 0.8 }}>Select Card:</label>
+                                            <select 
+                                                value={selectedCardForStats} 
+                                                onChange={(e) => setSelectedCardForStats(e.target.value)}
+                                                className="input-field"
+                                                style={{ width: 'auto', minWidth: '200px' }}
+                                            >
+                                                {majorSystem.map(card => (
+                                                    <option key={card.id} value={card.number}>
+                                                        {card.number} - {card.images[0]}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                            <div style={{ marginLeft: 'auto', opacity: 0.6, fontSize: '0.9rem' }}>
+                                                Total Attempts: {cardHistory.length}
+                                            </div>
+                                        </div>
+                                        
+                                        {cardHistory.length > 0 ? (
+                                            <div style={{ height: '400px', width: '100%' }}>
+                                                <ResponsiveContainer width="100%" height="100%">
+                                                    <LineChart data={cardHistory.map((h, i) => ({ 
+                                                        attempt: i + 1, 
+                                                        time: h.responseTime / 1000, 
+                                                        isCorrect: h.isCorrect,
+                                                        timestamp: new Date(h.timestamp).toLocaleDateString()
+                                                    }))}>
+                                                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+                                                        <XAxis 
+                                                            dataKey="attempt" 
+                                                            stroke="rgba(255,255,255,0.5)" 
+                                                            label={{ value: 'Attempt #', position: 'insideBottom', offset: -5, fill: 'rgba(255,255,255,0.5)' }} 
+                                                        />
+                                                        <YAxis 
+                                                            stroke="rgba(255,255,255,0.5)" 
+                                                            label={{ value: 'Recall Time (s)', angle: -90, position: 'insideLeft', fill: 'rgba(255,255,255,0.5)' }} 
+                                                        />
+                                                        <Tooltip 
+                                                            contentStyle={{ backgroundColor: '#1e293b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '0.5rem' }}
+                                                            itemStyle={{ color: '#fff' }}
+                                                            formatter={(value: number) => [`${value}s`, 'Time']}
+                                                            labelFormatter={(label, payload) => {
+                                                                if (payload && payload.length > 0) {
+                                                                    return `Attempt #${label} (${payload[0].payload.timestamp})`;
+                                                                }
+                                                                return `Attempt #${label}`;
+                                                            }}
+                                                        />
+                                                        <Line 
+                                                            type="monotone" 
+                                                            dataKey="time" 
+                                                            stroke="#8884d8" 
+                                                            strokeWidth={2}
+                                                            dot={(props: any) => {
+                                                                const { cx, cy, payload } = props;
+                                                                return (
+                                                                    <circle 
+                                                                        cx={cx} 
+                                                                        cy={cy} 
+                                                                        r={5} 
+                                                                        fill={payload.isCorrect ? '#10b981' : '#ef4444'} 
+                                                                        stroke="white"
+                                                                        strokeWidth={1}
+                                                                    />
+                                                                );
+                                                            }}
+                                                        />
+                                                    </LineChart>
+                                                </ResponsiveContainer>
+                                            </div>
+                                        ) : (
+                                            <div style={{ height: '300px', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0.5 }}>
+                                                No history found for this card in the selected time range.
+                                            </div>
+                                        )}
                                     </div>
                                 )}
                             </>

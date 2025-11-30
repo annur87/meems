@@ -1,5 +1,46 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
-import { getFirestore, collection, addDoc, query, orderBy, getDocs, doc, setDoc, getDoc, deleteDoc } from "firebase/firestore";
+import { getFirestore, collection, addDoc, query, orderBy, getDocs, doc, setDoc, getDoc, deleteDoc, where } from "firebase/firestore";
+
+// ... existing code ...
+
+export const getCardHistory = async (
+    cardNumber: string,
+    userId: string = USER_ID,
+    timeFilter?: '1d' | '1w' | '1m' | '1y' | 'all'
+): Promise<CardAttempt[]> => {
+    try {
+        if (!firebaseConfig.apiKey) {
+            return [];
+        }
+
+        const attemptsRef = collection(db, 'major_system_attempts', userId, 'attempts');
+        // Fetch by card number, sort in memory to avoid index requirement issues
+        const q = query(attemptsRef, where('cardNumber', '==', cardNumber));
+        
+        const snapshot = await getDocs(q);
+        let attempts = snapshot.docs.map(doc => doc.data() as CardAttempt);
+        
+        // Sort by timestamp ascending
+        attempts.sort((a, b) => a.timestamp - b.timestamp);
+        
+        // Filter by time
+        if (timeFilter && timeFilter !== 'all') {
+            const now = Date.now();
+            let cutoff = 0;
+            if (timeFilter === '1d') cutoff = now - 24 * 60 * 60 * 1000;
+            else if (timeFilter === '1w') cutoff = now - 7 * 24 * 60 * 60 * 1000;
+            else if (timeFilter === '1m') cutoff = now - 30 * 24 * 60 * 60 * 1000;
+            else if (timeFilter === '1y') cutoff = now - 365 * 24 * 60 * 60 * 1000;
+            
+            attempts = attempts.filter(a => a.timestamp >= cutoff);
+        }
+        
+        return attempts;
+    } catch (error) {
+        console.error('Error fetching card history:', error);
+        return [];
+    }
+};
 
 const firebaseConfig = {
     apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,

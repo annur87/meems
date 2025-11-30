@@ -26,7 +26,7 @@ const STORAGE_KEY = 'image_vault_data';
 export default function ImageVault() {
     const [activeTab, setActiveTab] = useState<SystemType>('major');
     const [searchQuery, setSearchQuery] = useState('');
-    const [timeFilter, setTimeFilter] = useState<TimeFilter>('all');
+    const [timeFilter, setTimeFilter] = useState<TimeFilter>('1w');
     const [cardPerformanceStats, setCardPerformanceStats] = useState<Map<string, CardStats>>(new Map());
 
     // Major System

@@ -9,17 +9,25 @@ import {
     DigitPaoEntry,
     Palace,
     getImageVaultData,
-    saveImageVaultData
+    saveImageVaultData,
+    CardStats,
+    CardAttempt,
+    saveCardAttempt,
+    getCardStats,
+    getCardPerformanceColor
 } from '@/lib/firebase';
 import { SAMPLE_MAJOR_SYSTEM, SAMPLE_PAO_SYSTEM, SAMPLE_PALACES } from '@/data/sampleImageVault';
 
 type SystemType = 'major' | 'card-pao' | 'digit-pao' | 'palace';
+type TimeFilter = '1d' | '1w' | '1m' | '1y' | 'all';
 
 const STORAGE_KEY = 'image_vault_data';
 
 export default function ImageVault() {
     const [activeTab, setActiveTab] = useState<SystemType>('major');
     const [searchQuery, setSearchQuery] = useState('');
+    const [timeFilter, setTimeFilter] = useState<TimeFilter>('all');
+    const [cardPerformanceStats, setCardPerformanceStats] = useState<Map<string, CardStats>>(new Map());
 
     // Major System
     const [majorSystem, setMajorSystem] = useState<MajorEntry[]>([]);
@@ -53,7 +61,12 @@ export default function ImageVault() {
 
     // Quiz State
     const [quizMode, setQuizMode] = useState<'config' | 'active' | 'result' | null>(null);
-    const [quizConfig, setQuizConfig] = useState({ count: 999, type: 'mixed' as 'digits' | 'words' | 'mixed', mode: 'untimed' as 'timed' | 'untimed' });
+    const [quizConfig, setQuizConfig] = useState({ 
+        count: 999, 
+        type: 'mixed' as 'digits' | 'words' | 'mixed', 
+        mode: 'untimed' as 'timed' | 'untimed',
+        cardDifficulty: 'all' as 'all' | 'green' | 'yellow' | 'red'
+    });
     const [quizQueue, setQuizQueue] = useState<MajorEntry[]>([]);
     const [currentQuizCard, setCurrentQuizCard] = useState<MajorEntry | null>(null);
     const [quizQuestionType, setQuizQuestionType] = useState<'digits' | 'words'>('digits');
@@ -81,10 +94,14 @@ export default function ImageVault() {
                 setMajorSystem(SAMPLE_MAJOR_SYSTEM.map(entry => ({ ...entry, images: [...entry.images] })));
                 // We don't load sample PAO here to avoid overwriting the bootstrapped data potentially
             }
+            
+            // Load card performance stats
+            const stats = await getCardStats('default_user', timeFilter);
+            setCardPerformanceStats(stats);
         };
 
         loadData();
-    }, []);
+    }, [timeFilter]);
 
     // Save to Firestore whenever data changes (Debounced)
     useEffect(() => {
@@ -320,14 +337,39 @@ export default function ImageVault() {
         setFlippedCards(newFlipped);
     };
 
+    // Helper to get card difficulty category
+    const getCardDifficulty = (cardNumber: string): 'green' | 'yellow' | 'red' | 'unknown' => {
+        const stats = cardPerformanceStats.get(cardNumber);
+        if (!stats || stats.totalAttempts === 0) return 'unknown';
+        
+        const score = stats.performanceScore;
+        if (score >= 75) return 'green';
+        if (score >= 50) return 'yellow';
+        return 'red';
+    };
+
     const startQuiz = () => {
         let pool = [...majorSystem];
         
-        // For "All Cards" (999), we test BOTH directions: 100 cards × 2 = 200 questions
+        // Filter by card difficulty if specified
+        if (quizConfig.cardDifficulty !== 'all') {
+            pool = pool.filter(card => {
+                const difficulty = getCardDifficulty(card.number);
+                // Include 'unknown' cards in all categories to ensure we have enough cards
+                return difficulty === quizConfig.cardDifficulty || difficulty === 'unknown';
+            });
+        }
+        
+        if (pool.length === 0) {
+            alert('No cards found for the selected difficulty level. Try practicing more cards first!');
+            return;
+        }
+        
+        // For "All Cards" (999), we test BOTH directions: cards × 2 = questions
         if (quizConfig.count === 999) {
             // Create two copies: one for digits->words, one for words->digits
             const shuffled = pool.sort(() => 0.5 - Math.random());
-            pool = [...shuffled, ...shuffled]; // 200 total questions
+            pool = [...shuffled, ...shuffled]; // Double for both directions
         } else if (quizConfig.count < pool.length) {
             pool = pool.sort(() => 0.5 - Math.random()).slice(0, quizConfig.count);
         } else {
@@ -371,7 +413,7 @@ export default function ImageVault() {
         }
     };
 
-    const handleQuizSubmit = (e: React.FormEvent) => {
+    const handleQuizSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!currentQuizCard || quizFeedback.status) return;
 
@@ -390,6 +432,19 @@ export default function ImageVault() {
             // Showed Word, expect Digits
             if (answer === targetNumber) isCorrect = true;
         }
+
+        // Calculate response time
+        const responseTime = Date.now() - currentCardStartTime;
+
+        // Save attempt to Firestore
+        const attempt: CardAttempt = {
+            cardNumber: currentQuizCard.number,
+            isCorrect,
+            responseTime,
+            timestamp: Date.now(),
+            questionType: quizQuestionType
+        };
+        await saveCardAttempt(attempt);
 
         // Update card stats
         const cardKey = currentQuizCard.number;
@@ -589,7 +644,7 @@ export default function ImageVault() {
                             <div className="glass-panel" style={{ marginBottom: '2rem', padding: '2rem', textAlign: 'center' }}>
                                 <h2 style={{ fontSize: '1.5rem', marginBottom: '1.5rem' }}>Major System Drill</h2>
                                 
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '2rem', maxWidth: '800px', margin: '0 auto 2rem' }}>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1.5rem', maxWidth: '1000px', margin: '0 auto 2rem' }}>
                                     <div>
                                         <label style={{ display: 'block', marginBottom: '0.5rem', color: '#cbd5e1' }}>Cards</label>
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
@@ -636,6 +691,52 @@ export default function ImageVault() {
                                                 style={{ padding: '0.5rem', opacity: quizConfig.type === 'mixed' ? 1 : 0.6 }}
                                             >
                                                 Both
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <label style={{ display: 'block', marginBottom: '0.5rem', color: '#cbd5e1' }}>Difficulty</label>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                            <button 
+                                                onClick={() => setQuizConfig(c => ({ ...c, cardDifficulty: 'all' }))}
+                                                className={`btn ${quizConfig.cardDifficulty === 'all' ? 'btn-primary' : ''}`}
+                                                style={{ padding: '0.5rem', opacity: quizConfig.cardDifficulty === 'all' ? 1 : 0.6 }}
+                                            >
+                                                All
+                                            </button>
+                                            <button 
+                                                onClick={() => setQuizConfig(c => ({ ...c, cardDifficulty: 'green' }))}
+                                                className={`btn ${quizConfig.cardDifficulty === 'green' ? 'btn-primary' : ''}`}
+                                                style={{ 
+                                                    padding: '0.5rem', 
+                                                    opacity: quizConfig.cardDifficulty === 'green' ? 1 : 0.6,
+                                                    background: quizConfig.cardDifficulty === 'green' ? 'rgba(34, 197, 94, 0.3)' : undefined
+                                                }}
+                                            >
+                                                Green
+                                            </button>
+                                            <button 
+                                                onClick={() => setQuizConfig(c => ({ ...c, cardDifficulty: 'yellow' }))}
+                                                className={`btn ${quizConfig.cardDifficulty === 'yellow' ? 'btn-primary' : ''}`}
+                                                style={{ 
+                                                    padding: '0.5rem', 
+                                                    opacity: quizConfig.cardDifficulty === 'yellow' ? 1 : 0.6,
+                                                    background: quizConfig.cardDifficulty === 'yellow' ? 'rgba(234, 179, 8, 0.3)' : undefined
+                                                }}
+                                            >
+                                                Yellow
+                                            </button>
+                                            <button 
+                                                onClick={() => setQuizConfig(c => ({ ...c, cardDifficulty: 'red' }))}
+                                                className={`btn ${quizConfig.cardDifficulty === 'red' ? 'btn-primary' : ''}`}
+                                                style={{ 
+                                                    padding: '0.5rem', 
+                                                    opacity: quizConfig.cardDifficulty === 'red' ? 1 : 0.6,
+                                                    background: quizConfig.cardDifficulty === 'red' ? 'rgba(239, 68, 68, 0.3)' : undefined
+                                                }}
+                                            >
+                                                Red
                                             </button>
                                         </div>
                                     </div>
@@ -812,72 +913,111 @@ export default function ImageVault() {
                         {/* Default View: Card Grid */}
                         {!quizMode && (
                             <>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
                                     <h3 style={{ fontSize: '1.1rem' }}>Major System Cards</h3>
-                                    <button 
-                                        onClick={() => setQuizMode('config')}
-                                        className="btn btn-primary"
-                                        style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
-                                    >
-                                        <span>⚡</span> Start Drill
-                                    </button>
+                                    <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                                        {/* Time Filter */}
+                                        <select 
+                                            value={timeFilter} 
+                                            onChange={(e) => setTimeFilter(e.target.value as TimeFilter)}
+                                            className="input-field"
+                                            style={{ padding: '0.5rem', fontSize: '0.9rem', width: 'auto' }}
+                                        >
+                                            <option value="1d">Today</option>
+                                            <option value="1w">This Week</option>
+                                            <option value="1m">This Month</option>
+                                            <option value="1y">This Year</option>
+                                            <option value="all">All Time</option>
+                                        </select>
+                                        
+                                        <button 
+                                            onClick={() => setQuizMode('config')}
+                                            className="btn btn-primary"
+                                            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                                        >
+                                            <span>⚡</span> Start Drill
+                                        </button>
+                                    </div>
                                 </div>
 
                                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: '1rem' }}>
-                                    {filteredMajor.map((entry) => (
-                                        <div 
-                                            key={entry.id} 
-                                            onClick={() => toggleCardFlip(entry.id)}
-                                            className="glass"
-                                            style={{ 
-                                                aspectRatio: '3/4', 
-                                                cursor: 'pointer',
-                                                perspective: '1000px',
-                                                position: 'relative',
-                                                padding: 0,
-                                                overflow: 'visible'
-                                            }}
-                                        >
-                                            <div style={{
-                                                width: '100%', height: '100%',
-                                                transition: 'transform 0.6s',
-                                                transformStyle: 'preserve-3d',
-                                                transform: flippedCards.has(entry.id) ? 'rotateY(180deg)' : 'rotateY(0deg)',
-                                                position: 'relative',
-                                                borderRadius: '0.5rem'
-                                            }}>
-                                                {/* Front (Number) */}
+                                    {filteredMajor.map((entry) => {
+                                        const stats = cardPerformanceStats.get(entry.number);
+                                        const bgColor = getCardPerformanceColor(stats);
+                                        
+                                        return (
+                                            <div 
+                                                key={entry.id} 
+                                                onClick={() => toggleCardFlip(entry.id)}
+                                                className="glass"
+                                                style={{ 
+                                                    aspectRatio: '3/4', 
+                                                    cursor: 'pointer',
+                                                    perspective: '1000px',
+                                                    position: 'relative',
+                                                    padding: 0,
+                                                    overflow: 'visible'
+                                                }}
+                                            >
                                                 <div style={{
-                                                    position: 'absolute', width: '100%', height: '100%',
-                                                    backfaceVisibility: 'hidden',
-                                                    WebkitBackfaceVisibility: 'hidden',
-                                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                                    fontSize: '2.5rem', fontWeight: 'bold', color: 'var(--primary)',
-                                                    background: 'rgba(30, 41, 59, 0.6)', 
-                                                    borderRadius: '0.5rem',
-                                                    border: '1px solid rgba(255,255,255,0.1)'
+                                                    width: '100%', height: '100%',
+                                                    transition: 'transform 0.6s',
+                                                    transformStyle: 'preserve-3d',
+                                                    transform: flippedCards.has(entry.id) ? 'rotateY(180deg)' : 'rotateY(0deg)',
+                                                    position: 'relative',
+                                                    borderRadius: '0.5rem'
                                                 }}>
-                                                    {entry.number}
-                                                </div>
-                                                {/* Back (Word) */}
-                                                <div style={{
-                                                    position: 'absolute', width: '100%', height: '100%',
-                                                    backfaceVisibility: 'hidden',
-                                                    WebkitBackfaceVisibility: 'hidden',
-                                                    transform: 'rotateY(180deg)',
-                                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                                    fontSize: '1rem', fontWeight: 'bold', color: 'white',
-                                                    background: 'var(--primary)', 
-                                                    borderRadius: '0.5rem',
-                                                    padding: '0.5rem', 
-                                                    textAlign: 'center',
-                                                    wordBreak: 'break-word'
-                                                }}>
-                                                    {entry.images?.[0] || '???'}
+                                                    {/* Front (Number) */}
+                                                    <div style={{
+                                                        position: 'absolute', width: '100%', height: '100%',
+                                                        backfaceVisibility: 'hidden',
+                                                        WebkitBackfaceVisibility: 'hidden',
+                                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                        fontSize: '2.5rem', fontWeight: 'bold', color: 'var(--primary)',
+                                                        background: `linear-gradient(135deg, rgba(30, 41, 59, 0.6), ${bgColor})`, 
+                                                        borderRadius: '0.5rem',
+                                                        border: '1px solid rgba(255,255,255,0.1)'
+                                                    }}>
+                                                        {entry.number}
+                                                    </div>
+                                                    {/* Back (Word + Stats) */}
+                                                    <div style={{
+                                                        position: 'absolute', width: '100%', height: '100%',
+                                                        backfaceVisibility: 'hidden',
+                                                        WebkitBackfaceVisibility: 'hidden',
+                                                        transform: 'rotateY(180deg)',
+                                                        display: 'flex', 
+                                                        flexDirection: 'column',
+                                                        alignItems: 'center', 
+                                                        justifyContent: 'center',
+                                                        fontSize: '1rem', fontWeight: 'bold', color: 'white',
+                                                        background: `linear-gradient(135deg, var(--primary), ${bgColor})`, 
+                                                        borderRadius: '0.5rem',
+                                                        padding: '0.5rem', 
+                                                        textAlign: 'center',
+                                                        wordBreak: 'break-word',
+                                                        gap: '0.25rem'
+                                                    }}>
+                                                        <div style={{ fontSize: '1.1rem', marginBottom: '0.25rem' }}>
+                                                            {entry.images?.[0] || '???'}
+                                                        </div>
+                                                        {stats && stats.totalAttempts > 0 && (
+                                                            <div style={{ 
+                                                                fontSize: '0.65rem', 
+                                                                opacity: 0.9,
+                                                                lineHeight: '1.2',
+                                                                marginTop: '0.25rem'
+                                                            }}>
+                                                                <div>{stats.totalAttempts} attempts</div>
+                                                                <div>{stats.mistakes} mistakes</div>
+                                                                <div>{(stats.averageTime / 1000).toFixed(1)}s avg</div>
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             </div>
-                                        </div>
-                                    ))}
+                                        );
+                                    })}
                                 </div>
                                 
                                 {filteredMajor.length === 0 && (

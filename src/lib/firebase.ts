@@ -321,3 +321,158 @@ export const saveFavorites = async (favorites: string[], userId: string = USER_I
         return false;
     }
 };
+
+// ===== MAJOR SYSTEM CARD STATISTICS =====
+
+export interface CardAttempt {
+    cardNumber: string;
+    isCorrect: boolean;
+    responseTime: number; // milliseconds
+    timestamp: number;
+    questionType: 'digits' | 'words'; // which direction was tested
+}
+
+export interface CardStats {
+    cardNumber: string;
+    totalAttempts: number;
+    mistakes: number;
+    averageTime: number; // milliseconds
+    lastAttempt: number;
+    performanceScore: number; // 0-100, higher is better
+}
+
+export const saveCardAttempt = async (attempt: CardAttempt, userId: string = USER_ID): Promise<boolean> => {
+    try {
+        if (!firebaseConfig.apiKey) {
+            console.warn("Firebase config missing. Card attempt not saved.");
+            return false;
+        }
+        
+        const attemptsRef = collection(db, 'major_system_attempts', userId, 'attempts');
+        await addDoc(attemptsRef, attempt);
+        return true;
+    } catch (error) {
+        console.error('Error saving card attempt:', error);
+        return false;
+    }
+};
+
+export const getCardStats = async (
+    userId: string = USER_ID, 
+    timeFilter?: '1d' | '1w' | '1m' | '1y' | 'all'
+): Promise<Map<string, CardStats>> => {
+    try {
+        if (!firebaseConfig.apiKey) {
+            return new Map();
+        }
+
+        const attemptsRef = collection(db, 'major_system_attempts', userId, 'attempts');
+        let q = query(attemptsRef, orderBy('timestamp', 'desc'));
+
+        // Apply time filter
+        if (timeFilter && timeFilter !== 'all') {
+            const now = Date.now();
+            const timeRanges = {
+                '1d': 24 * 60 * 60 * 1000,
+                '1w': 7 * 24 * 60 * 60 * 1000,
+                '1m': 30 * 24 * 60 * 60 * 1000,
+                '1y': 365 * 24 * 60 * 60 * 1000
+            };
+            const cutoff = now - timeRanges[timeFilter];
+            // Note: Firestore query requires an index for this
+            // For now, we'll filter in memory
+        }
+
+        const snapshot = await getDocs(q);
+        const attempts: CardAttempt[] = snapshot.docs.map(doc => doc.data() as CardAttempt);
+
+        // Apply time filter in memory if needed
+        const filteredAttempts = timeFilter && timeFilter !== 'all' 
+            ? attempts.filter(a => {
+                const now = Date.now();
+                const timeRanges = {
+                    '1d': 24 * 60 * 60 * 1000,
+                    '1w': 7 * 24 * 60 * 60 * 1000,
+                    '1m': 30 * 24 * 60 * 60 * 1000,
+                    '1y': 365 * 24 * 60 * 60 * 1000
+                };
+                return a.timestamp >= (now - timeRanges[timeFilter]);
+            })
+            : attempts;
+
+        // Calculate stats per card
+        const statsMap = new Map<string, CardStats>();
+        
+        filteredAttempts.forEach(attempt => {
+            const existing = statsMap.get(attempt.cardNumber);
+            
+            if (existing) {
+                const newTotal = existing.totalAttempts + 1;
+                const newMistakes = existing.mistakes + (attempt.isCorrect ? 0 : 1);
+                const newAvgTime = ((existing.averageTime * existing.totalAttempts) + attempt.responseTime) / newTotal;
+                
+                statsMap.set(attempt.cardNumber, {
+                    cardNumber: attempt.cardNumber,
+                    totalAttempts: newTotal,
+                    mistakes: newMistakes,
+                    averageTime: newAvgTime,
+                    lastAttempt: Math.max(existing.lastAttempt, attempt.timestamp),
+                    performanceScore: calculatePerformanceScore(newTotal, newMistakes, newAvgTime)
+                });
+            } else {
+                statsMap.set(attempt.cardNumber, {
+                    cardNumber: attempt.cardNumber,
+                    totalAttempts: 1,
+                    mistakes: attempt.isCorrect ? 0 : 1,
+                    averageTime: attempt.responseTime,
+                    lastAttempt: attempt.timestamp,
+                    performanceScore: calculatePerformanceScore(1, attempt.isCorrect ? 0 : 1, attempt.responseTime)
+                });
+            }
+        });
+
+        return statsMap;
+    } catch (error) {
+        console.error('Error getting card stats:', error);
+        return new Map();
+    }
+};
+
+// Calculate performance score (0-100, higher is better)
+// Factors: accuracy (70%), speed (30%)
+const calculatePerformanceScore = (totalAttempts: number, mistakes: number, avgTime: number): number => {
+    if (totalAttempts === 0) return 50; // neutral score for no data
+    
+    const accuracy = ((totalAttempts - mistakes) / totalAttempts) * 100;
+    
+    // Speed score: faster is better, normalize to 0-100
+    // Assume 5 seconds is perfect (100), 15 seconds is poor (0)
+    const avgTimeSeconds = avgTime / 1000;
+    const speedScore = Math.max(0, Math.min(100, 100 - ((avgTimeSeconds - 5) / 10) * 100));
+    
+    // Weighted combination: 70% accuracy, 30% speed
+    const score = (accuracy * 0.7) + (speedScore * 0.3);
+    
+    return Math.round(score);
+};
+
+export const getCardPerformanceColor = (stats: CardStats | undefined): string => {
+    if (!stats || stats.totalAttempts === 0) {
+        return 'rgba(100, 116, 139, 0.15)'; // neutral gray for no data
+    }
+    
+    const score = stats.performanceScore;
+    
+    // Green: 75-100 (well memorized)
+    if (score >= 75) {
+        return 'rgba(34, 197, 94, 0.15)'; // green
+    }
+    // Yellow: 50-74 (medium)
+    else if (score >= 50) {
+        return 'rgba(234, 179, 8, 0.15)'; // yellow
+    }
+    // Red: 0-49 (difficult)
+    else {
+        return 'rgba(239, 68, 68, 0.15)'; // red
+    }
+};

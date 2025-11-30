@@ -282,3 +282,42 @@ export const bootstrapMajorSystem = async (defaultData: MajorEntry[]) => {
         return false;
     }
 };
+
+// ===== TRAINING FAVORITES =====
+
+export const getFavorites = async (userId: string = USER_ID): Promise<string[]> => {
+    try {
+        if (!firebaseConfig.apiKey) {
+            return [];
+        }
+        const docRef = doc(db, 'training_favorites', userId);
+        const docSnap = await getDoc(docRef);
+        
+        if (docSnap.exists()) {
+            const data = docSnap.data();
+            return data.favorites || [];
+        }
+        return [];
+    } catch (error) {
+        console.error('Error loading favorites:', error);
+        return [];
+    }
+};
+
+export const saveFavorites = async (favorites: string[], userId: string = USER_ID): Promise<boolean> => {
+    try {
+        if (!firebaseConfig.apiKey) {
+            console.warn("Firebase config missing. Favorites not saved.");
+            return false;
+        }
+        const docRef = doc(db, 'training_favorites', userId);
+        await setDoc(docRef, {
+            favorites,
+            lastUpdated: Date.now()
+        });
+        return true;
+    } catch (error) {
+        console.error('Error saving favorites:', error);
+        return false;
+    }
+};

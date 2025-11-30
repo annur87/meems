@@ -974,9 +974,9 @@ export default function ImageVault() {
                                                         WebkitBackfaceVisibility: 'hidden',
                                                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                                                         fontSize: '2.5rem', fontWeight: 'bold', color: 'var(--primary)',
-                                                        background: `linear-gradient(135deg, rgba(30, 41, 59, 0.4), ${bgColor})`, 
+                                                        background: bgColor, 
                                                         borderRadius: '0.5rem',
-                                                        border: `2px solid ${bgColor !== 'rgba(100, 116, 139, 0.1)' ? bgColor.replace('0.5)', '0.8)') : 'rgba(255,255,255,0.1)'}`
+                                                        border: `2px solid ${bgColor !== 'rgba(100, 116, 139, 0.1)' ? bgColor.replace('0.2)', '0.6)') : 'rgba(255,255,255,0.1)'}`
                                                     }}>
                                                         {entry.number}
                                                     </div>

@@ -465,14 +465,14 @@ export const getCardPerformanceColor = (stats: CardStats | undefined): string =>
     
     // Green: 75-100 (well memorized)
     if (score >= 75) {
-        return 'rgba(34, 197, 94, 0.5)'; // stronger green
+        return 'rgba(34, 197, 94, 0.2)'; // subtle green
     }
     // Yellow: 50-74 (medium)
     else if (score >= 50) {
-        return 'rgba(234, 179, 8, 0.5)'; // stronger yellow
+        return 'rgba(234, 179, 8, 0.2)'; // subtle yellow
     }
     // Red: 0-49 (difficult)
     else {
-        return 'rgba(239, 68, 68, 0.5)'; // stronger red
+        return 'rgba(239, 68, 68, 0.2)'; // subtle red
     }
 };

@@ -504,6 +504,11 @@ export default function SystemComponentChecker() {
                             value={answer}
                             onChange={(e) => setAnswer(e.target.value)}
                             placeholder="Your answer"
+                            autoCapitalize="none"
+                            autoComplete="off"
+                            autoCorrect="off"
+                            inputMode={currentQuestion.category === 'major-reverse' ? 'numeric' : 'text'}
+                            pattern={currentQuestion.category === 'major-reverse' ? '[0-9]*' : undefined}
                             onKeyDown={(e) => {
                                 if (e.key === 'Enter') {
                                     e.preventDefault();
@@ -519,17 +524,75 @@ export default function SystemComponentChecker() {
                             autoFocus
                         />
 
-                        {/* Virtual Keyboard for Numbers */}
-                        <div style={{ 
-                            display: 'grid', 
-                            gridTemplateColumns: 'repeat(3, 1fr)', 
-                            gap: '0.5rem',
-                            marginTop: '0.5rem'
-                        }}>
-                            {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(num => (
+                        {/* Virtual Keyboard for Numbers (Only show for numeric answers) */}
+                        {currentQuestion.category === 'major-reverse' && (
+                            <div style={{ 
+                                display: 'grid', 
+                                gridTemplateColumns: 'repeat(3, 1fr)', 
+                                gap: '0.5rem',
+                                marginTop: '0.5rem'
+                            }}>
+                                {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(num => (
+                                    <button
+                                        key={num}
+                                        onClick={() => setAnswer(prev => prev + num)}
+                                        style={{
+                                            padding: '1rem',
+                                            fontSize: '1.5rem',
+                                            fontWeight: 'bold',
+                                            background: 'rgba(255, 255, 255, 0.05)',
+                                            border: '1px solid rgba(255, 255, 255, 0.1)',
+                                            borderRadius: '0.5rem',
+                                            color: '#fff',
+                                            cursor: 'pointer',
+                                            transition: 'all 0.2s'
+                                        }}
+                                        onMouseDown={(e) => {
+                                            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)';
+                                            e.currentTarget.style.transform = 'scale(0.95)';
+                                        }}
+                                        onMouseUp={(e) => {
+                                            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                                            e.currentTarget.style.transform = 'scale(1)';
+                                        }}
+                                        onMouseLeave={(e) => {
+                                            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                                            e.currentTarget.style.transform = 'scale(1)';
+                                        }}
+                                    >
+                                        {num}
+                                    </button>
+                                ))}
                                 <button
-                                    key={num}
-                                    onClick={() => setAnswer(prev => prev + num)}
+                                    onClick={() => setAnswer(prev => prev.slice(0, -1))}
+                                    style={{
+                                        padding: '1rem',
+                                        fontSize: '1.5rem',
+                                        fontWeight: 'bold',
+                                        background: 'rgba(239, 68, 68, 0.2)',
+                                        border: '1px solid rgba(239, 68, 68, 0.3)',
+                                        borderRadius: '0.5rem',
+                                        color: '#f87171',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.2s'
+                                    }}
+                                    onMouseDown={(e) => {
+                                        e.currentTarget.style.background = 'rgba(239, 68, 68, 0.3)';
+                                        e.currentTarget.style.transform = 'scale(0.95)';
+                                    }}
+                                    onMouseUp={(e) => {
+                                        e.currentTarget.style.background = 'rgba(239, 68, 68, 0.2)';
+                                        e.currentTarget.style.transform = 'scale(1)';
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        e.currentTarget.style.background = 'rgba(239, 68, 68, 0.2)';
+                                        e.currentTarget.style.transform = 'scale(1)';
+                                    }}
+                                >
+                                    ⌫
+                                </button>
+                                <button
+                                    onClick={() => setAnswer(prev => prev + '0')}
                                     style={{
                                         padding: '1rem',
                                         fontSize: '1.5rem',
@@ -554,94 +617,38 @@ export default function SystemComponentChecker() {
                                         e.currentTarget.style.transform = 'scale(1)';
                                     }}
                                 >
-                                    {num}
+                                    0
                                 </button>
-                            ))}
-                            <button
-                                onClick={() => setAnswer(prev => prev.slice(0, -1))}
-                                style={{
-                                    padding: '1rem',
-                                    fontSize: '1.2rem',
-                                    fontWeight: 'bold',
-                                    background: 'rgba(239, 68, 68, 0.2)',
-                                    border: '1px solid rgba(239, 68, 68, 0.3)',
-                                    borderRadius: '0.5rem',
-                                    color: '#ef4444',
-                                    cursor: 'pointer',
-                                    transition: 'all 0.2s'
-                                }}
-                                onMouseDown={(e) => {
-                                    e.currentTarget.style.background = 'rgba(239, 68, 68, 0.3)';
-                                    e.currentTarget.style.transform = 'scale(0.95)';
-                                }}
-                                onMouseUp={(e) => {
-                                    e.currentTarget.style.background = 'rgba(239, 68, 68, 0.2)';
-                                    e.currentTarget.style.transform = 'scale(1)';
-                                }}
-                                onMouseLeave={(e) => {
-                                    e.currentTarget.style.background = 'rgba(239, 68, 68, 0.2)';
-                                    e.currentTarget.style.transform = 'scale(1)';
-                                }}
-                            >
-                                ⌫
-                            </button>
-                            <button
-                                onClick={() => setAnswer(prev => prev + '0')}
-                                style={{
-                                    padding: '1rem',
-                                    fontSize: '1.5rem',
-                                    fontWeight: 'bold',
-                                    background: 'rgba(255, 255, 255, 0.05)',
-                                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                                    borderRadius: '0.5rem',
-                                    color: '#fff',
-                                    cursor: 'pointer',
-                                    transition: 'all 0.2s'
-                                }}
-                                onMouseDown={(e) => {
-                                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)';
-                                    e.currentTarget.style.transform = 'scale(0.95)';
-                                }}
-                                onMouseUp={(e) => {
-                                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
-                                    e.currentTarget.style.transform = 'scale(1)';
-                                }}
-                                onMouseLeave={(e) => {
-                                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
-                                    e.currentTarget.style.transform = 'scale(1)';
-                                }}
-                            >
-                                0
-                            </button>
-                            <button
-                                onClick={() => setAnswer('')}
-                                style={{
-                                    padding: '1rem',
-                                    fontSize: '1rem',
-                                    fontWeight: 'bold',
-                                    background: 'rgba(251, 191, 36, 0.2)',
-                                    border: '1px solid rgba(251, 191, 36, 0.3)',
-                                    borderRadius: '0.5rem',
-                                    color: '#fbbf24',
-                                    cursor: 'pointer',
-                                    transition: 'all 0.2s'
-                                }}
-                                onMouseDown={(e) => {
-                                    e.currentTarget.style.background = 'rgba(251, 191, 36, 0.3)';
-                                    e.currentTarget.style.transform = 'scale(0.95)';
-                                }}
-                                onMouseUp={(e) => {
-                                    e.currentTarget.style.background = 'rgba(251, 191, 36, 0.2)';
-                                    e.currentTarget.style.transform = 'scale(1)';
-                                }}
-                                onMouseLeave={(e) => {
-                                    e.currentTarget.style.background = 'rgba(251, 191, 36, 0.2)';
-                                    e.currentTarget.style.transform = 'scale(1)';
-                                }}
-                            >
-                                Clear
-                            </button>
-                        </div>
+                                <button
+                                    onClick={() => setAnswer('')}
+                                    style={{
+                                        padding: '1rem',
+                                        fontSize: '1rem',
+                                        fontWeight: 'bold',
+                                        background: 'rgba(251, 191, 36, 0.2)',
+                                        border: '1px solid rgba(251, 191, 36, 0.3)',
+                                        borderRadius: '0.5rem',
+                                        color: '#fbbf24',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.2s'
+                                    }}
+                                    onMouseDown={(e) => {
+                                        e.currentTarget.style.background = 'rgba(251, 191, 36, 0.3)';
+                                        e.currentTarget.style.transform = 'scale(0.95)';
+                                    }}
+                                    onMouseUp={(e) => {
+                                        e.currentTarget.style.background = 'rgba(251, 191, 36, 0.2)';
+                                        e.currentTarget.style.transform = 'scale(1)';
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        e.currentTarget.style.background = 'rgba(251, 191, 36, 0.2)';
+                                        e.currentTarget.style.transform = 'scale(1)';
+                                    }}
+                                >
+                                    Clear
+                                </button>
+                            </div>
+                        )}
 
                         {/* Action Buttons */}
                         <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '0.5rem', marginTop: '0.5rem' }}>
@@ -693,31 +700,31 @@ export default function SystemComponentChecker() {
 
                         {/* Detailed Breakdown for Major Mastery */}
                         {poolType === 'major-mastery' && (
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
-                                <div className="glass" style={{ padding: '1rem', borderRadius: '0.75rem' }}>
-                                    <h4 style={{ margin: '0 0 0.5rem', opacity: 0.8 }}>Number → Word</h4>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+                                <div className="glass" style={{ padding: '1rem', borderRadius: '0.75rem', textAlign: 'center' }}>
+                                    <h4 style={{ margin: '0 0 0.5rem', opacity: 0.8, fontSize: '0.9rem' }}>Number → Word</h4>
                                     {(() => {
                                         const subset = responses.filter(r => r.question.category === 'major-image');
                                         const avg = subset.length ? subset.reduce((a, b) => a + b.duration, 0) / subset.length : 0;
                                         const acc = subset.length ? (subset.filter(r => r.isCorrect).length / subset.length) * 100 : 0;
                                         return (
-                                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                                <span>Avg: <b>{avg.toFixed(2)}s</b></span>
-                                                <span>Acc: <b>{Math.round(acc)}%</b></span>
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                                                <div style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>{avg.toFixed(2)}s</div>
+                                                <div style={{ fontSize: '0.85rem', opacity: 0.7 }}>{Math.round(acc)}% Accuracy</div>
                                             </div>
                                         );
                                     })()}
                                 </div>
-                                <div className="glass" style={{ padding: '1rem', borderRadius: '0.75rem' }}>
-                                    <h4 style={{ margin: '0 0 0.5rem', opacity: 0.8 }}>Word → Number</h4>
+                                <div className="glass" style={{ padding: '1rem', borderRadius: '0.75rem', textAlign: 'center' }}>
+                                    <h4 style={{ margin: '0 0 0.5rem', opacity: 0.8, fontSize: '0.9rem' }}>Word → Number</h4>
                                     {(() => {
                                         const subset = responses.filter(r => r.question.category === 'major-reverse');
                                         const avg = subset.length ? subset.reduce((a, b) => a + b.duration, 0) / subset.length : 0;
                                         const acc = subset.length ? (subset.filter(r => r.isCorrect).length / subset.length) * 100 : 0;
                                         return (
-                                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                                <span>Avg: <b>{avg.toFixed(2)}s</b></span>
-                                                <span>Acc: <b>{Math.round(acc)}%</b></span>
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                                                <div style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>{avg.toFixed(2)}s</div>
+                                                <div style={{ fontSize: '0.85rem', opacity: 0.7 }}>{Math.round(acc)}% Accuracy</div>
                                             </div>
                                         );
                                     })()}
@@ -725,40 +732,41 @@ export default function SystemComponentChecker() {
                             </div>
                         )}
 
-                        <div style={{ maxHeight: '320px', overflowY: 'auto', marginBottom: '1.5rem' }}>
-                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
-                                <thead style={{ position: 'sticky', top: 0, background: 'rgba(15,23,42,0.95)' }}>
-                                    <tr>
-                                        <th style={{ textAlign: 'left', padding: '0.5rem' }}>number</th>
-                                        <th style={{ textAlign: 'left', padding: '0.5rem' }}>word</th>
-                                        <th style={{ textAlign: 'left', padding: '0.5rem' }}>your answer</th>
-                                        <th style={{ textAlign: 'left', padding: '0.5rem' }}>correct</th>
-                                        <th style={{ textAlign: 'center', padding: '0.5rem' }}>time (s)</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {responses.map((resp, idx) => {
-                                        const isNumToWord = resp.question.category === 'major-image';
-                                        const number = isNumToWord ? resp.question.source : resp.question.answer;
-                                        const word = isNumToWord ? resp.question.answer : resp.question.source;
-                                        
-                                        return (
-                                            <tr key={`${resp.question.id}-${idx}`} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                                                <td style={{ padding: '0.5rem' }}>{number.toLowerCase()}</td>
-                                                <td style={{ padding: '0.5rem' }}>{word.toLowerCase()}</td>
-                                                <td style={{ padding: '0.5rem', color: resp.isCorrect ? 'var(--success)' : 'var(--error)' }}>
-                                                    {resp.given ? resp.given.toLowerCase() : '—'}
-                                                </td>
-                                                <td style={{ padding: '0.5rem', opacity: 0.8 }}>
-                                                    {resp.isCorrect ? '✓' : '✗'}
-                                                </td>
-                                                <td style={{ padding: '0.5rem', textAlign: 'center' }}>{resp.duration.toFixed(2)}</td>
-                                            </tr>
-                                        );
-                                    })}
-                                </tbody>
-                            </table>
-                        </div>
+                        <div style={{ maxHeight: '400px', overflowY: 'auto', marginBottom: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                            {responses.map((resp, idx) => {
+                                const isNumToWord = resp.question.category === 'major-image';
+                                const number = isNumToWord ? resp.question.source : resp.question.answer;
+                                const word = isNumToWord ? resp.question.answer : resp.question.source;
+                                
+                                return (
+                                    <div key={idx} style={{ 
+                                        display: 'flex', 
+                                        justifyContent: 'space-between', 
+                                        alignItems: 'center',
+                                        padding: '1rem',
+                                        background: 'rgba(255,255,255,0.03)',
+                                        borderRadius: '0.75rem',
+                                        borderLeft: `4px solid ${resp.isCorrect ? 'var(--success)' : 'var(--error)'}`
+                                    }}>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                                            <div style={{ fontWeight: 'bold', fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                                <span>{number}</span>
+                                                <span style={{ opacity: 0.4, fontSize: '0.9rem' }}>↔</span>
+                                                <span>{word}</span>
+                                            </div>
+                                            <div style={{ fontSize: '0.9rem', color: resp.isCorrect ? 'var(--success)' : 'var(--error)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                                <span style={{ opacity: 0.7, color: 'var(--foreground)' }}>You:</span>
+                                                <span style={{ fontWeight: '600' }}>{resp.given || '(empty)'}</span>
+                                            </div>
+                                        </div>
+                                        <div style={{ textAlign: 'right', fontSize: '0.9rem', opacity: 0.6, fontWeight: '500' }}>
+                                            {resp.duration.toFixed(1)}s
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>                                        
+
 
                         <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
                             <button className="btn btn-secondary" style={{ flex: 1 }} onClick={reset}>

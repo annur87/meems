@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import Header from '@/components/Header';
 import Link from 'next/link';
-import { MajorEntry, PaoEntry, getImageVaultData, saveGameResult } from '@/lib/firebase';
+import { MajorEntry, PaoEntry, getImageVaultData, saveGameResult, saveCardAttempt, CardAttempt } from '@/lib/firebase';
 import { SAMPLE_MAJOR_SYSTEM, SAMPLE_PAO_SYSTEM } from '@/data/sampleImageVault';
 
 type GameState = 'loading' | 'setup' | 'running' | 'result';
@@ -277,12 +277,40 @@ export default function SystemComponentChecker() {
         sessionStartRef.current = Date.now();
     };
 
-    const handleSubmit = (skip = false) => {
+    const handleSubmit = async (skip = false) => {
         const currentQuestion = questions[currentIndex];
         if (!currentQuestion) return;
         const duration = (Date.now() - questionStartRef.current) / 1000;
         const sanitized = skip ? '' : answer;
         const isCorrect = !skip && normalize(sanitized) === normalize(currentQuestion.answer);
+
+        // Save card stats if this is a Major System question
+        if (currentQuestion.category === 'major-image' || currentQuestion.category === 'major-reverse') {
+            // Extract card number from source or answer depending on question type
+            let cardNumber = '';
+            let questionType: 'digits' | 'words' = 'digits';
+
+            if (currentQuestion.category === 'major-image') {
+                // Prompt: "What is the word for {number}?" -> Source is number
+                cardNumber = currentQuestion.source;
+                questionType = 'digits';
+            } else {
+                // Prompt: "What is the number for {word}?" -> Answer is number
+                cardNumber = currentQuestion.answer;
+                questionType = 'words';
+            }
+
+            const attempt: CardAttempt = {
+                cardNumber,
+                isCorrect,
+                responseTime: duration * 1000, // Convert to ms
+                timestamp: Date.now(),
+                questionType
+            };
+            
+            // Fire and forget - don't await to keep UI snappy
+            saveCardAttempt(attempt).catch(err => console.error("Failed to save card attempt:", err));
+        }
 
         const newResponse: DrillResponse = {
             question: currentQuestion,

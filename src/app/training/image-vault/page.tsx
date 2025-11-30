@@ -101,7 +101,7 @@ export default function ImageVault() {
         };
 
         loadData();
-    }, [timeFilter]);
+    }, [timeFilter, quizMode]);
 
     // Save to Firestore whenever data changes (Debounced)
     useEffect(() => {
@@ -974,9 +974,9 @@ export default function ImageVault() {
                                                         WebkitBackfaceVisibility: 'hidden',
                                                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                                                         fontSize: '2.5rem', fontWeight: 'bold', color: 'var(--primary)',
-                                                        background: `linear-gradient(135deg, rgba(30, 41, 59, 0.6), ${bgColor})`, 
+                                                        background: `linear-gradient(135deg, rgba(30, 41, 59, 0.4), ${bgColor})`, 
                                                         borderRadius: '0.5rem',
-                                                        border: '1px solid rgba(255,255,255,0.1)'
+                                                        border: `2px solid ${bgColor !== 'rgba(100, 116, 139, 0.1)' ? bgColor.replace('0.5)', '0.8)') : 'rgba(255,255,255,0.1)'}`
                                                     }}>
                                                         {entry.number}
                                                     </div>

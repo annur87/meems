@@ -112,6 +112,7 @@ export default function ImageVault() {
     const [flippedCards, setFlippedCards] = useState<Set<string>>(new Set());
     const [cardStats, setCardStats] = useState<Map<string, { attempts: number, firstSeenTime: number, masteredTime: number }>>(new Map());
     const [currentCardStartTime, setCurrentCardStartTime] = useState(0);
+    const [wordsVisible, setWordsVisible] = useState(true); // Toggle for showing/hiding words on cards
     const inputRef = useRef<HTMLInputElement>(null);
 
     // Load from Firestore on mount
@@ -1237,6 +1238,32 @@ export default function ImageVault() {
                                             })}
                                         </div>
 
+                                        {/* Eye Icon Toggle */}
+                                        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem' }}>
+                                            <button
+                                                onClick={() => setWordsVisible(!wordsVisible)}
+                                                style={{
+                                                    background: 'rgba(255,255,255,0.1)',
+                                                    border: '1px solid rgba(255,255,255,0.2)',
+                                                    borderRadius: '0.5rem',
+                                                    padding: '0.5rem 1rem',
+                                                    cursor: 'pointer',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '0.5rem',
+                                                    color: 'white',
+                                                    fontSize: '0.9rem',
+                                                    transition: 'all 0.2s'
+                                                }}
+                                                title={wordsVisible ? 'Hide words' : 'Show words'}
+                                            >
+                                                <span style={{ fontSize: '1.2rem' }}>
+                                                    {wordsVisible ? '👁️' : '👁️‍🗨️'}
+                                                </span>
+                                                {wordsVisible ? 'Hide Words' : 'Show Words'}
+                                            </button>
+                                        </div>
+
                                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: '1rem' }}>
                                             {filteredMajor.map((entry) => {
                                                 const stats = cardPerformanceStats.get(entry.number);
@@ -1282,9 +1309,11 @@ export default function ImageVault() {
                                                                 textShadow: '0 2px 4px rgba(0,0,0,0.5)' // Add shadow for better readability
                                                             }}>
                                                                 <div style={{ fontSize: '2rem', fontWeight: 'bold', lineHeight: 1 }}>{entry.number}</div>
-                                                                <div style={{ fontSize: '1rem', opacity: 1, marginTop: '0.25rem', textAlign: 'center', wordBreak: 'break-word', lineHeight: 1.2 }}>
-                                                                    {entry.images?.[0] || '???'}
-                                                                </div>
+                                                                {wordsVisible && (
+                                                                    <div style={{ fontSize: '1rem', opacity: 1, marginTop: '0.25rem', textAlign: 'center', wordBreak: 'break-word', lineHeight: 1.2 }}>
+                                                                        {entry.images?.[0] || '???'}
+                                                                    </div>
+                                                                )}
                                                             </div>
 
                                                             {/* Back (Stats) */}

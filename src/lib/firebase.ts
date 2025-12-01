@@ -1,33 +1,24 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getFirestore, collection, addDoc, query, orderBy, getDocs, doc, setDoc, getDoc, deleteDoc, where } from "firebase/firestore";
 
-// Helper function to get calendar-based time cutoffs
+// Helper function to get time cutoffs for filters
 const getCalendarCutoff = (timeFilter: '1d' | '1w' | '1m' | '1y' | 'all'): number => {
     if (timeFilter === 'all') return 0;
 
-    const now = new Date();
-    let cutoffDate: Date;
+    const now = Date.now();
 
     switch (timeFilter) {
-        case '1d': // Today (start of today)
-            cutoffDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
-            break;
-        case '1w': // This week (start of this week - Monday)
-            const dayOfWeek = now.getDay();
-            const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // Sunday is 0, Monday is 1
-            cutoffDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - daysToMonday, 0, 0, 0, 0);
-            break;
-        case '1m': // This month (start of this month)
-            cutoffDate = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
-            break;
-        case '1y': // This year (start of this year)
-            cutoffDate = new Date(now.getFullYear(), 0, 1, 0, 0, 0, 0);
-            break;
+        case '1d': // Today (last 24 hours)
+            return now - (24 * 60 * 60 * 1000);
+        case '1w': // This week (last 7 days)
+            return now - (7 * 24 * 60 * 60 * 1000);
+        case '1m': // This month (last 30 days)
+            return now - (30 * 24 * 60 * 60 * 1000);
+        case '1y': // This year (last 365 days)
+            return now - (365 * 24 * 60 * 60 * 1000);
         default:
             return 0;
     }
-
-    return cutoffDate.getTime();
 };
 
 // ... existing code ...
@@ -643,5 +634,195 @@ export const getPalaceStats = async (palaceId: string, userId: string = USER_ID)
             avgRecallTime: 0,
             locationStats: {}
         };
+    }
+};
+
+// ===== TRAINING TIME TRACKING =====
+
+export interface TrainingSession {
+    sessionId: string;
+    exerciseType: string; // 'major-drill', 'palace-drill', 'n-back', etc.
+    startTime: number;
+    endTime?: number; // undefined if ongoing
+    duration?: number; // milliseconds, calculated when session ends
+    completed: boolean;
+    metadata?: any; // exercise-specific data (score, config, etc.)
+}
+
+export interface TimeStats {
+    totalTime: number; // milliseconds
+    sessionCount: number;
+    completedSessions: number;
+    incompleteSessions: number;
+    byExercise: Record<string, {
+        totalTime: number;
+        sessionCount: number;
+    }>;
+}
+
+// Start a new training session
+export const startTrainingSession = async (
+    exerciseType: string,
+    userId: string = USER_ID,
+    metadata?: any
+): Promise<string> => {
+    try {
+        if (!firebaseConfig.apiKey) return '';
+
+        const sessionId = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        const session: TrainingSession = {
+            sessionId,
+            exerciseType,
+            startTime: Date.now(),
+            completed: false,
+            metadata
+        };
+
+        const sessionsRef = collection(db, 'training_sessions', userId, 'sessions');
+        await addDoc(sessionsRef, session);
+
+        return sessionId;
+    } catch (error) {
+        console.error('Error starting training session:', error);
+        return '';
+    }
+};
+
+// End a training session
+export const endTrainingSession = async (
+    sessionId: string,
+    userId: string = USER_ID,
+    completed: boolean = true,
+    metadata?: any
+): Promise<boolean> => {
+    try {
+        if (!firebaseConfig.apiKey || !sessionId) return false;
+
+        const sessionsRef = collection(db, 'training_sessions', userId, 'sessions');
+        const q = query(sessionsRef, where('sessionId', '==', sessionId));
+        const snapshot = await getDocs(q);
+
+        if (snapshot.empty) return false;
+
+        const docRef = snapshot.docs[0].ref;
+        const sessionData = snapshot.docs[0].data() as TrainingSession;
+
+        const endTime = Date.now();
+        const duration = endTime - sessionData.startTime;
+
+        await setDoc(docRef, {
+            ...sessionData,
+            endTime,
+            duration,
+            completed,
+            metadata: { ...sessionData.metadata, ...metadata }
+        });
+
+        return true;
+    } catch (error) {
+        console.error('Error ending training session:', error);
+        return false;
+    }
+};
+
+// Get time statistics
+export const getTimeStats = async (
+    userId: string = USER_ID,
+    timeFilter?: '1d' | '1w' | '1m' | '1y' | 'all'
+): Promise<TimeStats> => {
+    try {
+        if (!firebaseConfig.apiKey) {
+            return {
+                totalTime: 0,
+                sessionCount: 0,
+                completedSessions: 0,
+                incompleteSessions: 0,
+                byExercise: {}
+            };
+        }
+
+        const sessionsRef = collection(db, 'training_sessions', userId, 'sessions');
+        const q = query(sessionsRef, orderBy('startTime', 'desc'));
+        const snapshot = await getDocs(q);
+
+        let sessions = snapshot.docs.map(doc => doc.data() as TrainingSession);
+
+        // Apply time filter
+        if (timeFilter && timeFilter !== 'all') {
+            const cutoff = getCalendarCutoff(timeFilter);
+            sessions = sessions.filter(s => s.startTime >= cutoff);
+        }
+
+        let totalTime = 0;
+        let completedSessions = 0;
+        let incompleteSessions = 0;
+        const byExercise: Record<string, { totalTime: number; sessionCount: number }> = {};
+
+        sessions.forEach(session => {
+            const sessionTime = session.duration || 0;
+            totalTime += sessionTime;
+
+            if (session.completed) {
+                completedSessions++;
+            } else {
+                incompleteSessions++;
+            }
+
+            if (!byExercise[session.exerciseType]) {
+                byExercise[session.exerciseType] = { totalTime: 0, sessionCount: 0 };
+            }
+
+            byExercise[session.exerciseType].totalTime += sessionTime;
+            byExercise[session.exerciseType].sessionCount++;
+        });
+
+        return {
+            totalTime,
+            sessionCount: sessions.length,
+            completedSessions,
+            incompleteSessions,
+            byExercise
+        };
+    } catch (error) {
+        console.error('Error getting time stats:', error);
+        return {
+            totalTime: 0,
+            sessionCount: 0,
+            completedSessions: 0,
+            incompleteSessions: 0,
+            byExercise: {}
+        };
+    }
+};
+
+// Get session history
+export const getSessionHistory = async (
+    userId: string = USER_ID,
+    timeFilter?: '1d' | '1w' | '1m' | '1y' | 'all',
+    exerciseType?: string
+): Promise<TrainingSession[]> => {
+    try {
+        if (!firebaseConfig.apiKey) return [];
+
+        const sessionsRef = collection(db, 'training_sessions', userId, 'sessions');
+        let q = query(sessionsRef, orderBy('startTime', 'desc'));
+
+        const snapshot = await getDocs(q);
+        let sessions = snapshot.docs.map(doc => doc.data() as TrainingSession);
+
+        // Apply filters
+        if (timeFilter && timeFilter !== 'all') {
+            const cutoff = getCalendarCutoff(timeFilter);
+            sessions = sessions.filter(s => s.startTime >= cutoff);
+        }
+
+        if (exerciseType) {
+            sessions = sessions.filter(s => s.exerciseType === exerciseType);
+        }
+
+        return sessions;
+    } catch (error) {
+        console.error('Error getting session history:', error);
+        return [];
     }
 };

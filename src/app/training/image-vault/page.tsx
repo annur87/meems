@@ -484,16 +484,11 @@ export default function ImageVault() {
         return 'red';
     };
 
-    const [selectedDifficultyFilters, setSelectedDifficultyFilters] = useState<Set<string>>(new Set(['green', 'yellow', 'red', 'unknown']));
+    const [selectedDifficultyFilters, setSelectedDifficultyFilters] = useState<Set<string>>(new Set(['unknown']));
 
     const toggleDifficultyFilter = (difficulty: string) => {
-        const newFilters = new Set(selectedDifficultyFilters);
-        if (newFilters.has(difficulty)) {
-            newFilters.delete(difficulty);
-        } else {
-            newFilters.add(difficulty);
-        }
-        setSelectedDifficultyFilters(newFilters);
+        // Single-select behavior: only one filter active at a time
+        setSelectedDifficultyFilters(new Set([difficulty]));
     };
 
     // Search/Filter Functions

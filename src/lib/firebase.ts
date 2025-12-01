@@ -1,6 +1,35 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getFirestore, collection, addDoc, query, orderBy, getDocs, doc, setDoc, getDoc, deleteDoc, where } from "firebase/firestore";
 
+// Helper function to get calendar-based time cutoffs
+const getCalendarCutoff = (timeFilter: '1d' | '1w' | '1m' | '1y' | 'all'): number => {
+    if (timeFilter === 'all') return 0;
+
+    const now = new Date();
+    let cutoffDate: Date;
+
+    switch (timeFilter) {
+        case '1d': // Today (start of today)
+            cutoffDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+            break;
+        case '1w': // This week (start of this week - Monday)
+            const dayOfWeek = now.getDay();
+            const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // Sunday is 0, Monday is 1
+            cutoffDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - daysToMonday, 0, 0, 0, 0);
+            break;
+        case '1m': // This month (start of this month)
+            cutoffDate = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+            break;
+        case '1y': // This year (start of this year)
+            cutoffDate = new Date(now.getFullYear(), 0, 1, 0, 0, 0, 0);
+            break;
+        default:
+            return 0;
+    }
+
+    return cutoffDate.getTime();
+};
+
 // ... existing code ...
 
 export const getCardHistory = async (
@@ -23,15 +52,9 @@ export const getCardHistory = async (
         // Sort by timestamp ascending
         attempts.sort((a, b) => a.timestamp - b.timestamp);
 
-        // Filter by time
+        // Filter by time using calendar-based cutoffs
         if (timeFilter && timeFilter !== 'all') {
-            const now = Date.now();
-            let cutoff = 0;
-            if (timeFilter === '1d') cutoff = now - 24 * 60 * 60 * 1000;
-            else if (timeFilter === '1w') cutoff = now - 7 * 24 * 60 * 60 * 1000;
-            else if (timeFilter === '1m') cutoff = now - 30 * 24 * 60 * 60 * 1000;
-            else if (timeFilter === '1y') cutoff = now - 365 * 24 * 60 * 60 * 1000;
-
+            const cutoff = getCalendarCutoff(timeFilter);
             attempts = attempts.filter(a => a.timestamp >= cutoff);
         }
 
@@ -410,34 +433,14 @@ export const getCardStats = async (
         const attemptsRef = collection(db, 'major_system_attempts', userId, 'attempts');
         let q = query(attemptsRef, orderBy('timestamp', 'desc'));
 
-        // Apply time filter
-        if (timeFilter && timeFilter !== 'all') {
-            const now = Date.now();
-            const timeRanges = {
-                '1d': 24 * 60 * 60 * 1000,
-                '1w': 7 * 24 * 60 * 60 * 1000,
-                '1m': 30 * 24 * 60 * 60 * 1000,
-                '1y': 365 * 24 * 60 * 60 * 1000
-            };
-            const cutoff = now - timeRanges[timeFilter];
-            // Note: Firestore query requires an index for this
-            // For now, we'll filter in memory
-        }
-
         const snapshot = await getDocs(q);
         const attempts: CardAttempt[] = snapshot.docs.map(doc => doc.data() as CardAttempt);
 
-        // Apply time filter in memory if needed
+        // Apply time filter in memory using calendar-based cutoffs
         const filteredAttempts = timeFilter && timeFilter !== 'all'
             ? attempts.filter(a => {
-                const now = Date.now();
-                const timeRanges = {
-                    '1d': 24 * 60 * 60 * 1000,
-                    '1w': 7 * 24 * 60 * 60 * 1000,
-                    '1m': 30 * 24 * 60 * 60 * 1000,
-                    '1y': 365 * 24 * 60 * 60 * 1000
-                };
-                return a.timestamp >= (now - timeRanges[timeFilter]);
+                const cutoff = getCalendarCutoff(timeFilter);
+                return a.timestamp >= cutoff;
             })
             : attempts;
 

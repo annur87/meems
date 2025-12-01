@@ -1176,6 +1176,24 @@ export default function ImageVault() {
                                                     ? selectedDifficultyFilters.has('unknown') && selectedDifficultyFilters.has('green') && selectedDifficultyFilters.has('yellow') && selectedDifficultyFilters.has('red')
                                                     : selectedDifficultyFilters.has(diff);
 
+                                                // Calculate card count for this difficulty
+                                                let cardCount = 0;
+                                                if (diff === 'all') {
+                                                    cardCount = majorSystem.filter(e => {
+                                                        const matchesSearch = e.number.includes(searchQuery) ||
+                                                            e.images?.some(img => img.toLowerCase().includes(searchQuery.toLowerCase()));
+                                                        return matchesSearch;
+                                                    }).length;
+                                                } else {
+                                                    cardCount = majorSystem.filter(e => {
+                                                        const matchesSearch = e.number.includes(searchQuery) ||
+                                                            e.images?.some(img => img.toLowerCase().includes(searchQuery.toLowerCase()));
+                                                        if (!matchesSearch) return false;
+                                                        const difficulty = getCardDifficulty(e.number);
+                                                        return difficulty === diff;
+                                                    }).length;
+                                                }
+
                                                 return (
                                                     <button
                                                         key={diff}
@@ -1213,6 +1231,7 @@ export default function ImageVault() {
                                                             diff === 'green' ? 'Good' :
                                                                 diff === 'yellow' ? 'Okay' :
                                                                     'Bad'}
+                                                        <span style={{ opacity: 0.7, fontSize: '0.8rem' }}>({cardCount})</span>
                                                     </button>
                                                 );
                                             })}
@@ -1234,7 +1253,8 @@ export default function ImageVault() {
                                                             perspective: '1000px',
                                                             position: 'relative',
                                                             padding: 0,
-                                                            overflow: 'visible'
+                                                            overflow: 'visible',
+                                                            border: 'none'
                                                         }}
                                                     >
                                                         <div style={{

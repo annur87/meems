@@ -504,17 +504,17 @@ export const getCardPerformanceColor = (stats: CardStats | undefined): string =>
     
     const score = stats.performanceScore;
     
-    // Green: 75-100 (well memorized) - Emerald 500
+    // Cyan-Green: 75-100 (well memorized) - Teal/Cyan-Green
     if (score >= 75) {
-        return 'rgba(16, 185, 129, 0.35)'; 
+        return 'rgba(20, 184, 166, 0.35)'; // Teal 500
     }
-    // Yellow: 50-74 (medium) - Amber 500
+    // Orange: 50-74 (medium) - Orange 500
     else if (score >= 50) {
-        return 'rgba(245, 158, 11, 0.35)'; 
+        return 'rgba(249, 115, 22, 0.35)'; // Orange 500
     }
-    // Red: 0-49 (difficult) - Rose 500
+    // Violet-Red: 0-49 (difficult) - Fuchsia/Purple-Red
     else {
-        return 'rgba(244, 63, 94, 0.35)'; 
+        return 'rgba(217, 70, 239, 0.35)'; // Fuchsia 500
     }
 };
 

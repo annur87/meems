@@ -1279,11 +1279,13 @@ export default function ImageVault() {
                                                                 justifyContent: 'center',
                                                                 fontSize: '0.9rem', 
                                                                 fontWeight: '500', 
-                                                                color: 'white',
-                                                                background: 'var(--primary)', 
+                                                                color: '#ffffff',
+                                                                background: bgColor, 
                                                                 borderRadius: '0.5rem',
+                                                                border: `2px solid ${bgColor !== 'rgba(100, 116, 139, 0.15)' ? bgColor.replace('0.35)', '0.8)') : 'rgba(255,255,255,0.1)'}`,
                                                                 padding: '0.5rem', 
-                                                                textAlign: 'center'
+                                                                textAlign: 'center',
+                                                                textShadow: '0 2px 4px rgba(0,0,0,0.5)'
                                                             }}>
                                                                 {stats && stats.totalAttempts > 0 ? (
                                                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', width: '100%' }}>

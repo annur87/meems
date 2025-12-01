@@ -102,7 +102,7 @@ export default function ImageVault() {
     // Quiz State
     const [quizMode, setQuizMode] = useState<'config' | 'active' | 'result' | null>(null);
     const [quizConfig, setQuizConfig] = useState({
-        count: 999,
+        turns: 1,
         type: 'mixed' as 'digits' | 'words' | 'mixed',
         mode: 'untimed' as 'timed' | 'untimed',
         cardDifficulty: 'all' as 'all' | 'green' | 'yellow' | 'red'
@@ -607,16 +607,14 @@ export default function ImageVault() {
             return;
         }
 
-        // For "All Cards" (999), we test BOTH directions: cards × 2 = questions
-        if (quizConfig.count === 999) {
-            // Create two copies: one for digits->words, one for words->digits
-            const shuffled = pool.sort(() => 0.5 - Math.random());
-            pool = [...shuffled, ...shuffled]; // Double for both directions
-        } else if (quizConfig.count < pool.length) {
-            pool = pool.sort(() => 0.5 - Math.random()).slice(0, quizConfig.count);
-        } else {
-            pool = pool.sort(() => 0.5 - Math.random());
+        // Apply turns multiplier
+        let finalPool: MajorEntry[] = [];
+        for (let i = 0; i < quizConfig.turns; i++) {
+            finalPool = [...finalPool, ...pool];
         }
+
+        // Shuffle the final pool
+        pool = finalPool.sort(() => 0.5 - Math.random());
 
         setQuizQueue(pool);
         setQuizStats({ correct: 0, wrong: 0, startTime: Date.now(), endTime: 0 });
@@ -987,25 +985,18 @@ export default function ImageVault() {
 
                                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1.5rem', maxWidth: '1000px', margin: '0 auto 2rem' }}>
                                     <div>
-                                        <label style={{ display: 'block', marginBottom: '0.5rem', color: '#cbd5e1' }}>Cards</label>
+                                        <label style={{ display: 'block', marginBottom: '0.5rem', color: '#cbd5e1' }}>Turns (Multiplier)</label>
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                                            {[5, 10, 50, 100].map(n => (
+                                            {[1, 2, 3, 4, 5].map(n => (
                                                 <button
                                                     key={n}
-                                                    onClick={() => setQuizConfig(c => ({ ...c, count: n }))}
-                                                    className={`btn ${quizConfig.count === n ? 'btn-primary' : ''}`}
-                                                    style={{ padding: '0.5rem', opacity: quizConfig.count === n ? 1 : 0.6 }}
+                                                    onClick={() => setQuizConfig(c => ({ ...c, turns: n }))}
+                                                    className={`btn ${quizConfig.turns === n ? 'btn-primary' : ''}`}
+                                                    style={{ padding: '0.5rem', opacity: quizConfig.turns === n ? 1 : 0.6 }}
                                                 >
-                                                    {n}
+                                                    {n}x
                                                 </button>
                                             ))}
-                                            <button
-                                                onClick={() => setQuizConfig(c => ({ ...c, count: 999 }))}
-                                                className={`btn ${quizConfig.count === 999 ? 'btn-primary' : ''}`}
-                                                style={{ padding: '0.5rem', opacity: quizConfig.count === 999 ? 1 : 0.6 }}
-                                            >
-                                                All
-                                            </button>
                                         </div>
                                     </div>
 
@@ -1203,7 +1194,7 @@ export default function ImageVault() {
                             <div className="glass-panel" style={{ marginBottom: '2rem', padding: '2rem' }}>
                                 <h2 style={{ fontSize: '2rem', marginBottom: '1rem', color: 'var(--success)', textAlign: 'center' }}>Quiz Complete!</h2>
                                 <p style={{ fontSize: '1.2rem', marginBottom: '2rem', textAlign: 'center' }}>
-                                    You successfully memorized {quizConfig.count === 999 ? `all ${majorSystem.length} cards (${majorSystem.length * 2} questions)` : `${quizConfig.count} cards`}.
+                                    You successfully completed {quizConfig.turns} turn{quizConfig.turns > 1 ? 's' : ''} of the selected cards.
                                 </p>
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', maxWidth: '600px', margin: '0 auto 2rem' }}>
                                     <div className="glass" style={{ padding: '1rem', textAlign: 'center' }}>

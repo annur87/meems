@@ -5,15 +5,6 @@ import { useState, useEffect, useRef } from 'react';
 import Header from '@/components/Header';
 import Link from 'next/link';
 import { 
-    saveMajorSystem, 
-    getMajorSystem, 
-    saveCardPaoSystem, 
-    getCardPaoSystem, 
-    saveDigitPaoSystem, 
-    getDigitPaoSystem,
-    savePalace,
-    getPalaces,
-    deletePalace,
     getImageVaultData,
     saveImageVaultData,
     CardStats,
@@ -1180,7 +1171,7 @@ export default function ImageVault() {
                                     <>
                                         {/* Difficulty Filters */}
                                         <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
-                                            {(['green', 'yellow', 'red', 'unknown'] as const).map(diff => (
+                                            {(['unknown', 'green', 'yellow', 'red'] as const).map(diff => (
                                                 <button
                                                     key={diff}
                                                     onClick={() => toggleDifficultyFilter(diff)}
@@ -1190,9 +1181,9 @@ export default function ImageVault() {
                                                         border: '1px solid',
                                                         borderColor: selectedDifficultyFilters.has(diff) ? 'transparent' : 'rgba(255,255,255,0.1)',
                                                         background: selectedDifficultyFilters.has(diff) 
-                                                            ? (diff === 'green' ? 'rgba(16, 185, 129, 0.35)' : 
-                                                               diff === 'yellow' ? 'rgba(245, 158, 11, 0.35)' : 
-                                                               diff === 'red' ? 'rgba(244, 63, 94, 0.35)' : 
+                                                            ? (diff === 'green' ? 'rgba(20, 184, 166, 0.35)' : 
+                                                               diff === 'yellow' ? 'rgba(249, 115, 22, 0.35)' : 
+                                                               diff === 'red' ? 'rgba(217, 70, 239, 0.35)' : 
                                                                'rgba(100, 116, 139, 0.35)')
                                                             : 'rgba(255,255,255,0.03)',
                                                         color: selectedDifficultyFilters.has(diff) ? 'white' : 'rgba(255,255,255,0.5)',
@@ -1208,12 +1199,12 @@ export default function ImageVault() {
                                                         width: '8px', 
                                                         height: '8px', 
                                                         borderRadius: '50%', 
-                                                        background: diff === 'green' ? '#10b981' : 
-                                                                    diff === 'yellow' ? '#f59e0b' : 
-                                                                    diff === 'red' ? '#f43f5e' : 
+                                                        background: diff === 'green' ? '#14b8a6' : 
+                                                                    diff === 'yellow' ? '#f97316' : 
+                                                                    diff === 'red' ? '#d946ef' : 
                                                                     '#64748b'
                                                     }} />
-                                                    {diff === 'unknown' ? 'Unseen' : diff.charAt(0).toUpperCase() + diff.slice(1)}
+                                                    {diff === 'unknown' ? 'All' : diff.charAt(0).toUpperCase() + diff.slice(1)}
                                                 </button>
                                             ))}
                                         </div>

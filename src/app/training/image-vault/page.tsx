@@ -698,24 +698,32 @@ export default function ImageVault() {
         const cardKey = currentQuizCard.number;
         const stats = cardStats.get(cardKey);
         if (stats) {
-            setCardStats(prev => new Map(prev).set(cardKey, {
-                ...stats,
-                attempts: stats.attempts + 1,
-                attemptTimes: [...stats.attemptTimes, responseTime]
-            }));
+            setCardStats(prev => {
+                const updatedStats = {
+                    ...stats,
+                    attempts: stats.attempts + 1,
+                    attemptTimes: [...stats.attemptTimes, responseTime]
+                };
+                return new Map(prev).set(cardKey, updatedStats);
+            });
         }
 
         if (isCorrect) {
             setQuizFeedback({ status: 'correct', message: 'Correct!' });
             setQuizStats(prev => ({ ...prev, correct: prev.correct + 1 }));
 
-            // Mark as mastered
+            // Mark as mastered (only if first time getting it right)
             if (stats && stats.masteredTime === 0) {
-                setCardStats(prev => new Map(prev).set(cardKey, {
-                    ...stats,
-                    attempts: stats.attempts + 1,
-                    masteredTime: Date.now()
-                }));
+                setCardStats(prev => {
+                    const currentStats = prev.get(cardKey);
+                    if (currentStats && currentStats.masteredTime === 0) {
+                        return new Map(prev).set(cardKey, {
+                            ...currentStats,
+                            masteredTime: Date.now()
+                        });
+                    }
+                    return prev;
+                });
             }
 
             setTimeout(() => {

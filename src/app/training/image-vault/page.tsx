@@ -35,7 +35,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { SAMPLE_MAJOR_SYSTEM, SAMPLE_PAO_SYSTEM, SAMPLE_PALACES } from '@/data/sampleImageVault';
 
 type SystemType = 'analytics' | 'major' | 'card-pao' | 'digit-pao' | 'palace';
-type TimeFilter = '12h' | '1d' | '1w' | '1m' | '1y' | 'all';
+type TimeFilter = '1h' | '2h' | '12h' | '1d' | '1w' | '1m' | '1y' | 'all';
 
 const STORAGE_KEY = 'image_vault_data';
 
@@ -116,7 +116,7 @@ export default function ImageVault() {
     const [flippedCards, setFlippedCards] = useState<Set<string>>(new Set());
     const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
     const [timeStats, setTimeStats] = useState<TimeStats | null>(null);
-    const [cardStats, setCardStats] = useState<Map<string, { attempts: number, firstSeenTime: number, masteredTime: number }>>(new Map());
+    const [cardStats, setCardStats] = useState<Map<string, { attempts: number, attemptTimes: number[], masteredTime: number }>>(new Map());
     const [currentCardStartTime, setCurrentCardStartTime] = useState(0);
     const [wordsVisible, setWordsVisible] = useState(true); // Toggle for showing/hiding words on cards
     const inputRef = useRef<HTMLInputElement>(null);
@@ -649,7 +649,7 @@ export default function ImageVault() {
         if (!cardStats.has(cardKey)) {
             setCardStats(prev => new Map(prev).set(cardKey, {
                 attempts: 0,
-                firstSeenTime: Date.now(),
+                attemptTimes: [],
                 masteredTime: 0
             }));
         }
@@ -700,7 +700,8 @@ export default function ImageVault() {
         if (stats) {
             setCardStats(prev => new Map(prev).set(cardKey, {
                 ...stats,
-                attempts: stats.attempts + 1
+                attempts: stats.attempts + 1,
+                attemptTimes: [...stats.attemptTimes, responseTime]
             }));
         }
 
@@ -912,6 +913,8 @@ export default function ImageVault() {
                                 className="input-field"
                                 style={{ padding: '0.5rem', fontSize: '0.9rem', width: 'auto' }}
                             >
+                                <option value="1h">1 hr</option>
+                                <option value="2h">2 hrs</option>
                                 <option value="12h">12 hrs</option>
                                 <option value="1d">Today</option>
                                 <option value="1w">This Week</option>
@@ -1028,8 +1031,23 @@ export default function ImageVault() {
                                     </div>
 
                                     <div>
-                                        <label style={{ display: 'block', marginBottom: '0.5rem', color: '#cbd5e1' }}>Difficulty</label>
+                                        <label style={{ display: 'block', marginBottom: '0.5rem', color: '#cbd5e1' }}>Difficulty (Time Period)</label>
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                            <select
+                                                value={timeFilter}
+                                                onChange={(e) => setTimeFilter(e.target.value as TimeFilter)}
+                                                className="input-field"
+                                                style={{ padding: '0.5rem', fontSize: '0.85rem', marginBottom: '0.5rem' }}
+                                            >
+                                                <option value="1h">1 hr</option>
+                                                <option value="2h">2 hrs</option>
+                                                <option value="12h">12 hrs</option>
+                                                <option value="1d">Today</option>
+                                                <option value="1w">This Week</option>
+                                                <option value="1m">This Month</option>
+                                                <option value="1y">This Year</option>
+                                                <option value="all">All Time</option>
+                                            </select>
                                             <button
                                                 onClick={() => setQuizConfig(c => ({ ...c, cardDifficulty: 'all' }))}
                                                 className={`btn ${quizConfig.cardDifficulty === 'all' ? 'btn-primary' : ''}`}
@@ -1229,23 +1247,29 @@ export default function ImageVault() {
                                         </div>
                                         {Array.from(cardStats.entries())
                                             .sort((a, b) => {
-                                                const aTime = a[1].masteredTime > 0 ? (a[1].masteredTime - a[1].firstSeenTime) : 0;
-                                                const bTime = b[1].masteredTime > 0 ? (b[1].masteredTime - b[1].firstSeenTime) : 0;
-                                                return bTime - aTime; // Descending order
+                                                const aAvgTime = a[1].attemptTimes.length > 0
+                                                    ? a[1].attemptTimes.reduce((sum, t) => sum + t, 0) / a[1].attemptTimes.length
+                                                    : 0;
+                                                const bAvgTime = b[1].attemptTimes.length > 0
+                                                    ? b[1].attemptTimes.reduce((sum, t) => sum + t, 0) / b[1].attemptTimes.length
+                                                    : 0;
+                                                return bAvgTime - aAvgTime; // Descending order
                                             })
                                             .map(([cardNum, stats]) => {
                                                 const card = majorSystem.find(c => c.number === cardNum);
-                                                const timeToMaster = stats.masteredTime > 0
-                                                    ? ((stats.masteredTime - stats.firstSeenTime) / 1000).toFixed(1)
+                                                const avgTime = stats.attemptTimes.length > 0
+                                                    ? (stats.attemptTimes.reduce((sum, t) => sum + t, 0) / stats.attemptTimes.length / 1000).toFixed(1)
                                                     : 'N/A';
+                                                // Color based on whether all attempts were successful (attempts = times seen)
+                                                const isGood = stats.masteredTime > 0; // Mastered means got it right
                                                 return (
                                                     <div key={cardNum} className="glass" style={{ display: 'grid', gridTemplateColumns: '80px 1fr 100px 120px', gap: '0.5rem', padding: '0.75rem', marginBottom: '0.5rem', alignItems: 'center' }}>
                                                         <div style={{ fontWeight: 'bold', color: 'var(--primary)' }}>{cardNum}</div>
                                                         <div>{card?.images?.[0] || '???'}</div>
-                                                        <div style={{ color: stats.attempts > 1 ? 'var(--error)' : 'var(--success)' }}>
+                                                        <div style={{ color: isGood ? 'var(--success)' : 'var(--error)' }}>
                                                             {stats.attempts}
                                                         </div>
-                                                        <div style={{ opacity: 0.8 }}>{timeToMaster}s</div>
+                                                        <div style={{ opacity: 0.8 }}>{avgTime}s</div>
                                                     </div>
                                                 );
                                             })}
@@ -1308,6 +1332,8 @@ export default function ImageVault() {
                                             className="input-field"
                                             style={{ padding: '0.5rem', fontSize: '0.9rem', width: 'auto' }}
                                         >
+                                            <option value="1h">1 hr</option>
+                                            <option value="2h">2 hrs</option>
                                             <option value="12h">12 hrs</option>
                                             <option value="1d">Today</option>
                                             <option value="1w">This Week</option>

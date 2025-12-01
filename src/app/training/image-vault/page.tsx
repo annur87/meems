@@ -21,7 +21,11 @@ import {
     MajorEntry,
     PaoEntry,
     DigitPaoEntry,
-    Palace
+    Palace,
+    startTrainingSession,
+    endTrainingSession,
+    getTimeStats,
+    type TimeStats
 } from '@/lib/firebase';
 import { majorSystemList } from '@/data/major-system';
 import { cardPaoList } from '@/data/card-pao';
@@ -30,17 +34,17 @@ import wordList from '@/data/words.json';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { SAMPLE_MAJOR_SYSTEM, SAMPLE_PAO_SYSTEM, SAMPLE_PALACES } from '@/data/sampleImageVault';
 
-type SystemType = 'major' | 'card-pao' | 'digit-pao' | 'palace';
-type TimeFilter = '1d' | '1w' | '1m' | '1y' | 'all';
+type SystemType = 'analytics' | 'major' | 'card-pao' | 'digit-pao' | 'palace';
+type TimeFilter = '12h' | '1d' | '1w' | '1m' | '1y' | 'all';
 
 const STORAGE_KEY = 'image_vault_data';
 
 export default function ImageVault() {
-    const [activeTab, setActiveTab] = useState<SystemType>('major');
+    const [activeTab, setActiveTab] = useState<SystemType>('analytics');
     const [userId, setUserId] = useState('default_user');
     const [drillStartTime, setDrillStartTime] = useState(0);
     const [searchQuery, setSearchQuery] = useState('');
-    const [timeFilter, setTimeFilter] = useState<TimeFilter>('1w');
+    const [timeFilter, setTimeFilter] = useState<TimeFilter>('all');
     const [cardPerformanceStats, setCardPerformanceStats] = useState<Map<string, CardStats>>(new Map());
 
     // Major System
@@ -110,10 +114,37 @@ export default function ImageVault() {
     const [quizStats, setQuizStats] = useState({ correct: 0, wrong: 0, startTime: 0, endTime: 0 });
     const [quizFeedback, setQuizFeedback] = useState<{ status: 'correct' | 'wrong' | null, message: string }>({ status: null, message: '' });
     const [flippedCards, setFlippedCards] = useState<Set<string>>(new Set());
+    const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+    const [timeStats, setTimeStats] = useState<TimeStats | null>(null);
     const [cardStats, setCardStats] = useState<Map<string, { attempts: number, firstSeenTime: number, masteredTime: number }>>(new Map());
     const [currentCardStartTime, setCurrentCardStartTime] = useState(0);
     const [wordsVisible, setWordsVisible] = useState(true); // Toggle for showing/hiding words on cards
     const inputRef = useRef<HTMLInputElement>(null);
+    useEffect(() => {
+        if (activeTab === 'analytics') {
+            const loadTimeStats = async () => {
+                const stats = await getTimeStats(userId, timeFilter);
+                setTimeStats(stats);
+            };
+            loadTimeStats();
+        }
+    }, [activeTab, timeFilter, userId]);
+
+    // Helper to format duration
+    const formatDuration = (ms: number) => {
+        const seconds = Math.floor(ms / 1000);
+        const minutes = Math.floor(seconds / 60);
+        const hours = Math.floor(minutes / 60);
+
+        if (hours > 0) {
+            return `${hours}h ${minutes % 60}m`;
+        } else if (minutes > 0) {
+            return `${minutes}m ${seconds % 60}s`;
+        } else {
+            return `${seconds}s`;
+        }
+    };
+
 
     // Load from Firestore on mount
     useEffect(() => {
@@ -201,6 +232,13 @@ export default function ImageVault() {
         setPalaceDrillMode('memorize');
         setMemorizeStartTime(Date.now());
         setDrillStartTime(Date.now());
+
+        // Start tracking session
+        startTrainingSession('palace-drill', userId, {
+            palaceId: selectedPalaceForDrill.id,
+            turns: drillTurns,
+            timed: drillIsTimed
+        }).then(id => setCurrentSessionId(id));
     };
 
     const nextMemorizeItem = () => {
@@ -262,6 +300,9 @@ export default function ImageVault() {
 
     const finishPalaceDrill = async (finalStats: PalaceItemStat[]) => {
         if (!selectedPalaceForDrill) return;
+
+        // End tracking session
+        endCurrentSession(true);
 
         const endTime = Date.now();
         const memorizeTime = recallStartTime - memorizeStartTime;
@@ -437,7 +478,12 @@ export default function ImageVault() {
         }));
     };
 
-    const deletePalace = (id: string) => {
+    const exitPalaceDrill = () => {
+        endCurrentSession(false);
+        setPalaceDrillMode(null);
+    };
+
+    const deletePalace = async (id: string) => {
         setPalaces(palaces.filter(p => p.id !== id));
         if (editingPalace === id) setEditingPalace(null);
     };
@@ -537,6 +583,13 @@ export default function ImageVault() {
 
 
 
+    const endCurrentSession = (completed: boolean) => {
+        if (currentSessionId) {
+            endTrainingSession(currentSessionId, userId, completed, { stats: quizStats });
+            setCurrentSessionId(null);
+        }
+    };
+
     const startQuiz = () => {
         let pool = [...majorSystem];
 
@@ -569,6 +622,11 @@ export default function ImageVault() {
         setQuizStats({ correct: 0, wrong: 0, startTime: Date.now(), endTime: 0 });
         setCardStats(new Map());
         setQuizMode('active');
+
+        // Start tracking session
+        startTrainingSession('major-drill', userId, { config: quizConfig })
+            .then(id => setCurrentSessionId(id));
+
         nextQuizCard(pool);
     };
 
@@ -576,6 +634,9 @@ export default function ImageVault() {
         if (queue.length === 0) {
             setQuizStats(prev => ({ ...prev, endTime: Date.now() }));
             setQuizMode('result');
+
+            // End tracking session
+            endCurrentSession(true);
             return;
         }
 
@@ -764,6 +825,21 @@ export default function ImageVault() {
                 {/* Tabs */}
                 <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem', borderBottom: '1px solid var(--glass-border)', flexWrap: 'wrap' }}>
                     <button
+                        onClick={() => { setActiveTab('analytics'); setSearchQuery(''); }}
+                        style={{
+                            padding: '1rem 1.5rem',
+                            background: 'none',
+                            border: 'none',
+                            color: activeTab === 'analytics' ? 'var(--primary)' : 'var(--foreground)',
+                            borderBottom: activeTab === 'analytics' ? '2px solid var(--primary)' : 'none',
+                            cursor: 'pointer',
+                            fontSize: '1rem',
+                            fontWeight: activeTab === 'analytics' ? 'bold' : 'normal'
+                        }}
+                    >
+                        Analytics
+                    </button>
+                    <button
                         onClick={() => { setActiveTab('major'); setSearchQuery(''); }}
                         style={{
                             padding: '1rem 1.5rem',
@@ -824,6 +900,82 @@ export default function ImageVault() {
                         Memory Palaces ({palaces.length})
                     </button>
                 </div>
+
+                {/* Analytics Dashboard */}
+                {activeTab === 'analytics' && (
+                    <div className="animate-fade-in">
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+                            <h2 style={{ fontSize: '1.5rem' }}>Training Analytics</h2>
+
+                            {/* Time Filter */}
+                            <select
+                                value={timeFilter}
+                                onChange={(e) => setTimeFilter(e.target.value as TimeFilter)}
+                                className="input-field"
+                                style={{ padding: '0.5rem', fontSize: '0.9rem', width: 'auto' }}
+                            >
+                                <option value="12h">12 hrs</option>
+                                <option value="1d">Today</option>
+                                <option value="1w">This Week</option>
+                                <option value="1m">This Month</option>
+                                <option value="1y">This Year</option>
+                                <option value="all">All Time</option>
+                            </select>
+                        </div>
+
+                        {timeStats ? (
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
+                                {/* Total Time Card */}
+                                <div className="glass-panel" style={{ padding: '1.5rem', textAlign: 'center' }}>
+                                    <div style={{ fontSize: '0.9rem', opacity: 0.7, marginBottom: '0.5rem' }}>Total Training Time</div>
+                                    <div style={{ fontSize: '2.5rem', fontWeight: 'bold', color: 'var(--primary)' }}>
+                                        {formatDuration(timeStats.totalTime)}
+                                    </div>
+                                </div>
+
+                                {/* Sessions Card */}
+                                <div className="glass-panel" style={{ padding: '1.5rem', textAlign: 'center' }}>
+                                    <div style={{ fontSize: '0.9rem', opacity: 0.7, marginBottom: '0.5rem' }}>Total Sessions</div>
+                                    <div style={{ fontSize: '2.5rem', fontWeight: 'bold', color: 'var(--accent)' }}>
+                                        {timeStats.sessionCount}
+                                    </div>
+                                    <div style={{ fontSize: '0.8rem', opacity: 0.6, marginTop: '0.5rem' }}>
+                                        {timeStats.completedSessions} Completed | {timeStats.incompleteSessions} Incomplete
+                                    </div>
+                                </div>
+
+                                {/* Breakdown by Exercise */}
+                                <div className="glass-panel" style={{ padding: '1.5rem', gridColumn: '1 / -1' }}>
+                                    <h3 style={{ fontSize: '1.1rem', marginBottom: '1rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '0.5rem' }}>
+                                        Time by Exercise
+                                    </h3>
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1rem' }}>
+                                        {Object.entries(timeStats.byExercise).map(([type, stats]) => (
+                                            <div key={type} style={{ background: 'rgba(255,255,255,0.05)', padding: '1rem', borderRadius: '0.5rem' }}>
+                                                <div style={{ textTransform: 'capitalize', fontWeight: 'bold', marginBottom: '0.5rem' }}>
+                                                    {type.replace('-', ' ')}
+                                                </div>
+                                                <div style={{ fontSize: '1.2rem', color: 'var(--primary)' }}>
+                                                    {formatDuration(stats.totalTime)}
+                                                </div>
+                                                <div style={{ fontSize: '0.8rem', opacity: 0.6 }}>
+                                                    {stats.sessionCount} sessions
+                                                </div>
+                                            </div>
+                                        ))}
+                                        {Object.keys(timeStats.byExercise).length === 0 && (
+                                            <div style={{ opacity: 0.5, fontStyle: 'italic' }}>No training data found for this period.</div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        ) : (
+                            <div style={{ textAlign: 'center', padding: '3rem', opacity: 0.5 }}>
+                                Loading analytics...
+                            </div>
+                        )}
+                    </div>
+                )}
 
                 {/* Major System Tab */}
                 {activeTab === 'major' && (
@@ -1028,6 +1180,22 @@ export default function ImageVault() {
                                         {quizFeedback.status === 'correct' ? '✓ Correct!' : '✗ Wrong!'}
                                     </div>
                                 )}
+
+                                <button
+                                    onClick={() => {
+                                        endCurrentSession(false);
+                                        setQuizMode('config');
+                                    }}
+                                    className="btn"
+                                    style={{
+                                        marginTop: '2rem',
+                                        background: 'rgba(255,255,255,0.05)',
+                                        fontSize: '0.9rem',
+                                        padding: '0.5rem 1rem'
+                                    }}
+                                >
+                                    Stop Drill
+                                </button>
                             </div>
                         )}
 
@@ -1149,6 +1317,7 @@ export default function ImageVault() {
                                             className="input-field"
                                             style={{ padding: '0.5rem', fontSize: '0.9rem', width: 'auto' }}
                                         >
+                                            <option value="12h">12 hrs</option>
                                             <option value="1d">Today</option>
                                             <option value="1w">This Week</option>
                                             <option value="1m">This Month</option>
@@ -1666,7 +1835,7 @@ export default function ImageVault() {
                         {palaceDrillMode ? (
                             <div className="glass-panel" style={{ padding: '2rem' }}>
                                 <div style={{ marginBottom: '1rem' }}>
-                                    <button onClick={() => setPalaceDrillMode(null)} className="btn btn-secondary">← Exit Drill</button>
+                                    <button onClick={exitPalaceDrill} className="btn btn-secondary">← Exit Drill</button>
                                 </div>
 
                                 {palaceDrillMode === 'config' && selectedPalaceForDrill && (

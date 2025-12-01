@@ -2,12 +2,14 @@ import { initializeApp, getApps, getApp } from "firebase/app";
 import { getFirestore, collection, addDoc, query, orderBy, getDocs, doc, setDoc, getDoc, deleteDoc, where } from "firebase/firestore";
 
 // Helper function to get time cutoffs for filters
-const getCalendarCutoff = (timeFilter: '1d' | '1w' | '1m' | '1y' | 'all'): number => {
+const getCalendarCutoff = (timeFilter: '12h' | '1d' | '1w' | '1m' | '1y' | 'all'): number => {
     if (timeFilter === 'all') return 0;
 
     const now = Date.now();
 
     switch (timeFilter) {
+        case '12h': // Last 12 hours
+            return now - (12 * 60 * 60 * 1000);
         case '1d': // Today (last 24 hours)
             return now - (24 * 60 * 60 * 1000);
         case '1w': // This week (last 7 days)
@@ -26,7 +28,7 @@ const getCalendarCutoff = (timeFilter: '1d' | '1w' | '1m' | '1y' | 'all'): numbe
 export const getCardHistory = async (
     cardNumber: string,
     userId: string = USER_ID,
-    timeFilter?: '1d' | '1w' | '1m' | '1y' | 'all'
+    timeFilter?: '12h' | '1d' | '1w' | '1m' | '1y' | 'all'
 ): Promise<CardAttempt[]> => {
     try {
         if (!firebaseConfig.apiKey) {
@@ -414,7 +416,7 @@ export const saveCardAttempt = async (attempt: CardAttempt, userId: string = USE
 
 export const getCardStats = async (
     userId: string = USER_ID,
-    timeFilter?: '1d' | '1w' | '1m' | '1y' | 'all'
+    timeFilter?: '12h' | '1d' | '1w' | '1m' | '1y' | 'all'
 ): Promise<Map<string, CardStats>> => {
     try {
         if (!firebaseConfig.apiKey) {
@@ -728,7 +730,7 @@ export const endTrainingSession = async (
 // Get time statistics
 export const getTimeStats = async (
     userId: string = USER_ID,
-    timeFilter?: '1d' | '1w' | '1m' | '1y' | 'all'
+    timeFilter?: '12h' | '1d' | '1w' | '1m' | '1y' | 'all'
 ): Promise<TimeStats> => {
     try {
         if (!firebaseConfig.apiKey) {
@@ -798,7 +800,7 @@ export const getTimeStats = async (
 // Get session history
 export const getSessionHistory = async (
     userId: string = USER_ID,
-    timeFilter?: '1d' | '1w' | '1m' | '1y' | 'all',
+    timeFilter?: '12h' | '1d' | '1w' | '1m' | '1y' | 'all',
     exerciseType?: string
 ): Promise<TrainingSession[]> => {
     try {

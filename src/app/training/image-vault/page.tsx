@@ -4,7 +4,7 @@
 import { useState, useEffect, useRef } from 'react';
 import Header from '@/components/Header';
 import Link from 'next/link';
-import { 
+import {
     getImageVaultData,
     saveImageVaultData,
     CardStats,
@@ -48,7 +48,7 @@ export default function ImageVault() {
     const [editingMajor, setEditingMajor] = useState<string | null>(null);
     const [newMajorNumber, setNewMajorNumber] = useState('');
     const [newMajorImage, setNewMajorImage] = useState('');
-    
+
     // Analytics State
     const [majorViewMode, setMajorViewMode] = useState<'cards' | 'analytics'>('cards');
     const [selectedCardForStats, setSelectedCardForStats] = useState<string>('');
@@ -97,9 +97,9 @@ export default function ImageVault() {
 
     // Quiz State
     const [quizMode, setQuizMode] = useState<'config' | 'active' | 'result' | null>(null);
-    const [quizConfig, setQuizConfig] = useState({ 
-        count: 999, 
-        type: 'mixed' as 'digits' | 'words' | 'mixed', 
+    const [quizConfig, setQuizConfig] = useState({
+        count: 999,
+        type: 'mixed' as 'digits' | 'words' | 'mixed',
         mode: 'untimed' as 'timed' | 'untimed',
         cardDifficulty: 'all' as 'all' | 'green' | 'yellow' | 'red'
     });
@@ -175,7 +175,7 @@ export default function ImageVault() {
     }, [majorSystem, cardPaoSystem, digitPaoSystem, palaces]);
 
     // ===== PALACE DRILL FUNCTIONS =====
-    
+
     const startPalaceDrillConfig = (palace: Palace) => {
         setSelectedPalaceForDrill(palace);
         setPalaceDrillMode('config');
@@ -477,25 +477,30 @@ export default function ImageVault() {
     const getCardDifficulty = (cardNumber: string): 'green' | 'yellow' | 'red' | 'unknown' => {
         const stats = cardPerformanceStats.get(cardNumber);
         if (!stats || stats.totalAttempts === 0) return 'unknown';
-        
+
         const score = stats.performanceScore;
         if (score >= 75) return 'green';
         if (score >= 50) return 'yellow';
         return 'red';
     };
 
-    const [selectedDifficultyFilters, setSelectedDifficultyFilters] = useState<Set<string>>(new Set(['unknown']));
+    const [selectedDifficultyFilters, setSelectedDifficultyFilters] = useState<Set<string>>(new Set(['unknown', 'green', 'yellow', 'red']));
 
     const toggleDifficultyFilter = (difficulty: string) => {
         // Single-select behavior: only one filter active at a time
-        setSelectedDifficultyFilters(new Set([difficulty]));
+        // 'all' shows everything (unknown + green + yellow + red)
+        if (difficulty === 'all') {
+            setSelectedDifficultyFilters(new Set(['unknown', 'green', 'yellow', 'red']));
+        } else {
+            setSelectedDifficultyFilters(new Set([difficulty]));
+        }
     };
 
     // Search/Filter Functions
     const filteredMajor = majorSystem.filter(e => {
-        const matchesSearch = e.number.includes(searchQuery) || 
-                              e.images?.some(img => img.toLowerCase().includes(searchQuery.toLowerCase()));
-        
+        const matchesSearch = e.number.includes(searchQuery) ||
+            e.images?.some(img => img.toLowerCase().includes(searchQuery.toLowerCase()));
+
         if (!matchesSearch) return false;
 
         const difficulty = getCardDifficulty(e.number);
@@ -533,7 +538,7 @@ export default function ImageVault() {
 
     const startQuiz = () => {
         let pool = [...majorSystem];
-        
+
         // Filter by card difficulty if specified
         if (quizConfig.cardDifficulty !== 'all') {
             pool = pool.filter(card => {
@@ -542,12 +547,12 @@ export default function ImageVault() {
                 return difficulty === quizConfig.cardDifficulty || difficulty === 'unknown';
             });
         }
-        
+
         if (pool.length === 0) {
             alert('No cards found for the selected difficulty level. Try practicing more cards first!');
             return;
         }
-        
+
         // For "All Cards" (999), we test BOTH directions: cards × 2 = questions
         if (quizConfig.count === 999) {
             // Create two copies: one for digits->words, one for words->digits
@@ -558,7 +563,7 @@ export default function ImageVault() {
         } else {
             pool = pool.sort(() => 0.5 - Math.random());
         }
-        
+
         setQuizQueue(pool);
         setQuizStats({ correct: 0, wrong: 0, startTime: Date.now(), endTime: 0 });
         setCardStats(new Map());
@@ -572,13 +577,13 @@ export default function ImageVault() {
             setQuizMode('result');
             return;
         }
-        
+
         const nextCard = queue[0];
         setCurrentQuizCard(nextCard);
         setQuizInput('');
         setQuizFeedback({ status: null, message: '' });
         setCurrentCardStartTime(Date.now());
-        
+
         // Initialize card stats if first time seeing this card
         const cardKey = nextCard.number;
         if (!cardStats.has(cardKey)) {
@@ -588,7 +593,7 @@ export default function ImageVault() {
                 masteredTime: 0
             }));
         }
-        
+
         if (quizConfig.type === 'mixed') {
             setQuizQuestionType(Math.random() > 0.5 ? 'digits' : 'words');
         } else {
@@ -602,11 +607,11 @@ export default function ImageVault() {
 
         const answer = quizInput.trim().toLowerCase();
         if (!answer) return; // Don't submit if input is empty
-        
+
         let isCorrect = false;
         const targetNumber = currentQuizCard.number;
         // Use first image as primary, but check against all
-        const targetWord = currentQuizCard.images?.[0] || '???'; 
+        const targetWord = currentQuizCard.images?.[0] || '???';
 
         if (quizQuestionType === 'digits') {
             // Showed Digits, expect Word
@@ -642,7 +647,7 @@ export default function ImageVault() {
         if (isCorrect) {
             setQuizFeedback({ status: 'correct', message: 'Correct!' });
             setQuizStats(prev => ({ ...prev, correct: prev.correct + 1 }));
-            
+
             // Mark as mastered
             if (stats && stats.masteredTime === 0) {
                 setCardStats(prev => new Map(prev).set(cardKey, {
@@ -651,7 +656,7 @@ export default function ImageVault() {
                     masteredTime: Date.now()
                 }));
             }
-            
+
             setTimeout(() => {
                 const newQueue = quizQueue.slice(1);
                 setQuizQueue(newQueue);
@@ -659,12 +664,12 @@ export default function ImageVault() {
                 setTimeout(() => inputRef.current?.focus(), 100);
             }, 300);
         } else {
-            setQuizFeedback({ 
-                status: 'wrong', 
-                message: `Wrong! It was ${quizQuestionType === 'digits' ? targetWord : targetNumber}` 
+            setQuizFeedback({
+                status: 'wrong',
+                message: `Wrong! It was ${quizQuestionType === 'digits' ? targetWord : targetNumber}`
             });
             setQuizStats(prev => ({ ...prev, wrong: prev.wrong + 1 }));
-            
+
             setTimeout(() => {
                 const newQueue = [...quizQueue.slice(1), currentQuizCard];
                 setQuizQueue(newQueue);
@@ -693,16 +698,16 @@ export default function ImageVault() {
                                 <span style={{ marginRight: '0.5rem' }}>☁️</span>
                                 Cloud Storage Active
                             </div>
-                            <button 
+                            <button
                                 onClick={async () => {
                                     if (confirm('This will overwrite your current data with the default sets. Are you sure?')) {
                                         const { digitPaoList } = await import('@/data/digit-pao');
                                         const { cardPaoList } = await import('@/data/card-pao');
                                         const { majorSystemList } = await import('@/data/major-system');
-                                        
+
                                         const digitEntries = digitPaoList.map(p => ({ id: p.number, ...p }));
                                         const cardEntries = cardPaoList.map(p => ({ id: p.card, ...p }));
-                                        
+
                                         const majorEntries = majorSystemList.map(m => ({
                                             id: m.number,
                                             number: m.number,
@@ -715,7 +720,7 @@ export default function ImageVault() {
                                             majorSystem: majorEntries,
                                             palaces: [] // Keep palaces empty but initialized
                                         });
-                                        
+
                                         // Reload
                                         const data = await getImageVaultData();
                                         if (data) {
@@ -826,13 +831,13 @@ export default function ImageVault() {
                         {quizMode === 'config' && (
                             <div className="glass-panel" style={{ marginBottom: '2rem', padding: '2rem', textAlign: 'center' }}>
                                 <h2 style={{ fontSize: '1.5rem', marginBottom: '1.5rem' }}>Major System Drill</h2>
-                                
+
                                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1.5rem', maxWidth: '1000px', margin: '0 auto 2rem' }}>
                                     <div>
                                         <label style={{ display: 'block', marginBottom: '0.5rem', color: '#cbd5e1' }}>Cards</label>
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                                             {[5, 10, 50, 100].map(n => (
-                                                <button 
+                                                <button
                                                     key={n}
                                                     onClick={() => setQuizConfig(c => ({ ...c, count: n }))}
                                                     className={`btn ${quizConfig.count === n ? 'btn-primary' : ''}`}
@@ -841,7 +846,7 @@ export default function ImageVault() {
                                                     {n}
                                                 </button>
                                             ))}
-                                            <button 
+                                            <button
                                                 onClick={() => setQuizConfig(c => ({ ...c, count: 999 }))}
                                                 className={`btn ${quizConfig.count === 999 ? 'btn-primary' : ''}`}
                                                 style={{ padding: '0.5rem', opacity: quizConfig.count === 999 ? 1 : 0.6 }}
@@ -854,21 +859,21 @@ export default function ImageVault() {
                                     <div>
                                         <label style={{ display: 'block', marginBottom: '0.5rem', color: '#cbd5e1' }}>Drill Type</label>
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                                            <button 
+                                            <button
                                                 onClick={() => setQuizConfig(c => ({ ...c, type: 'digits' }))}
                                                 className={`btn ${quizConfig.type === 'digits' ? 'btn-primary' : ''}`}
                                                 style={{ padding: '0.5rem', opacity: quizConfig.type === 'digits' ? 1 : 0.6 }}
                                             >
                                                 Digits
                                             </button>
-                                            <button 
+                                            <button
                                                 onClick={() => setQuizConfig(c => ({ ...c, type: 'words' }))}
                                                 className={`btn ${quizConfig.type === 'words' ? 'btn-primary' : ''}`}
                                                 style={{ padding: '0.5rem', opacity: quizConfig.type === 'words' ? 1 : 0.6 }}
                                             >
                                                 Words
                                             </button>
-                                            <button 
+                                            <button
                                                 onClick={() => setQuizConfig(c => ({ ...c, type: 'mixed' }))}
                                                 className={`btn ${quizConfig.type === 'mixed' ? 'btn-primary' : ''}`}
                                                 style={{ padding: '0.5rem', opacity: quizConfig.type === 'mixed' ? 1 : 0.6 }}
@@ -881,40 +886,40 @@ export default function ImageVault() {
                                     <div>
                                         <label style={{ display: 'block', marginBottom: '0.5rem', color: '#cbd5e1' }}>Difficulty</label>
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                                            <button 
+                                            <button
                                                 onClick={() => setQuizConfig(c => ({ ...c, cardDifficulty: 'all' }))}
                                                 className={`btn ${quizConfig.cardDifficulty === 'all' ? 'btn-primary' : ''}`}
                                                 style={{ padding: '0.5rem', opacity: quizConfig.cardDifficulty === 'all' ? 1 : 0.6 }}
                                             >
                                                 All
                                             </button>
-                                            <button 
+                                            <button
                                                 onClick={() => setQuizConfig(c => ({ ...c, cardDifficulty: 'green' }))}
                                                 className={`btn ${quizConfig.cardDifficulty === 'green' ? 'btn-primary' : ''}`}
-                                                style={{ 
-                                                    padding: '0.5rem', 
+                                                style={{
+                                                    padding: '0.5rem',
                                                     opacity: quizConfig.cardDifficulty === 'green' ? 1 : 0.6,
                                                     background: quizConfig.cardDifficulty === 'green' ? 'rgba(34, 197, 94, 0.3)' : undefined
                                                 }}
                                             >
                                                 Green
                                             </button>
-                                            <button 
+                                            <button
                                                 onClick={() => setQuizConfig(c => ({ ...c, cardDifficulty: 'yellow' }))}
                                                 className={`btn ${quizConfig.cardDifficulty === 'yellow' ? 'btn-primary' : ''}`}
-                                                style={{ 
-                                                    padding: '0.5rem', 
+                                                style={{
+                                                    padding: '0.5rem',
                                                     opacity: quizConfig.cardDifficulty === 'yellow' ? 1 : 0.6,
                                                     background: quizConfig.cardDifficulty === 'yellow' ? 'rgba(234, 179, 8, 0.3)' : undefined
                                                 }}
                                             >
                                                 Yellow
                                             </button>
-                                            <button 
+                                            <button
                                                 onClick={() => setQuizConfig(c => ({ ...c, cardDifficulty: 'red' }))}
                                                 className={`btn ${quizConfig.cardDifficulty === 'red' ? 'btn-primary' : ''}`}
-                                                style={{ 
-                                                    padding: '0.5rem', 
+                                                style={{
+                                                    padding: '0.5rem',
                                                     opacity: quizConfig.cardDifficulty === 'red' ? 1 : 0.6,
                                                     background: quizConfig.cardDifficulty === 'red' ? 'rgba(239, 68, 68, 0.3)' : undefined
                                                 }}
@@ -927,14 +932,14 @@ export default function ImageVault() {
                                     <div>
                                         <label style={{ display: 'block', marginBottom: '0.5rem', color: '#cbd5e1' }}>Mode</label>
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                                            <button 
+                                            <button
                                                 onClick={() => setQuizConfig(c => ({ ...c, mode: 'untimed' }))}
                                                 className={`btn ${quizConfig.mode === 'untimed' ? 'btn-primary' : ''}`}
                                                 style={{ padding: '0.5rem', opacity: quizConfig.mode === 'untimed' ? 1 : 0.6 }}
                                             >
                                                 Untimed
                                             </button>
-                                            <button 
+                                            <button
                                                 onClick={() => setQuizConfig(c => ({ ...c, mode: 'timed' }))}
                                                 className={`btn ${quizConfig.mode === 'timed' ? 'btn-primary' : ''}`}
                                                 style={{ padding: '0.5rem', opacity: quizConfig.mode === 'timed' ? 1 : 0.6 }}
@@ -957,10 +962,10 @@ export default function ImageVault() {
                                 <div style={{ marginBottom: '1rem', opacity: 0.7 }}>
                                     Remaining: {quizQueue.length} | Wrong Attempts: {quizStats.wrong}
                                 </div>
-                                
-                                <div style={{ 
-                                    fontSize: '4rem', 
-                                    fontWeight: 'bold', 
+
+                                <div style={{
+                                    fontSize: '4rem',
+                                    fontWeight: 'bold',
                                     marginBottom: '1rem',
                                     color: 'var(--primary)',
                                     minHeight: '120px',
@@ -974,8 +979,8 @@ export default function ImageVault() {
                                         {quizQuestionType === 'digits' ? currentQuizCard.number : (currentQuizCard.images?.[0] || '???')}
                                     </div>
                                     {quizFeedback.status === 'wrong' && (
-                                        <div className="animate-fade-in" style={{ 
-                                            fontSize: '1.5rem', 
+                                        <div className="animate-fade-in" style={{
+                                            fontSize: '1.5rem',
                                             color: 'var(--error)',
                                             fontWeight: 'normal'
                                         }}>
@@ -994,17 +999,17 @@ export default function ImageVault() {
                                         onChange={(e) => setQuizInput(e.target.value)}
                                         autoFocus
                                         disabled={!!quizFeedback.status}
-                                        style={{ 
-                                            textAlign: 'center', 
-                                            fontSize: '1rem', 
+                                        style={{
+                                            textAlign: 'center',
+                                            fontSize: '1rem',
                                             marginBottom: '0.75rem',
                                             padding: '0.5rem',
                                             borderColor: quizFeedback.status === 'correct' ? 'var(--success)' : quizFeedback.status === 'wrong' ? 'var(--error)' : undefined
                                         }}
                                     />
-                                    <button 
-                                        type="submit" 
-                                        className="btn btn-primary" 
+                                    <button
+                                        type="submit"
+                                        className="btn btn-primary"
                                         style={{ width: '100%', padding: '0.5rem 1rem', fontSize: '0.95rem' }}
                                         disabled={!!quizFeedback.status}
                                     >
@@ -1013,9 +1018,9 @@ export default function ImageVault() {
                                 </form>
 
                                 {quizFeedback.status && (
-                                    <div className="animate-fade-in" style={{ 
+                                    <div className="animate-fade-in" style={{
                                         marginTop: '1.5rem',
-                                        fontSize: '1.2rem', 
+                                        fontSize: '1.2rem',
                                         fontWeight: 'bold',
                                         color: quizFeedback.status === 'correct' ? 'var(--success)' : 'var(--error)'
                                     }}>
@@ -1070,7 +1075,7 @@ export default function ImageVault() {
                                             })
                                             .map(([cardNum, stats]) => {
                                                 const card = majorSystem.find(c => c.number === cardNum);
-                                                const timeToMaster = stats.masteredTime > 0 
+                                                const timeToMaster = stats.masteredTime > 0
                                                     ? ((stats.masteredTime - stats.firstSeenTime) / 1000).toFixed(1)
                                                     : 'N/A';
                                                 return (
@@ -1098,15 +1103,15 @@ export default function ImageVault() {
                             <>
                                 {/* View Switcher */}
                                 <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '0.5rem' }}>
-                                    <button 
+                                    <button
                                         onClick={() => setMajorViewMode('cards')}
-                                        style={{ 
-                                            opacity: majorViewMode === 'cards' ? 1 : 0.5, 
-                                            fontWeight: majorViewMode === 'cards' ? 'bold' : 'normal', 
-                                            background: 'none', 
-                                            border: 'none', 
-                                            color: 'white', 
-                                            cursor: 'pointer', 
+                                        style={{
+                                            opacity: majorViewMode === 'cards' ? 1 : 0.5,
+                                            fontWeight: majorViewMode === 'cards' ? 'bold' : 'normal',
+                                            background: 'none',
+                                            border: 'none',
+                                            color: 'white',
+                                            cursor: 'pointer',
                                             padding: '0.5rem 1rem',
                                             borderBottom: majorViewMode === 'cards' ? '2px solid var(--primary)' : '2px solid transparent',
                                             transition: 'all 0.2s'
@@ -1114,15 +1119,15 @@ export default function ImageVault() {
                                     >
                                         Cards
                                     </button>
-                                    <button 
+                                    <button
                                         onClick={() => setMajorViewMode('analytics')}
-                                        style={{ 
-                                            opacity: majorViewMode === 'analytics' ? 1 : 0.5, 
-                                            fontWeight: majorViewMode === 'analytics' ? 'bold' : 'normal', 
-                                            background: 'none', 
-                                            border: 'none', 
-                                            color: 'white', 
-                                            cursor: 'pointer', 
+                                        style={{
+                                            opacity: majorViewMode === 'analytics' ? 1 : 0.5,
+                                            fontWeight: majorViewMode === 'analytics' ? 'bold' : 'normal',
+                                            background: 'none',
+                                            border: 'none',
+                                            color: 'white',
+                                            cursor: 'pointer',
                                             padding: '0.5rem 1rem',
                                             borderBottom: majorViewMode === 'analytics' ? '2px solid var(--primary)' : '2px solid transparent',
                                             transition: 'all 0.2s'
@@ -1137,8 +1142,8 @@ export default function ImageVault() {
                                     <h3 style={{ fontSize: '1.1rem' }}>{majorViewMode === 'cards' ? 'Major System Cards' : 'Card Performance History'}</h3>
                                     <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
                                         {/* Time Filter */}
-                                        <select 
-                                            value={timeFilter} 
+                                        <select
+                                            value={timeFilter}
                                             onChange={(e) => setTimeFilter(e.target.value as TimeFilter)}
                                             className="input-field"
                                             style={{ padding: '0.5rem', fontSize: '0.9rem', width: 'auto' }}
@@ -1149,9 +1154,9 @@ export default function ImageVault() {
                                             <option value="1y">This Year</option>
                                             <option value="all">All Time</option>
                                         </select>
-                                        
+
                                         {majorViewMode === 'cards' && (
-                                            <button 
+                                            <button
                                                 onClick={() => setQuizMode('config')}
                                                 className="btn btn-primary"
                                                 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
@@ -1166,56 +1171,65 @@ export default function ImageVault() {
                                     <>
                                         {/* Difficulty Filters */}
                                         <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
-                                            {(['unknown', 'green', 'yellow', 'red'] as const).map(diff => (
-                                                <button
-                                                    key={diff}
-                                                    onClick={() => toggleDifficultyFilter(diff)}
-                                                    style={{
-                                                        padding: '0.4rem 1rem',
-                                                        borderRadius: '999px',
-                                                        border: '1px solid',
-                                                        borderColor: selectedDifficultyFilters.has(diff) ? 'transparent' : 'rgba(255,255,255,0.1)',
-                                                        background: selectedDifficultyFilters.has(diff) 
-                                                            ? (diff === 'green' ? 'rgba(20, 184, 166, 0.35)' : 
-                                                               diff === 'yellow' ? 'rgba(249, 115, 22, 0.35)' : 
-                                                               diff === 'red' ? 'rgba(217, 70, 239, 0.35)' : 
-                                                               'rgba(100, 116, 139, 0.35)')
-                                                            : 'rgba(255,255,255,0.03)',
-                                                        color: selectedDifficultyFilters.has(diff) ? 'white' : 'rgba(255,255,255,0.5)',
-                                                        fontSize: '0.85rem',
-                                                        cursor: 'pointer',
-                                                        transition: 'all 0.2s',
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        gap: '0.4rem'
-                                                    }}
-                                                >
-                                                    <span style={{ 
-                                                        width: '8px', 
-                                                        height: '8px', 
-                                                        borderRadius: '50%', 
-                                                        background: diff === 'green' ? '#14b8a6' : 
-                                                                    diff === 'yellow' ? '#f97316' : 
-                                                                    diff === 'red' ? '#d946ef' : 
-                                                                    '#64748b'
-                                                    }} />
-                                                    {diff === 'unknown' ? 'All' : diff.charAt(0).toUpperCase() + diff.slice(1)}
-                                                </button>
-                                            ))}
+                                            {(['all', 'green', 'yellow', 'red'] as const).map(diff => {
+                                                const isActive = diff === 'all'
+                                                    ? selectedDifficultyFilters.has('unknown') && selectedDifficultyFilters.has('green') && selectedDifficultyFilters.has('yellow') && selectedDifficultyFilters.has('red')
+                                                    : selectedDifficultyFilters.has(diff);
+
+                                                return (
+                                                    <button
+                                                        key={diff}
+                                                        onClick={() => toggleDifficultyFilter(diff)}
+                                                        style={{
+                                                            padding: '0.4rem 1rem',
+                                                            borderRadius: '999px',
+                                                            border: '1px solid',
+                                                            borderColor: isActive ? 'transparent' : 'rgba(255,255,255,0.1)',
+                                                            background: isActive
+                                                                ? (diff === 'green' ? 'rgba(34, 197, 94, 0.35)' :
+                                                                    diff === 'yellow' ? 'rgba(234, 179, 8, 0.35)' :
+                                                                        diff === 'red' ? 'rgba(239, 68, 68, 0.35)' :
+                                                                            'rgba(100, 116, 139, 0.35)')
+                                                                : 'rgba(255,255,255,0.03)',
+                                                            color: isActive ? 'white' : 'rgba(255,255,255,0.5)',
+                                                            fontSize: '0.85rem',
+                                                            cursor: 'pointer',
+                                                            transition: 'all 0.2s',
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            gap: '0.4rem'
+                                                        }}
+                                                    >
+                                                        <span style={{
+                                                            width: '8px',
+                                                            height: '8px',
+                                                            borderRadius: '50%',
+                                                            background: diff === 'green' ? '#22c55e' :
+                                                                diff === 'yellow' ? '#eab308' :
+                                                                    diff === 'red' ? '#ef4444' :
+                                                                        '#64748b'
+                                                        }} />
+                                                        {diff === 'all' ? 'All' :
+                                                            diff === 'green' ? 'Good' :
+                                                                diff === 'yellow' ? 'Okay' :
+                                                                    'Bad'}
+                                                    </button>
+                                                );
+                                            })}
                                         </div>
 
                                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: '1rem' }}>
                                             {filteredMajor.map((entry) => {
                                                 const stats = cardPerformanceStats.get(entry.number);
                                                 const bgColor = getCardPerformanceColor(stats);
-                                                
+
                                                 return (
-                                                    <div 
-                                                        key={entry.id} 
+                                                    <div
+                                                        key={entry.id}
                                                         onClick={() => toggleCardFlip(entry.id)}
                                                         className="glass"
-                                                        style={{ 
-                                                            aspectRatio: '3/4', 
+                                                        style={{
+                                                            aspectRatio: '3/4',
                                                             cursor: 'pointer',
                                                             perspective: '1000px',
                                                             position: 'relative',
@@ -1236,12 +1250,12 @@ export default function ImageVault() {
                                                                 position: 'absolute', width: '100%', height: '100%',
                                                                 backfaceVisibility: 'hidden',
                                                                 WebkitBackfaceVisibility: 'hidden',
-                                                                display: 'flex', 
+                                                                display: 'flex',
                                                                 flexDirection: 'column',
-                                                                alignItems: 'center', 
+                                                                alignItems: 'center',
                                                                 justifyContent: 'center',
                                                                 color: '#ffffff', // Pure white
-                                                                background: bgColor, 
+                                                                background: bgColor,
                                                                 borderRadius: '0.5rem',
                                                                 border: `2px solid ${bgColor !== 'rgba(100, 116, 139, 0.15)' ? bgColor.replace('0.35)', '0.8)') : 'rgba(255,255,255,0.1)'}`,
                                                                 padding: '0.5rem',
@@ -1259,17 +1273,17 @@ export default function ImageVault() {
                                                                 backfaceVisibility: 'hidden',
                                                                 WebkitBackfaceVisibility: 'hidden',
                                                                 transform: 'rotateY(180deg)',
-                                                                display: 'flex', 
+                                                                display: 'flex',
                                                                 flexDirection: 'column',
-                                                                alignItems: 'center', 
+                                                                alignItems: 'center',
                                                                 justifyContent: 'center',
-                                                                fontSize: '0.9rem', 
-                                                                fontWeight: '500', 
+                                                                fontSize: '0.9rem',
+                                                                fontWeight: '500',
                                                                 color: '#ffffff',
-                                                                background: bgColor, 
+                                                                background: bgColor,
                                                                 borderRadius: '0.5rem',
                                                                 border: `2px solid ${bgColor !== 'rgba(100, 116, 139, 0.15)' ? bgColor.replace('0.35)', '0.8)') : 'rgba(255,255,255,0.1)'}`,
-                                                                padding: '0.5rem', 
+                                                                padding: '0.5rem',
                                                                 textAlign: 'center',
                                                                 textShadow: '0 2px 4px rgba(0,0,0,0.5)'
                                                             }}>
@@ -1299,7 +1313,7 @@ export default function ImageVault() {
                                                 );
                                             })}
                                         </div>
-                                        
+
                                         {filteredMajor.length === 0 && (
                                             <div style={{ textAlign: 'center', padding: '3rem', opacity: 0.5 }}>
                                                 No cards found.
@@ -1310,8 +1324,8 @@ export default function ImageVault() {
                                     <div className="glass-panel" style={{ padding: '1.5rem' }}>
                                         <div style={{ marginBottom: '2rem', display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
                                             <label style={{ opacity: 0.8 }}>Select Card:</label>
-                                            <select 
-                                                value={selectedCardForStats} 
+                                            <select
+                                                value={selectedCardForStats}
                                                 onChange={(e) => setSelectedCardForStats(e.target.value)}
                                                 className="input-field"
                                                 style={{ width: 'auto', minWidth: '200px' }}
@@ -1326,27 +1340,27 @@ export default function ImageVault() {
                                                 Total Attempts: {cardHistory.length}
                                             </div>
                                         </div>
-                                        
+
                                         {cardHistory.length > 0 ? (
                                             <div style={{ height: '400px', width: '100%' }}>
                                                 <ResponsiveContainer width="100%" height="100%">
-                                                    <LineChart data={cardHistory.map((h, i) => ({ 
-                                                        attempt: i + 1, 
-                                                        time: h.responseTime / 1000, 
+                                                    <LineChart data={cardHistory.map((h, i) => ({
+                                                        attempt: i + 1,
+                                                        time: h.responseTime / 1000,
                                                         isCorrect: h.isCorrect,
                                                         timestamp: new Date(h.timestamp).toLocaleDateString()
                                                     }))}>
                                                         <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-                                                        <XAxis 
-                                                            dataKey="attempt" 
-                                                            stroke="rgba(255,255,255,0.5)" 
-                                                            label={{ value: 'Attempt #', position: 'insideBottom', offset: -5, fill: 'rgba(255,255,255,0.5)' }} 
+                                                        <XAxis
+                                                            dataKey="attempt"
+                                                            stroke="rgba(255,255,255,0.5)"
+                                                            label={{ value: 'Attempt #', position: 'insideBottom', offset: -5, fill: 'rgba(255,255,255,0.5)' }}
                                                         />
-                                                        <YAxis 
-                                                            stroke="rgba(255,255,255,0.5)" 
-                                                            label={{ value: 'Recall Time (s)', angle: -90, position: 'insideLeft', fill: 'rgba(255,255,255,0.5)' }} 
+                                                        <YAxis
+                                                            stroke="rgba(255,255,255,0.5)"
+                                                            label={{ value: 'Recall Time (s)', angle: -90, position: 'insideLeft', fill: 'rgba(255,255,255,0.5)' }}
                                                         />
-                                                        <Tooltip 
+                                                        <Tooltip
                                                             contentStyle={{ backgroundColor: '#1e293b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '0.5rem' }}
                                                             itemStyle={{ color: '#fff' }}
                                                             formatter={(value: number) => [`${value}s`, 'Time']}
@@ -1357,19 +1371,19 @@ export default function ImageVault() {
                                                                 return `Attempt #${label}`;
                                                             }}
                                                         />
-                                                        <Line 
-                                                            type="monotone" 
-                                                            dataKey="time" 
-                                                            stroke="#8884d8" 
+                                                        <Line
+                                                            type="monotone"
+                                                            dataKey="time"
+                                                            stroke="#8884d8"
                                                             strokeWidth={2}
                                                             dot={(props: any) => {
                                                                 const { cx, cy, payload } = props;
                                                                 return (
-                                                                    <circle 
-                                                                        cx={cx} 
-                                                                        cy={cy} 
-                                                                        r={5} 
-                                                                        fill={payload.isCorrect ? '#10b981' : '#ef4444'} 
+                                                                    <circle
+                                                                        cx={cx}
+                                                                        cy={cy}
+                                                                        r={5}
+                                                                        fill={payload.isCorrect ? '#10b981' : '#ef4444'}
                                                                         stroke="white"
                                                                         strokeWidth={1}
                                                                     />
@@ -1609,14 +1623,14 @@ export default function ImageVault() {
                                 {palaceDrillMode === 'config' && selectedPalaceForDrill && (
                                     <div style={{ maxWidth: '500px', margin: '0 auto', textAlign: 'center' }}>
                                         <h2 style={{ fontSize: '1.5rem', marginBottom: '1.5rem' }}>Drill: {selectedPalaceForDrill.name}</h2>
-                                        
+
                                         <div style={{ marginBottom: '1.5rem', textAlign: 'left' }}>
                                             <label style={{ display: 'block', marginBottom: '0.5rem' }}>Turns (Multiplier)</label>
-                                            <input 
-                                                type="number" 
-                                                min="1" 
-                                                max="10" 
-                                                value={drillTurns} 
+                                            <input
+                                                type="number"
+                                                min="1"
+                                                max="10"
+                                                value={drillTurns}
                                                 onChange={(e) => setDrillTurns(parseInt(e.target.value) || 1)}
                                                 className="input-field"
                                             />
@@ -1627,9 +1641,9 @@ export default function ImageVault() {
 
                                         <div style={{ marginBottom: '1.5rem', textAlign: 'left' }}>
                                             <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
-                                                <input 
-                                                    type="checkbox" 
-                                                    checked={drillIsTimed} 
+                                                <input
+                                                    type="checkbox"
+                                                    checked={drillIsTimed}
                                                     onChange={(e) => setDrillIsTimed(e.target.checked)}
                                                 />
                                                 Timed Mode
@@ -1639,10 +1653,10 @@ export default function ImageVault() {
                                         {drillIsTimed && (
                                             <div style={{ marginBottom: '1.5rem', textAlign: 'left' }}>
                                                 <label style={{ display: 'block', marginBottom: '0.5rem' }}>Time Limit (Seconds)</label>
-                                                <input 
-                                                    type="number" 
-                                                    min="10" 
-                                                    value={drillTimeLimit} 
+                                                <input
+                                                    type="number"
+                                                    min="10"
+                                                    value={drillTimeLimit}
                                                     onChange={(e) => setDrillTimeLimit(parseInt(e.target.value) || 60)}
                                                     className="input-field"
                                                 />
@@ -1661,7 +1675,7 @@ export default function ImageVault() {
                                         <div style={{ fontSize: '1.2rem', marginBottom: '2rem', color: 'var(--accent)' }}>
                                             Location {currentDrillIndex % selectedPalaceForDrill.locations.length + 1}: {selectedPalaceForDrill.locations[currentDrillIndex % selectedPalaceForDrill.locations.length]}
                                         </div>
-                                        
+
                                         <div className="card glass" style={{ padding: '3rem', fontSize: '2.5rem', fontWeight: 'bold', marginBottom: '2rem', display: 'inline-block', minWidth: '300px' }}>
                                             {drillWords[currentDrillIndex]}
                                         </div>
@@ -1686,8 +1700,8 @@ export default function ImageVault() {
                                         </div>
 
                                         <div style={{ marginBottom: '2rem' }}>
-                                            <input 
-                                                type="text" 
+                                            <input
+                                                type="text"
                                                 value={currentRecallInput}
                                                 onChange={(e) => setCurrentRecallInput(e.target.value)}
                                                 onKeyPress={(e) => e.key === 'Enter' && !lastRecallFeedback && submitRecallItem()}
@@ -1700,9 +1714,9 @@ export default function ImageVault() {
                                         </div>
 
                                         {lastRecallFeedback && (
-                                            <div className={`animate-fade-in`} style={{ 
-                                                fontSize: '1.2rem', 
-                                                fontWeight: 'bold', 
+                                            <div className={`animate-fade-in`} style={{
+                                                fontSize: '1.2rem',
+                                                fontWeight: 'bold',
                                                 color: lastRecallFeedback === 'correct' ? '#10b981' : '#ef4444',
                                                 marginBottom: '1rem'
                                             }}>
@@ -1713,7 +1727,7 @@ export default function ImageVault() {
                                         {!lastRecallFeedback && (
                                             <button onClick={submitRecallItem} className="btn btn-primary">Submit</button>
                                         )}
-                                        
+
                                         <div style={{ marginTop: '1rem', opacity: 0.5 }}>
                                             {currentDrillIndex + 1} / {drillWords.length}
                                         </div>
@@ -1723,7 +1737,7 @@ export default function ImageVault() {
                                 {palaceDrillMode === 'result' && palaceStats && (
                                     <div style={{ textAlign: 'center' }}>
                                         <h2 style={{ fontSize: '2rem', marginBottom: '2rem' }}>Drill Complete!</h2>
-                                        
+
                                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
                                             <div className="glass-panel" style={{ padding: '1.5rem' }}>
                                                 <div style={{ fontSize: '0.9rem', opacity: 0.7 }}>Success Rate</div>
@@ -1742,9 +1756,9 @@ export default function ImageVault() {
                                         <h3 style={{ textAlign: 'left', marginBottom: '1rem' }}>Detailed Breakdown</h3>
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', textAlign: 'left' }}>
                                             {drillItemStats.map((stat, idx) => (
-                                                <div key={idx} className="glass-panel" style={{ 
-                                                    padding: '1rem', 
-                                                    display: 'flex', 
+                                                <div key={idx} className="glass-panel" style={{
+                                                    padding: '1rem',
+                                                    display: 'flex',
                                                     justifyContent: 'space-between',
                                                     borderLeft: `4px solid ${stat.isCorrect ? '#10b981' : '#ef4444'}`
                                                 }}>
@@ -1819,7 +1833,7 @@ export default function ImageVault() {
                                                                 {palace.name} ({palace.locations.length} locations)
                                                             </h3>
                                                         )}
-                                                        <button 
+                                                        <button
                                                             onClick={() => startPalaceDrillConfig(palace)}
                                                             className="btn btn-primary"
                                                             style={{ padding: '0.25rem 0.75rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}

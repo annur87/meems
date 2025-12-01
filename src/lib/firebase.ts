@@ -16,13 +16,13 @@ export const getCardHistory = async (
         const attemptsRef = collection(db, 'major_system_attempts', userId, 'attempts');
         // Fetch by card number, sort in memory to avoid index requirement issues
         const q = query(attemptsRef, where('cardNumber', '==', cardNumber));
-        
+
         const snapshot = await getDocs(q);
         let attempts = snapshot.docs.map(doc => doc.data() as CardAttempt);
-        
+
         // Sort by timestamp ascending
         attempts.sort((a, b) => a.timestamp - b.timestamp);
-        
+
         // Filter by time
         if (timeFilter && timeFilter !== 'all') {
             const now = Date.now();
@@ -31,10 +31,10 @@ export const getCardHistory = async (
             else if (timeFilter === '1w') cutoff = now - 7 * 24 * 60 * 60 * 1000;
             else if (timeFilter === '1m') cutoff = now - 30 * 24 * 60 * 60 * 1000;
             else if (timeFilter === '1y') cutoff = now - 365 * 24 * 60 * 60 * 1000;
-            
+
             attempts = attempts.filter(a => a.timestamp >= cutoff);
         }
-        
+
         return attempts;
     } catch (error) {
         console.error('Error fetching card history:', error);
@@ -266,7 +266,7 @@ export const getImageVaultData = async (): Promise<ImageVaultData | null> => {
 export const bootstrapDigitPaoSystem = async (defaultData: DigitPaoEntry[]) => {
     try {
         const currentData = await getImageVaultData();
-        
+
         const updates: Partial<ImageVaultData> = {};
         let needsUpdate = false;
 
@@ -333,7 +333,7 @@ export const getFavorites = async (userId: string = USER_ID): Promise<string[]> 
         }
         const docRef = doc(db, 'training_favorites', userId);
         const docSnap = await getDoc(docRef);
-        
+
         if (docSnap.exists()) {
             const data = docSnap.data();
             return data.favorites || [];
@@ -388,7 +388,7 @@ export const saveCardAttempt = async (attempt: CardAttempt, userId: string = USE
             console.warn("Firebase config missing. Card attempt not saved.");
             return false;
         }
-        
+
         const attemptsRef = collection(db, 'major_system_attempts', userId, 'attempts');
         await addDoc(attemptsRef, attempt);
         return true;
@@ -399,7 +399,7 @@ export const saveCardAttempt = async (attempt: CardAttempt, userId: string = USE
 };
 
 export const getCardStats = async (
-    userId: string = USER_ID, 
+    userId: string = USER_ID,
     timeFilter?: '1d' | '1w' | '1m' | '1y' | 'all'
 ): Promise<Map<string, CardStats>> => {
     try {
@@ -428,7 +428,7 @@ export const getCardStats = async (
         const attempts: CardAttempt[] = snapshot.docs.map(doc => doc.data() as CardAttempt);
 
         // Apply time filter in memory if needed
-        const filteredAttempts = timeFilter && timeFilter !== 'all' 
+        const filteredAttempts = timeFilter && timeFilter !== 'all'
             ? attempts.filter(a => {
                 const now = Date.now();
                 const timeRanges = {
@@ -443,15 +443,15 @@ export const getCardStats = async (
 
         // Calculate stats per card
         const statsMap = new Map<string, CardStats>();
-        
+
         filteredAttempts.forEach(attempt => {
             const existing = statsMap.get(attempt.cardNumber);
-            
+
             if (existing) {
                 const newTotal = existing.totalAttempts + 1;
                 const newMistakes = existing.mistakes + (attempt.isCorrect ? 0 : 1);
                 const newAvgTime = ((existing.averageTime * existing.totalAttempts) + attempt.responseTime) / newTotal;
-                
+
                 statsMap.set(attempt.cardNumber, {
                     cardNumber: attempt.cardNumber,
                     totalAttempts: newTotal,
@@ -483,17 +483,17 @@ export const getCardStats = async (
 // Factors: accuracy (70%), speed (30%)
 const calculatePerformanceScore = (totalAttempts: number, mistakes: number, avgTime: number): number => {
     if (totalAttempts === 0) return 50; // neutral score for no data
-    
+
     const accuracy = ((totalAttempts - mistakes) / totalAttempts) * 100;
-    
+
     // Speed score: faster is better, normalize to 0-100
     // Assume 5 seconds is perfect (100), 15 seconds is poor (0)
     const avgTimeSeconds = avgTime / 1000;
     const speedScore = Math.max(0, Math.min(100, 100 - ((avgTimeSeconds - 5) / 10) * 100));
-    
+
     // Weighted combination: 70% accuracy, 30% speed
     const score = (accuracy * 0.7) + (speedScore * 0.3);
-    
+
     return Math.round(score);
 };
 
@@ -501,20 +501,20 @@ export const getCardPerformanceColor = (stats: CardStats | undefined): string =>
     if (!stats || stats.totalAttempts === 0) {
         return 'rgba(100, 116, 139, 0.15)'; // faint gray for no data
     }
-    
+
     const score = stats.performanceScore;
-    
-    // Cyan-Green: 75-100 (well memorized) - Teal/Cyan-Green
+
+    // Green: 75-100 (well memorized) - Good performance
     if (score >= 75) {
-        return 'rgba(20, 184, 166, 0.35)'; // Teal 500
+        return 'rgba(34, 197, 94, 0.35)'; // Green 500
     }
-    // Orange: 50-74 (medium) - Orange 500
+    // Yellow: 50-74 (medium) - Okay performance
     else if (score >= 50) {
-        return 'rgba(249, 115, 22, 0.35)'; // Orange 500
+        return 'rgba(234, 179, 8, 0.35)'; // Yellow 500
     }
-    // Violet-Red: 0-49 (difficult) - Fuchsia/Purple-Red
+    // Red: 0-49 (difficult) - Bad performance
     else {
-        return 'rgba(217, 70, 239, 0.35)'; // Fuchsia 500
+        return 'rgba(239, 68, 68, 0.35)'; // Red 500
     }
 };
 
@@ -556,7 +556,7 @@ export interface PalaceStats {
 export const savePalaceAttempt = async (attempt: PalaceAttempt, userId: string = USER_ID): Promise<boolean> => {
     try {
         if (!firebaseConfig.apiKey) return false;
-        
+
         const attemptsRef = collection(db, 'memory_palace_attempts', userId, 'attempts');
         await addDoc(attemptsRef, attempt);
         return true;
@@ -581,9 +581,9 @@ export const getPalaceStats = async (palaceId: string, userId: string = USER_ID)
         const attemptsRef = collection(db, 'memory_palace_attempts', userId, 'attempts');
         const q = query(attemptsRef, where('palaceId', '==', palaceId));
         const snapshot = await getDocs(q);
-        
+
         const attempts = snapshot.docs.map(doc => doc.data() as PalaceAttempt);
-        
+
         if (attempts.length === 0) {
             return {
                 palaceId,
@@ -602,7 +602,7 @@ export const getPalaceStats = async (palaceId: string, userId: string = USER_ID)
         attempts.forEach(attempt => {
             const successRate = (attempt.correctCount / attempt.totalWords) * 100;
             totalSuccessRate += successRate;
-            
+
             attempt.itemStats.forEach(item => {
                 totalRecallTime += item.recallTime;
                 totalItems++;
@@ -617,7 +617,7 @@ export const getPalaceStats = async (palaceId: string, userId: string = USER_ID)
 
                 const locStat = locationStats[item.locationIndex];
                 const totalLocTime = (locStat.avgRetrievalTime * locStat.timesUsed) + item.recallTime;
-                
+
                 locStat.timesUsed++;
                 if (!item.isCorrect) locStat.timesFailed++;
                 locStat.avgRetrievalTime = totalLocTime / locStat.timesUsed;

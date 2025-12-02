@@ -105,7 +105,7 @@ export default function ImageVault() {
         turns: 1,
         type: 'mixed' as 'digits' | 'words' | 'mixed',
         mode: 'untimed' as 'timed' | 'untimed',
-        cardDifficulty: 'all' as 'all' | 'green' | 'yellow' | 'red'
+        cardDifficulty: 'all' as 'all' | 'mastered' | 'green' | 'yellow' | 'red'
     });
     const [quizQueue, setQuizQueue] = useState<MajorEntry[]>([]);
     const [currentQuizCard, setCurrentQuizCard] = useState<MajorEntry | null>(null);
@@ -521,9 +521,14 @@ export default function ImageVault() {
 
     // Search/Filter Functions
     // Helper to get card difficulty category
-    const getCardDifficulty = (cardNumber: string): 'green' | 'yellow' | 'red' | 'unknown' => {
+    const getCardDifficulty = (cardNumber: string): 'mastered' | 'green' | 'yellow' | 'red' | 'unknown' => {
         const stats = cardPerformanceStats.get(cardNumber);
         if (!stats || stats.totalAttempts === 0) return 'unknown';
+
+        const avgTimeInSeconds = stats.averageTime / 1000;
+        
+        // Mastered: 0 mistakes AND average time < 2 seconds
+        if (stats.mistakes === 0 && avgTimeInSeconds < 2) return 'mastered';
 
         const score = stats.performanceScore;
         if (score >= 75) return 'green';
@@ -531,13 +536,13 @@ export default function ImageVault() {
         return 'red';
     };
 
-    const [selectedDifficultyFilters, setSelectedDifficultyFilters] = useState<Set<string>>(new Set(['unknown', 'green', 'yellow', 'red']));
+    const [selectedDifficultyFilters, setSelectedDifficultyFilters] = useState<Set<string>>(new Set(['unknown', 'mastered', 'green', 'yellow', 'red']));
 
     const toggleDifficultyFilter = (difficulty: string) => {
         // Single-select behavior: only one filter active at a time
-        // 'all' shows everything (unknown + green + yellow + red)
+        // 'all' shows everything (unknown + mastered + green + yellow + red)
         if (difficulty === 'all') {
-            setSelectedDifficultyFilters(new Set(['unknown', 'green', 'yellow', 'red']));
+            setSelectedDifficultyFilters(new Set(['unknown', 'mastered', 'green', 'yellow', 'red']));
         } else {
             setSelectedDifficultyFilters(new Set([difficulty]));
         }
@@ -1064,6 +1069,18 @@ export default function ImageVault() {
                                                 All
                                             </button>
                                             <button
+                                                onClick={() => setQuizConfig(c => ({ ...c, cardDifficulty: 'mastered' }))}
+                                                className={`btn ${quizConfig.cardDifficulty === 'mastered' ? 'btn-primary' : ''}`}
+                                                style={{
+                                                    padding: '0.5rem',
+                                                    opacity: quizConfig.cardDifficulty === 'mastered' ? 1 : 0.6,
+                                                    background: quizConfig.cardDifficulty === 'mastered' ? 'linear-gradient(135deg, rgba(251, 191, 36, 0.4) 0%, rgba(245, 158, 11, 0.4) 100%)' : undefined,
+                                                    boxShadow: quizConfig.cardDifficulty === 'mastered' ? '0 0 10px rgba(251, 191, 36, 0.3)' : undefined
+                                                }}
+                                            >
+                                                ⭐ Mastered
+                                            </button>
+                                            <button
                                                 onClick={() => setQuizConfig(c => ({ ...c, cardDifficulty: 'green' }))}
                                                 className={`btn ${quizConfig.cardDifficulty === 'green' ? 'btn-primary' : ''}`}
                                                 style={{
@@ -1366,9 +1383,9 @@ export default function ImageVault() {
                                     <>
                                         {/* Difficulty Filters */}
                                         <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
-                                            {(['all', 'green', 'yellow', 'red'] as const).map(diff => {
+                                            {(['all', 'mastered', 'green', 'yellow', 'red'] as const).map(diff => {
                                                 const isActive = diff === 'all'
-                                                    ? selectedDifficultyFilters.has('unknown') && selectedDifficultyFilters.has('green') && selectedDifficultyFilters.has('yellow') && selectedDifficultyFilters.has('red')
+                                                    ? selectedDifficultyFilters.has('unknown') && selectedDifficultyFilters.has('mastered') && selectedDifficultyFilters.has('green') && selectedDifficultyFilters.has('yellow') && selectedDifficultyFilters.has('red')
                                                     : selectedDifficultyFilters.has(diff);
 
                                                 // Calculate card count for this difficulty
@@ -1399,7 +1416,8 @@ export default function ImageVault() {
                                                             border: '1px solid',
                                                             borderColor: isActive ? 'transparent' : 'rgba(255,255,255,0.1)',
                                                             background: isActive
-                                                                ? (diff === 'green' ? 'rgba(34, 197, 94, 0.35)' :
+                                                                ? (diff === 'mastered' ? 'linear-gradient(135deg, rgba(251, 191, 36, 0.5) 0%, rgba(245, 158, 11, 0.5) 100%)' :
+                                                                    diff === 'green' ? 'rgba(34, 197, 94, 0.35)' :
                                                                     diff === 'yellow' ? 'rgba(234, 179, 8, 0.35)' :
                                                                         diff === 'red' ? 'rgba(239, 68, 68, 0.35)' :
                                                                             'rgba(100, 116, 139, 0.35)')
@@ -1410,19 +1428,23 @@ export default function ImageVault() {
                                                             transition: 'all 0.2s',
                                                             display: 'flex',
                                                             alignItems: 'center',
-                                                            gap: '0.4rem'
+                                                            gap: '0.4rem',
+                                                            boxShadow: diff === 'mastered' && isActive ? '0 0 15px rgba(251, 191, 36, 0.4)' : 'none'
                                                         }}
                                                     >
                                                         <span style={{
                                                             width: '8px',
                                                             height: '8px',
                                                             borderRadius: '50%',
-                                                            background: diff === 'green' ? '#22c55e' :
+                                                            background: diff === 'mastered' ? 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)' :
+                                                                diff === 'green' ? '#22c55e' :
                                                                 diff === 'yellow' ? '#eab308' :
                                                                     diff === 'red' ? '#ef4444' :
-                                                                        '#64748b'
+                                                                        '#64748b',
+                                                            boxShadow: diff === 'mastered' ? '0 0 8px rgba(251, 191, 36, 0.6)' : 'none'
                                                         }} />
                                                         {diff === 'all' ? 'All' :
+                                                            diff === 'mastered' ? 'Mastered' :
                                                             diff === 'green' ? 'Good' :
                                                                 diff === 'yellow' ? 'Okay' :
                                                                     'Bad'}

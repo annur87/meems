@@ -503,9 +503,14 @@ export const getCardPerformanceColor = (stats: CardStats | undefined): string =>
     }
 
     const score = stats.performanceScore;
+    const avgTimeInSeconds = stats.averageTime / 1000;
 
+    // Mastered: 0 mistakes AND average time < 2 seconds - Golden tier
+    if (stats.mistakes === 0 && avgTimeInSeconds < 2) {
+        return 'linear-gradient(135deg, rgba(251, 191, 36, 0.45) 0%, rgba(245, 158, 11, 0.45) 100%)'; // Golden gradient
+    }
     // Green: 75-100 (well memorized) - Good performance
-    if (score >= 75) {
+    else if (score >= 75) {
         return 'rgba(34, 197, 94, 0.35)'; // Green 500
     }
     // Yellow: 50-74 (medium) - Okay performance

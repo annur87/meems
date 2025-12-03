@@ -932,7 +932,7 @@ export const getTimeStats = async (
 // Get session history
 export const getSessionHistory = async (
     userId: string = USER_ID,
-    timeFilter?: '12h' | '1d' | '1w' | '1m' | '1y' | 'all',
+    timeFilter?: '1h' | '2h' | '12h' | '1d' | '1w' | '1m' | '1y' | 'all',
     exerciseType?: string
 ): Promise<TrainingSession[]> => {
     try {

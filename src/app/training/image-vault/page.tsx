@@ -28,7 +28,9 @@ import {
     startTrainingSession,
     endTrainingSession,
     getTimeStats,
-    type TimeStats
+    type TimeStats,
+    getSessionHistory,
+    type TrainingSession
 } from '@/lib/firebase';
 import { majorSystemList } from '@/data/major-system';
 import { cardPaoList } from '@/data/card-pao';
@@ -49,6 +51,7 @@ export default function ImageVault() {
     const [searchQuery, setSearchQuery] = useState('');
     const [timeFilter, setTimeFilter] = useState<TimeFilter>('all');
     const [cardPerformanceStats, setCardPerformanceStats] = useState<Map<string, CardStats>>(new Map());
+    const [sessionHistory, setSessionHistory] = useState<TrainingSession[]>([]);
 
     // Major System
     const [majorSystem, setMajorSystem] = useState<MajorEntry[]>([]);
@@ -175,6 +178,11 @@ export default function ImageVault() {
 
     // Load stats when mode changes or time filter changes
     useEffect(() => {
+        const loadSessionHistory = async () => {
+            const sessions = await getSessionHistory(userId, timeFilter);
+            setSessionHistory(sessions);
+        };
+
         const loadStats = async () => {
             if (majorViewMode === 'cards') {
                 const stats = await getCardStats(userId, timeFilter);
@@ -183,6 +191,8 @@ export default function ImageVault() {
                 // Load global stats
                 const gStats = await getGlobalDailyStats(userId, timeFilter);
                 setGlobalStats(gStats);
+                // Load session history
+                await loadSessionHistory();
             }
         };
         loadStats();
@@ -317,13 +327,17 @@ export default function ImageVault() {
     const finishPalaceDrill = async (finalStats: PalaceItemStat[]) => {
         if (!selectedPalaceForDrill) return;
 
-        // End tracking session
-        endCurrentSession(true);
-
         const endTime = Date.now();
         const memorizeTime = recallStartTime - memorizeStartTime;
         const recallTime = endTime - recallStartTime;
         const correctCount = finalStats.filter(s => s.isCorrect).length;
+
+        // End tracking session with stats
+        endCurrentSession(true, {
+            correct: correctCount,
+            wrong: finalStats.length - correctCount,
+            total: finalStats.length
+        });
 
         const attempt: PalaceAttempt = {
             palaceId: selectedPalaceForDrill.id,
@@ -537,14 +551,14 @@ export default function ImageVault() {
 
     // Search/Filter Functions
     // Helper to get card difficulty category
-    const getCardDifficulty = (cardNumber: string): 'platinum' | 'gold' | 'silver' | 'bronze' | 'unknown' => {
+    const getCardDifficulty = (cardNumber: string): 'diamond' | 'gold' | 'silver' | 'bronze' | 'unknown' => {
         const stats = cardPerformanceStats.get(cardNumber);
         if (!stats || stats.totalAttempts === 0) return 'unknown';
 
         const avgTimeInSeconds = stats.averageTime / 1000;
         
-        // Platinum: 0 mistakes AND average time < 2 seconds
-        if (stats.mistakes === 0 && avgTimeInSeconds < 2) return 'platinum';
+        // Diamond: 0 mistakes AND average time < 2 seconds
+        if (stats.mistakes === 0 && avgTimeInSeconds < 2) return 'diamond';
 
         const score = stats.performanceScore;
         if (score >= 75) return 'gold';
@@ -552,13 +566,13 @@ export default function ImageVault() {
         return 'bronze';
     };
 
-    const [selectedDifficultyFilters, setSelectedDifficultyFilters] = useState<Set<string>>(new Set(['unknown', 'platinum', 'gold', 'silver', 'bronze']));
+    const [selectedDifficultyFilters, setSelectedDifficultyFilters] = useState<Set<string>>(new Set(['unknown', 'diamond', 'gold', 'silver', 'bronze']));
 
     const toggleDifficultyFilter = (difficulty: string) => {
         // Single-select behavior: only one filter active at a time
-        // 'all' shows everything (unknown + platinum + gold + silver + bronze)
+        // 'all' shows everything (unknown + diamond + gold + silver + bronze)
         if (difficulty === 'all') {
-            setSelectedDifficultyFilters(new Set(['unknown', 'platinum', 'gold', 'silver', 'bronze']));
+            setSelectedDifficultyFilters(new Set(['unknown', 'diamond', 'gold', 'silver', 'bronze']));
         } else {
             setSelectedDifficultyFilters(new Set([difficulty]));
         }
@@ -604,9 +618,10 @@ export default function ImageVault() {
 
 
 
-    const endCurrentSession = (completed: boolean) => {
+    const endCurrentSession = (completed: boolean, customStats?: any) => {
         if (currentSessionId) {
-            endTrainingSession(currentSessionId, userId, completed, { stats: quizStats });
+            const statsToSave = customStats || quizStats;
+            endTrainingSession(currentSessionId, userId, completed, { stats: statsToSave });
             setCurrentSessionId(null);
         }
     };
@@ -1522,28 +1537,28 @@ export default function ImageVault() {
                                                     
                                                     if (stats.mistakes === 0 && avgTimeInSeconds < 2) {
                                                         tier = 'diamond';
-                                                        // Diamond: Reference "Diamond Sparkle" colors - Icy blue/white
-                                                        solidBgColor = 'linear-gradient(135deg, #B9F2FF 0%, #F3FBFF 50%, #B9F2FF 100%)';
-                                                        boxShadow = '0 0 15px rgba(0, 215, 255, 0.6)'; // Vivid Sky Blue glow
-                                                        border = '1px solid rgba(233, 254, 255, 0.8)'; // Bubbles border
+                                                        // Diamond: Soft glowing silver (not too bright)
+                                                        solidBgColor = 'linear-gradient(135deg, #d1d5db 0%, #f3f4f6 50%, #d1d5db 100%)';
+                                                        boxShadow = '0 0 12px rgba(209, 213, 219, 0.5)'; // Soft silver glow
+                                                        border = '1px solid rgba(229, 231, 235, 0.6)';
                                                     } else if (score >= 75) {
                                                         tier = 'gold';
-                                                        // Gold: Darker gold gradient, soft glow, no border
-                                                        solidBgColor = 'linear-gradient(135deg, #b45309 0%, #fbbf24 50%, #b45309 100%)';
-                                                        boxShadow = '0 0 15px rgba(251, 191, 36, 0.4)';
+                                                        // Gold: Vibrant gold (most colorful)
+                                                        solidBgColor = 'linear-gradient(135deg, #d97706 0%, #fbbf24 50%, #d97706 100%)';
+                                                        boxShadow = '0 0 10px rgba(217, 119, 6, 0.3)';
                                                         border = 'none';
                                                     } else if (score >= 50) {
                                                         tier = 'silver';
-                                                        // Silver: Solid silver color, no border
-                                                        solidBgColor = 'linear-gradient(135deg, #cbd5e1 0%, #94a3b8 50%, #cbd5e1 100%)';
+                                                        // Silver: Slightly muted silver-grey
+                                                        solidBgColor = 'linear-gradient(135deg, #9ca3af 0%, #d1d5db 50%, #9ca3af 100%)';
                                                         boxShadow = 'none';
                                                         border = 'none';
                                                     } else {
                                                         tier = 'bronze';
-                                                        // Bronze: Solid bronze color with subtle border
-                                                        solidBgColor = 'linear-gradient(135deg, #cd7f32 0%, #b45309 50%, #cd7f32 100%)';
+                                                        // Bronze: Muted grey-brown (least colorful)
+                                                        solidBgColor = 'linear-gradient(135deg, #78716c 0%, #a8a29e 50%, #78716c 100%)';
                                                         boxShadow = 'none';
-                                                        border = '1px solid rgba(205, 127, 50, 0.3)';
+                                                        border = '1px solid rgba(120, 113, 108, 0.2)';
                                                     }
                                                 }
 
@@ -1703,7 +1718,7 @@ export default function ImageVault() {
                                             </div>
                                             
                                             {globalStats.length > 0 ? (
-                                                <div style={{ height: '400px', width: '100%' }}>
+                                                <div style={{ height: '400px', width: '100%', minHeight: '400px' }}>
                                                     <ResponsiveContainer width="100%" height="100%">
                                                         <ComposedChart data={(() => {
                                                             // Merge global and card stats by date
@@ -1749,7 +1764,11 @@ export default function ImageVault() {
                                                             <Tooltip
                                                                 contentStyle={{ backgroundColor: '#1e293b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '0.5rem' }}
                                                                 itemStyle={{ color: '#fff' }}
-                                                                formatter={(value: number, name: string) => {
+                                                                formatter={(value: any, name: string) => {
+                                                                    // Handle null/undefined values
+                                                                    if (value === null || value === undefined || typeof value !== 'number') {
+                                                                        return ['N/A', name];
+                                                                    }
                                                                     if (name.includes('ErrorRate')) {
                                                                         return [`${value.toFixed(1)}%`, name.replace('globalErrorRate', 'Global Error Rate').replace('cardErrorRate', `Card ${selectedCardForStats} Error Rate`)];
                                                                     }
@@ -1809,6 +1828,68 @@ export default function ImageVault() {
                                             ) : (
                                                 <div style={{ height: '300px', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0.5 }}>
                                                     No data available for the selected time range.
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Session History List */}
+                                        <div className="glass-panel" style={{ padding: '1.5rem', marginBottom: '1.5rem' }}>
+                                            <h4 style={{ fontSize: '1rem', marginBottom: '1.5rem', opacity: 0.9 }}>Session History</h4>
+                                            
+                                            {sessionHistory.length > 0 ? (
+                                                <div className="space-y-6">
+                                                    {Object.entries(sessionHistory.reduce((acc, session) => {
+                                                        const date = new Date(session.startTime).toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+                                                        if (!acc[date]) acc[date] = [];
+                                                        acc[date].push(session);
+                                                        return acc;
+                                                    }, {} as Record<string, TrainingSession[]>)).map(([date, sessions]) => (
+                                                        <div key={date}>
+                                                            <h5 style={{ fontSize: '0.9rem', opacity: 0.7, marginBottom: '0.75rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '0.5rem' }}>{date}</h5>
+                                                            <div className="space-y-3">
+                                                                {sessions.map(session => (
+                                                                    <div key={session.sessionId} style={{ 
+                                                                        background: 'rgba(255,255,255,0.03)', 
+                                                                        borderRadius: '0.5rem', 
+                                                                        padding: '1rem',
+                                                                        display: 'flex',
+                                                                        justifyContent: 'space-between',
+                                                                        alignItems: 'center'
+                                                                    }}>
+                                                                        <div>
+                                                                            <div style={{ fontWeight: 500, marginBottom: '0.25rem' }}>
+                                                                                {session.exerciseType === 'major-drill' ? 'Major System Drill' : 
+                                                                                 session.exerciseType === 'palace-drill' ? 'Memory Palace Drill' : 
+                                                                                 session.exerciseType}
+                                                                            </div>
+                                                                            <div style={{ fontSize: '0.8rem', opacity: 0.6 }}>
+                                                                                {new Date(session.startTime).toLocaleTimeString()} • {formatDuration(session.duration || 0)}
+                                                                                {session.exerciseType === 'major-drill' && session.metadata?.config && ` • ${session.metadata.config.type} • ${session.metadata.config.cardDifficulty}`}
+                                                                                {session.exerciseType === 'palace-drill' && session.metadata && ` • ${session.metadata.turns} turns • ${session.metadata.timed ? 'Timed' : 'Untimed'}`}
+                                                                            </div>
+                                                                        </div>
+                                                                        <div style={{ textAlign: 'right' }}>
+                                                                            <div style={{ 
+                                                                                color: session.metadata?.stats?.wrong === 0 ? '#10b981' : '#ef4444',
+                                                                                fontWeight: 600
+                                                                            }}>
+                                                                                {session.metadata?.stats ? (
+                                                                                    `${Math.round((session.metadata.stats.correct / (session.metadata.stats.correct + session.metadata.stats.wrong)) * 100)}%`
+                                                                                ) : 'N/A'}
+                                                                            </div>
+                                                                            <div style={{ fontSize: '0.8rem', opacity: 0.6 }}>
+                                                                                {session.metadata?.stats?.wrong || 0} errors ({session.metadata?.stats ? Math.round((session.metadata.stats.wrong / (session.metadata.stats.correct + session.metadata.stats.wrong)) * 100) : 0}%)
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <div style={{ opacity: 0.5, textAlign: 'center', padding: '2rem' }}>
+                                                    No session history found.
                                                 </div>
                                             )}
                                         </div>

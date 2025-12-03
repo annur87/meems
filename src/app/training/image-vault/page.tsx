@@ -102,6 +102,7 @@ export default function ImageVault() {
     // Memory Palaces
     const [palaces, setPalaces] = useState<Palace[]>([]);
     const [editingPalace, setEditingPalace] = useState<string | null>(null);
+    const [activeLocationInput, setActiveLocationInput] = useState<string | null>(null);
     const [newPalaceName, setNewPalaceName] = useState('');
     const [newLocation, setNewLocation] = useState('');
 
@@ -2681,10 +2682,11 @@ export default function ImageVault() {
                                                         type="text"
                                                         className="input-field"
                                                         placeholder="Add new location..."
-                                                        value={editingPalace === palace.id ? newLocation : ''}
+                                                        value={activeLocationInput === palace.id ? newLocation : ''}
                                                         onChange={(e) => setNewLocation(e.target.value)}
                                                         onKeyPress={(e) => e.key === 'Enter' && addLocation(palace.id)}
-                                                        onFocus={() => setEditingPalace(palace.id)}
+                                                        onFocus={() => setActiveLocationInput(palace.id)}
+                                                        onBlur={() => setActiveLocationInput(null)}
                                                         style={{ padding: '0.5rem' }}
                                                     />
                                                     <button

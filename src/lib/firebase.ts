@@ -91,7 +91,12 @@ export interface GameResult {
 export interface MajorEntry {
     id: string;
     number: string;
-    images: string[];
+    // Legacy support - keep for backward compatibility
+    images?: string[];
+    // New PAO-style structure
+    persons: string[];
+    actions: string[];
+    objects: string[];
 }
 
 export interface PaoEntry {

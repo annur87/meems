@@ -57,7 +57,11 @@ export default function ImageVault() {
     const [majorSystem, setMajorSystem] = useState<MajorEntry[]>([]);
     const [editingMajor, setEditingMajor] = useState<string | null>(null);
     const [newMajorNumber, setNewMajorNumber] = useState('');
-    const [newMajorImage, setNewMajorImage] = useState('');
+    // New PAO-style inputs
+    const [newMajorPerson, setNewMajorPerson] = useState('');
+    const [newMajorAction, setNewMajorAction] = useState('');
+    const [newMajorObject, setNewMajorObject] = useState('');
+    const [majorEditCategory, setMajorEditCategory] = useState<'persons' | 'actions' | 'objects'>('persons');
 
     // Analytics State
     const [majorViewMode, setMajorViewMode] = useState<'cards' | 'analytics'>('cards');
@@ -116,6 +120,7 @@ export default function ImageVault() {
     const [quizQueue, setQuizQueue] = useState<MajorEntry[]>([]);
     const [currentQuizCard, setCurrentQuizCard] = useState<MajorEntry | null>(null);
     const [quizQuestionType, setQuizQuestionType] = useState<'digits' | 'words'>('digits');
+    const [quizPromptWord, setQuizPromptWord] = useState('');
     const [quizInput, setQuizInput] = useState('');
     const [quizStats, setQuizStats] = useState({ correct: 0, wrong: 0, startTime: 0, endTime: 0 });
     const [quizFeedback, setQuizFeedback] = useState<{ status: 'correct' | 'wrong' | null, message: string }>({ status: null, message: '' });
@@ -165,7 +170,7 @@ export default function ImageVault() {
                 // Initialize with sample data if no cloud data exists (or handle empty state)
                 // For now, we'll just leave them empty or rely on the bootstrap logic from TrainingHub
                 // But if we want to be safe:
-                setMajorSystem(SAMPLE_MAJOR_SYSTEM.map(entry => ({ ...entry, images: [...entry.images] })));
+                setMajorSystem([...SAMPLE_MAJOR_SYSTEM]);
                 // We don't load sample PAO here to avoid overwriting the bootstrapped data potentially
             }
         };
@@ -357,40 +362,102 @@ export default function ImageVault() {
         setPalaceDrillMode('result');
     };
 
-    // Major System Functions
-    const addMajorEntry = () => {
-        if (!newMajorNumber || !newMajorImage) return;
-
-        const existing = majorSystem.find(e => e.number === newMajorNumber);
+    // Major System Functions - PAO Style
+    const addMajorPerson = (number: string, person: string) => {
+        if (!person.trim()) return;
+        
+        const existing = majorSystem.find(e => e.number === number);
         if (existing) {
-            // Add to existing number
             setMajorSystem(majorSystem.map(e =>
-                e.number === newMajorNumber
-                    ? { ...e, images: [...e.images, newMajorImage] }
+                e.number === number
+                    ? { ...e, persons: [...(e.persons || []), person.trim()] }
                     : e
             ));
         } else {
-            // Create new entry
             const newEntry: MajorEntry = {
                 id: Date.now().toString(),
-                number: newMajorNumber,
-                images: [newMajorImage]
+                number,
+                persons: [person.trim()],
+                actions: [],
+                objects: []
             };
             setMajorSystem([...majorSystem, newEntry].sort((a, b) => parseInt(a.number) - parseInt(b.number)));
         }
-
-        setNewMajorNumber('');
-        setNewMajorImage('');
     };
 
-    const deleteMajorImage = (number: string, image: string) => {
+    const addMajorAction = (number: string, action: string) => {
+        if (!action.trim()) return;
+        
+        const existing = majorSystem.find(e => e.number === number);
+        if (existing) {
+            setMajorSystem(majorSystem.map(e =>
+                e.number === number
+                    ? { ...e, actions: [...(e.actions || []), action.trim()] }
+                    : e
+            ));
+        } else {
+            const newEntry: MajorEntry = {
+                id: Date.now().toString(),
+                number,
+                persons: [],
+                actions: [action.trim()],
+                objects: []
+            };
+            setMajorSystem([...majorSystem, newEntry].sort((a, b) => parseInt(a.number) - parseInt(b.number)));
+        }
+    };
+
+    const addMajorObject = (number: string, object: string) => {
+        if (!object.trim()) return;
+        
+        const existing = majorSystem.find(e => e.number === number);
+        if (existing) {
+            setMajorSystem(majorSystem.map(e =>
+                e.number === number
+                    ? { ...e, objects: [...(e.objects || []), object.trim()] }
+                    : e
+            ));
+        } else {
+            const newEntry: MajorEntry = {
+                id: Date.now().toString(),
+                number,
+                persons: [],
+                actions: [],
+                objects: [object.trim()]
+            };
+            setMajorSystem([...majorSystem, newEntry].sort((a, b) => parseInt(a.number) - parseInt(b.number)));
+        }
+    };
+
+    const deleteMajorPerson = (number: string, person: string) => {
         setMajorSystem(majorSystem.map(e => {
             if (e.number === number) {
-                const newImages = e.images.filter(img => img !== image);
-                return newImages.length > 0 ? { ...e, images: newImages } : null;
+                const newPersons = (e.persons || []).filter(p => p !== person);
+                // Keep entry even if persons is empty (might have actions/objects)
+                return { ...e, persons: newPersons };
             }
             return e;
-        }).filter(Boolean) as MajorEntry[]);
+        }));
+    };
+
+    const deleteMajorAction = (number: string, action: string) => {
+        setMajorSystem(majorSystem.map(e => {
+            if (e.number === number) {
+                const newActions = (e.actions || []).filter(a => a !== action);
+                return { ...e, actions: newActions };
+            }
+            return e;
+        }));
+    };
+
+    const deleteMajorObject = (number: string, object: string) => {
+        setMajorSystem(majorSystem.map(e => {
+            if (e.number === number) {
+                const newObjects = (e.objects || []).filter(o => o !== object);
+                return { ...e, objects: newObjects };
+            }
+            return e;
+        }));
     };
 
     const deleteMajorEntry = (id: string) => {
@@ -690,10 +757,26 @@ export default function ImageVault() {
             }));
         }
 
-        if (quizConfig.type === 'mixed') {
-            setQuizQuestionType(Math.random() > 0.5 ? 'digits' : 'words');
+        let qType = quizConfig.type;
+        if (qType === 'mixed') {
+            qType = Math.random() > 0.5 ? 'digits' : 'words';
+        }
+        setQuizQuestionType(qType as 'digits' | 'words');
+
+        // If showing words (asking for digits), pick a random word from any category
+        if (qType === 'words') {
+            const allWords = [
+                ...(nextCard.persons || []),
+                ...(nextCard.actions || []),
+                ...(nextCard.objects || []),
+                ...(nextCard.images || [])
+            ];
+            const randomWord = allWords.length > 0 
+                ? allWords[Math.floor(Math.random() * allWords.length)] 
+                : '???';
+            setQuizPromptWord(randomWord);
         } else {
-            setQuizQuestionType(quizConfig.type);
+            setQuizPromptWord('');
         }
     };
 
@@ -706,12 +789,27 @@ export default function ImageVault() {
 
         let isCorrect = false;
         const targetNumber = currentQuizCard.number;
-        // Use first image as primary, but check against all
-        const targetWord = currentQuizCard.images?.[0] || '???';
+        
+        // Collect all valid words for this card
+        const allValidWords = [
+            ...(currentQuizCard.persons || []),
+            ...(currentQuizCard.actions || []),
+            ...(currentQuizCard.objects || []),
+            ...(currentQuizCard.images || [])
+        ].map(w => w.toLowerCase());
+
+        // For display in feedback
+        const targetWord = allValidWords.length > 0 ? allValidWords[0] : '???';
+        // Or better: show a few examples
+        const displayWords = [
+            ...(currentQuizCard.persons || []),
+            ...(currentQuizCard.actions || []),
+            ...(currentQuizCard.objects || [])
+        ].slice(0, 3).join(' / ') || (currentQuizCard.images?.[0] || '???');
 
         if (quizQuestionType === 'digits') {
             // Showed Digits, expect Word
-            if (currentQuizCard.images?.some(img => img.toLowerCase() === answer)) isCorrect = true;
+            if (allValidWords.includes(answer)) isCorrect = true;
         } else {
             // Showed Word, expect Digits
             if (answer === targetNumber) isCorrect = true;
@@ -771,7 +869,7 @@ export default function ImageVault() {
         } else {
             setQuizFeedback({
                 status: 'wrong',
-                message: `Wrong! It was ${quizQuestionType === 'digits' ? targetWord : targetNumber}`
+                message: `Wrong! It was ${quizQuestionType === 'digits' ? displayWords : targetNumber}`
             });
             setQuizStats(prev => ({ ...prev, wrong: prev.wrong + 1 }));
 
@@ -816,7 +914,10 @@ export default function ImageVault() {
                                         const majorEntries = majorSystemList.map(m => ({
                                             id: m.number,
                                             number: m.number,
-                                            images: [m.word]
+                                            images: [m.word],
+                                            persons: [],
+                                            actions: [],
+                                            objects: []
                                         }));
 
                                         await saveImageVaultData({
@@ -1197,7 +1298,7 @@ export default function ImageVault() {
                                     gap: '0.5rem'
                                 }}>
                                     <div>
-                                        {quizQuestionType === 'digits' ? currentQuizCard.number : (currentQuizCard.images?.[0] || '???')}
+                                        {quizQuestionType === 'digits' ? currentQuizCard.number : quizPromptWord}
                                     </div>
                                     {quizFeedback.status === 'wrong' && (
                                         <div className="animate-fade-in" style={{
@@ -1205,7 +1306,9 @@ export default function ImageVault() {
                                             color: 'var(--error)',
                                             fontWeight: 'normal'
                                         }}>
-                                            → {quizQuestionType === 'digits' ? (currentQuizCard.images?.[0] || '???') : currentQuizCard.number}
+                                            → {quizQuestionType === 'digits' ? (
+                                                [...(currentQuizCard.persons || []), ...(currentQuizCard.actions || []), ...(currentQuizCard.objects || [])].slice(0, 3).join(' / ') || (currentQuizCard.images?.[0] || '???')
+                                            ) : currentQuizCard.number}
                                         </div>
                                     )}
                                 </div>
@@ -1619,8 +1722,13 @@ export default function ImageVault() {
                                                                 )}
                                                                 <div style={{ fontSize: '2rem', fontWeight: 'bold', lineHeight: 1, position: 'relative', zIndex: 1 }}>{entry.number}</div>
                                                                 {wordsVisible && (
-                                                                    <div style={{ fontSize: '1rem', opacity: 1, marginTop: '0.25rem', textAlign: 'center', wordBreak: 'break-word', lineHeight: 1.2, position: 'relative', zIndex: 1 }}>
-                                                                        {entry.images?.[0] || '???'}
+                                                                    <div style={{ fontSize: '0.75rem', opacity: 1, marginTop: '0.5rem', textAlign: 'center', wordBreak: 'break-word', lineHeight: 1.2, position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                                                        {entry.persons && entry.persons.length > 0 && <div style={{whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%'}}>👤 {entry.persons[0]}</div>}
+                                                                        {entry.actions && entry.actions.length > 0 && <div style={{whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%'}}>🎬 {entry.actions[0]}</div>}
+                                                                        {entry.objects && entry.objects.length > 0 && <div style={{whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%'}}>📦 {entry.objects[0]}</div>}
+                                                                        {(!entry.persons?.length && !entry.actions?.length && !entry.objects?.length) && (
+                                                                            <div>{entry.images?.[0] || '???'}</div>
+                                                                        )}
                                                                     </div>
                                                                 )}
                                                             </div>
@@ -1681,12 +1789,162 @@ export default function ImageVault() {
                                                                         No data yet
                                                                     </div>
                                                                 )}
+                                                                
+                                                                <button
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        setEditingMajor(entry.number);
+                                                                        // Initialize inputs if needed, but we'll handle that in the modal
+                                                                    }}
+                                                                    style={{
+                                                                        marginTop: '0.5rem',
+                                                                        background: 'rgba(255,255,255,0.2)',
+                                                                        border: 'none',
+                                                                        borderRadius: '4px',
+                                                                        padding: '4px 12px',
+                                                                        fontSize: '0.8rem',
+                                                                        color: 'white',
+                                                                        cursor: 'pointer',
+                                                                        position: 'relative',
+                                                                        zIndex: 2,
+                                                                        transition: 'background 0.2s'
+                                                                    }}
+                                                                    onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.3)'}
+                                                                    onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.2)'}
+                                                                >
+                                                                    Edit PAO
+                                                                </button>
                                                             </div>
                                                         </div>
                                                     </div>
                                                 );
                                             })}
                                         </div>
+
+                                        {/* Edit Modal */}
+                                        {editingMajor && (
+                                            <div style={{
+                                                position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                                                background: 'rgba(0,0,0,0.8)', zIndex: 100,
+                                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                backdropFilter: 'blur(5px)'
+                                            }} onClick={() => setEditingMajor(null)}>
+                                                <div 
+                                                    className="glass-panel" 
+                                                    style={{ width: '90%', maxWidth: '500px', padding: '2rem', maxHeight: '90vh', overflowY: 'auto' }}
+                                                    onClick={e => e.stopPropagation()}
+                                                >
+                                                    <h3 style={{ fontSize: '1.5rem', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                                        <span style={{ color: 'var(--primary)', fontWeight: 'bold' }}>{editingMajor}</span>
+                                                        PAO Setup
+                                                    </h3>
+
+                                                    {/* Tabs */}
+                                                    <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '0.5rem' }}>
+                                                        {(['persons', 'actions', 'objects'] as const).map(cat => (
+                                                            <button
+                                                                key={cat}
+                                                                onClick={() => setMajorEditCategory(cat)}
+                                                                style={{
+                                                                    background: 'none', border: 'none',
+                                                                    color: majorEditCategory === cat ? 'var(--primary)' : 'rgba(255,255,255,0.5)',
+                                                                    fontWeight: majorEditCategory === cat ? 'bold' : 'normal',
+                                                                    padding: '0.5rem 1rem',
+                                                                    cursor: 'pointer',
+                                                                    borderBottom: majorEditCategory === cat ? '2px solid var(--primary)' : '2px solid transparent',
+                                                                    textTransform: 'capitalize'
+                                                                }}
+                                                            >
+                                                                {cat}
+                                                            </button>
+                                                        ))}
+                                                    </div>
+
+                                                    {/* Content */}
+                                                    <div style={{ marginBottom: '2rem' }}>
+                                                        {(() => {
+                                                            const entry = majorSystem.find(e => e.number === editingMajor);
+                                                            const items = entry ? (entry[majorEditCategory] || []) : [];
+                                                            
+                                                            return (
+                                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                                                                    {/* Add New */}
+                                                                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                                                        <input
+                                                                            type="text"
+                                                                            className="input-field"
+                                                                            placeholder={`Add new ${majorEditCategory.slice(0, -1)}...`}
+                                                                            value={
+                                                                                majorEditCategory === 'persons' ? newMajorPerson :
+                                                                                majorEditCategory === 'actions' ? newMajorAction :
+                                                                                newMajorObject
+                                                                            }
+                                                                            onChange={e => {
+                                                                                const val = e.target.value;
+                                                                                if (majorEditCategory === 'persons') setNewMajorPerson(val);
+                                                                                else if (majorEditCategory === 'actions') setNewMajorAction(val);
+                                                                                else setNewMajorObject(val);
+                                                                            }}
+                                                                            onKeyDown={e => {
+                                                                                if (e.key === 'Enter') {
+                                                                                    if (majorEditCategory === 'persons') { addMajorPerson(editingMajor, newMajorPerson); setNewMajorPerson(''); }
+                                                                                    else if (majorEditCategory === 'actions') { addMajorAction(editingMajor, newMajorAction); setNewMajorAction(''); }
+                                                                                    else { addMajorObject(editingMajor, newMajorObject); setNewMajorObject(''); }
+                                                                                }
+                                                                            }}
+                                                                        />
+                                                                        <button 
+                                                                            className="btn btn-primary"
+                                                                            onClick={() => {
+                                                                                if (majorEditCategory === 'persons') { addMajorPerson(editingMajor, newMajorPerson); setNewMajorPerson(''); }
+                                                                                else if (majorEditCategory === 'actions') { addMajorAction(editingMajor, newMajorAction); setNewMajorAction(''); }
+                                                                                else { addMajorObject(editingMajor, newMajorObject); setNewMajorObject(''); }
+                                                                            }}
+                                                                        >
+                                                                            Add
+                                                                        </button>
+                                                                    </div>
+
+                                                                    {/* List */}
+                                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '300px', overflowY: 'auto' }}>
+                                                                        {items.length === 0 && (
+                                                                            <div style={{ opacity: 0.5, fontStyle: 'italic', padding: '1rem', textAlign: 'center' }}>
+                                                                                No {majorEditCategory} added yet.
+                                                                            </div>
+                                                                        )}
+                                                                        {items.map((item, i) => (
+                                                                            <div key={i} className="glass" style={{ padding: '0.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                                                <span>{item}</span>
+                                                                                <button
+                                                                                    onClick={() => {
+                                                                                        if (majorEditCategory === 'persons') deleteMajorPerson(editingMajor, item);
+                                                                                        else if (majorEditCategory === 'actions') deleteMajorAction(editingMajor, item);
+                                                                                        else deleteMajorObject(editingMajor, item);
+                                                                                    }}
+                                                                                    style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', opacity: 0.7 }}
+                                                                                >
+                                                                                    ✕
+                                                                                </button>
+                                                                            </div>
+                                                                        ))}
+                                                                    </div>
+                                                                </div>
+                                                            );
+                                                        })()}
+                                                    </div>
+
+                                                    <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                                                        <button 
+                                                            className="btn" 
+                                                            onClick={() => setEditingMajor(null)}
+                                                            style={{ background: 'rgba(255,255,255,0.1)' }}
+                                                        >
+                                                            Done
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
 
                                         {filteredMajor.length === 0 && (
                                             <div style={{ textAlign: 'center', padding: '3rem', opacity: 0.5 }}>
@@ -1710,7 +1968,7 @@ export default function ImageVault() {
                                                     >
                                                         {majorSystem.map(card => (
                                                             <option key={card.id} value={card.number}>
-                                                                {card.number} - {card.images[0]}
+                                                                {card.number} - {card.persons?.[0] || card.actions?.[0] || card.objects?.[0] || card.images?.[0] || 'Empty'}
                                                             </option>
                                                         ))}
                                                     </select>

@@ -1,17 +1,17 @@
 import { MajorEntry, PaoEntry, Palace } from '@/lib/firebase';
 
 export const SAMPLE_MAJOR_SYSTEM: MajorEntry[] = [
-    { id: 'major-00', number: '00', images: ['Sauce', 'Seas'] },
-    { id: 'major-01', number: '01', images: ['Suit', 'Seed'] },
-    { id: 'major-02', number: '02', images: ['Sun', 'Sane'] },
-    { id: 'major-10', number: '10', images: ['Toes', 'Dice'] },
-    { id: 'major-11', number: '11', images: ['Toad', 'Dad'] },
-    { id: 'major-12', number: '12', images: ['Tin', 'Dune'] },
-    { id: 'major-20', number: '20', images: ['Nose', 'Noose'] },
-    { id: 'major-21', number: '21', images: ['Net', 'Knot'] },
-    { id: 'major-34', number: '34', images: ['Mower', 'Hammer'] },
-    { id: 'major-47', number: '47', images: ['Rake', 'Rocket'] },
-    { id: 'major-83', number: '83', images: ['Foam', 'Fame'] },
+    { id: 'major-00', number: '00', persons: ['Zeus', 'Sisyphus'], actions: ['Sizzling', 'Soaring'], objects: ['Sauce', 'Seas'] },
+    { id: 'major-01', number: '01', persons: ['Socrates', 'Saddam'], actions: ['Sitting', 'Studying'], objects: ['Suit', 'Seed'] },
+    { id: 'major-02', number: '02', persons: ['Sun Tzu', 'Senna'], actions: ['Sunbathing', 'Singing'], objects: ['Sun', 'Sane'] },
+    { id: 'major-10', number: '10', persons: ['Tesla', 'Tyson'], actions: ['Tossing', 'Dancing'], objects: ['Toes', 'Dice'] },
+    { id: 'major-11', number: '11', persons: ['Teddy Roosevelt', 'Dali'], actions: ['Tooting', 'Dodging'], objects: ['Toad', 'Dad'] },
+    { id: 'major-12', number: '12', persons: ['Tina Turner', 'Diana'], actions: ['Tuning', 'Dunking'], objects: ['Tin', 'Dune'] },
+    { id: 'major-20', number: '20', persons: ['Newton', 'Nietzsche'], actions: ['Nosing', 'Nuzzling'], objects: ['Nose', 'Noose'] },
+    { id: 'major-21', number: '21', persons: ['Napoleon', 'Nadal'], actions: ['Netting', 'Knotting'], objects: ['Net', 'Knot'] },
+    { id: 'major-34', number: '34', persons: ['Mower Man', 'Mr. Rogers'], actions: ['Mowing', 'Hammering'], objects: ['Mower', 'Hammer'] },
+    { id: 'major-47', number: '47', persons: ['Rocky', 'Rocket Man'], actions: ['Raking', 'Rocketing'], objects: ['Rake', 'Rocket'] },
+    { id: 'major-83', number: '83', persons: ['Farmer', 'Freddie Mercury'], actions: ['Foaming', 'Faming'], objects: ['Foam', 'Fame'] },
 ];
 
 export const SAMPLE_PAO_SYSTEM: PaoEntry[] = [

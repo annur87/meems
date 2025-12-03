@@ -499,27 +499,92 @@ const calculatePerformanceScore = (totalAttempts: number, mistakes: number, avgT
 
 export const getCardPerformanceColor = (stats: CardStats | undefined): string => {
     if (!stats || stats.totalAttempts === 0) {
-        return 'rgba(100, 116, 139, 0.15)'; // faint gray for no data
+        return 'rgba(99, 102, 241, 0.15)'; // Primary theme color (indigo) for no data
     }
 
     const score = stats.performanceScore;
     const avgTimeInSeconds = stats.averageTime / 1000;
 
-    // Mastered: 0 mistakes AND average time < 2 seconds - Golden tier
+    // Platinum: 0 mistakes AND average time < 2 seconds - Ultimate tier with radiant glow
     if (stats.mistakes === 0 && avgTimeInSeconds < 2) {
-        return 'linear-gradient(135deg, rgba(251, 191, 36, 0.45) 0%, rgba(245, 158, 11, 0.45) 100%)'; // Golden gradient
+        return 'linear-gradient(135deg, rgba(229, 228, 226, 0.6) 0%, rgba(156, 163, 175, 0.6) 50%, rgba(229, 228, 226, 0.6) 100%)'; // Platinum gradient
     }
-    // Green: 75-100 (well memorized) - Good performance
+    // Gold: 75-100 (well memorized) - Premium tier with warm glow
     else if (score >= 75) {
-        return 'rgba(34, 197, 94, 0.35)'; // Green 500
+        return 'linear-gradient(135deg, rgba(251, 191, 36, 0.5) 0%, rgba(245, 158, 11, 0.5) 50%, rgba(251, 191, 36, 0.5) 100%)'; // Gold gradient
     }
-    // Yellow: 50-74 (medium) - Okay performance
+    // Silver: 50-74 (medium) - Mid tier with cool metallic shine
     else if (score >= 50) {
-        return 'rgba(234, 179, 8, 0.35)'; // Yellow 500
+        return 'linear-gradient(135deg, rgba(203, 213, 225, 0.45) 0%, rgba(148, 163, 184, 0.45) 50%, rgba(203, 213, 225, 0.45) 100%)'; // Silver gradient
     }
-    // Red: 0-49 (difficult) - Bad performance
+    // Bronze: 0-49 (difficult) - Base tier with warm bronze tone
     else {
-        return 'rgba(239, 68, 68, 0.35)'; // Red 500
+        return 'linear-gradient(135deg, rgba(205, 127, 50, 0.4) 0%, rgba(180, 83, 9, 0.4) 50%, rgba(205, 127, 50, 0.4) 100%)'; // Bronze gradient
+    }
+};
+
+export interface DailyGlobalStats {
+    date: string; // YYYY-MM-DD
+    totalAttempts: number;
+    mistakes: number;
+    errorRate: number; // percentage
+    averageTime: number; // seconds
+}
+
+export const getGlobalDailyStats = async (
+    userId: string = USER_ID,
+    timeFilter?: '1h' | '2h' | '12h' | '1d' | '1w' | '1m' | '1y' | 'all'
+): Promise<DailyGlobalStats[]> => {
+    try {
+        if (!firebaseConfig.apiKey) {
+            return [];
+        }
+
+        const attemptsRef = collection(db, 'major_system_attempts', userId, 'attempts');
+        // We fetch all and filter in memory to ensure consistent filtering logic
+        const q = query(attemptsRef, orderBy('timestamp', 'desc'));
+        const snapshot = await getDocs(q);
+        const attempts: CardAttempt[] = snapshot.docs.map(doc => doc.data() as CardAttempt);
+
+        // Apply time filter
+        const filteredAttempts = timeFilter && timeFilter !== 'all'
+            ? attempts.filter(a => {
+                const cutoff = getCalendarCutoff(timeFilter);
+                return a.timestamp >= cutoff;
+            })
+            : attempts;
+
+        // Group by day
+        const dayMap = new Map<string, { totalTime: number; totalAttempts: number; mistakes: number }>();
+
+        filteredAttempts.forEach(attempt => {
+            const date = new Date(attempt.timestamp).toLocaleDateString('en-CA'); // YYYY-MM-DD
+            const current = dayMap.get(date) || { totalTime: 0, totalAttempts: 0, mistakes: 0 };
+
+            current.totalTime += attempt.responseTime;
+            current.totalAttempts += 1;
+            if (!attempt.isCorrect) {
+                current.mistakes += 1;
+            }
+
+            dayMap.set(date, current);
+        });
+
+        // Convert to array and sort
+        const stats: DailyGlobalStats[] = Array.from(dayMap.entries()).map(([date, data]) => ({
+            date,
+            totalAttempts: data.totalAttempts,
+            mistakes: data.mistakes,
+            errorRate: (data.mistakes / data.totalAttempts) * 100,
+            averageTime: (data.totalTime / data.totalAttempts) / 1000 // convert ms to seconds
+        }));
+
+        // Sort by date ascending
+        return stats.sort((a, b) => a.date.localeCompare(b.date));
+
+    } catch (error) {
+        console.error('Error getting global daily stats:', error);
+        return [];
     }
 };
 

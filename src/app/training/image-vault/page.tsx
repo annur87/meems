@@ -13,6 +13,8 @@ import {
     getCardStats,
     getCardPerformanceColor,
     getCardHistory,
+    getGlobalDailyStats,
+    type DailyGlobalStats,
     savePalaceAttempt,
     getPalaceStats,
     type PalaceAttempt,
@@ -105,7 +107,7 @@ export default function ImageVault() {
         turns: 1,
         type: 'mixed' as 'digits' | 'words' | 'mixed',
         mode: 'untimed' as 'timed' | 'untimed',
-        cardDifficulty: 'all' as 'all' | 'mastered' | 'green' | 'yellow' | 'red'
+        cardDifficulty: 'all' as 'all' | 'platinum' | 'gold' | 'silver' | 'bronze'
     });
     const [quizQueue, setQuizQueue] = useState<MajorEntry[]>([]);
     const [currentQuizCard, setCurrentQuizCard] = useState<MajorEntry | null>(null);
@@ -165,16 +167,24 @@ export default function ImageVault() {
         };
 
         loadData();
-    }, []); // Removed timeFilter, quizMode from dependencies as they are handled by separate effects
+    }, []);
+    
+    const [globalStats, setGlobalStats] = useState<DailyGlobalStats[]>([]);
 
-    // Load card performance stats
+    // Load stats when mode changes or time filter changes
     useEffect(() => {
         const loadStats = async () => {
-            const stats = await getCardStats('default_user', timeFilter);
-            setCardPerformanceStats(stats);
+            if (majorViewMode === 'cards') {
+                const stats = await getCardStats(userId, timeFilter);
+                setCardPerformanceStats(stats);
+            } else if (majorViewMode === 'analytics') {
+                // Load global stats
+                const gStats = await getGlobalDailyStats(userId, timeFilter);
+                setGlobalStats(gStats);
+            }
         };
         loadStats();
-    }, [timeFilter, quizMode]);
+    }, [timeFilter, quizMode, majorViewMode]);
 
     // Load card history when selected
     useEffect(() => {
@@ -521,28 +531,28 @@ export default function ImageVault() {
 
     // Search/Filter Functions
     // Helper to get card difficulty category
-    const getCardDifficulty = (cardNumber: string): 'mastered' | 'green' | 'yellow' | 'red' | 'unknown' => {
+    const getCardDifficulty = (cardNumber: string): 'platinum' | 'gold' | 'silver' | 'bronze' | 'unknown' => {
         const stats = cardPerformanceStats.get(cardNumber);
         if (!stats || stats.totalAttempts === 0) return 'unknown';
 
         const avgTimeInSeconds = stats.averageTime / 1000;
         
-        // Mastered: 0 mistakes AND average time < 2 seconds
-        if (stats.mistakes === 0 && avgTimeInSeconds < 2) return 'mastered';
+        // Platinum: 0 mistakes AND average time < 2 seconds
+        if (stats.mistakes === 0 && avgTimeInSeconds < 2) return 'platinum';
 
         const score = stats.performanceScore;
-        if (score >= 75) return 'green';
-        if (score >= 50) return 'yellow';
-        return 'red';
+        if (score >= 75) return 'gold';
+        if (score >= 50) return 'silver';
+        return 'bronze';
     };
 
-    const [selectedDifficultyFilters, setSelectedDifficultyFilters] = useState<Set<string>>(new Set(['unknown', 'mastered', 'green', 'yellow', 'red']));
+    const [selectedDifficultyFilters, setSelectedDifficultyFilters] = useState<Set<string>>(new Set(['unknown', 'platinum', 'gold', 'silver', 'bronze']));
 
     const toggleDifficultyFilter = (difficulty: string) => {
         // Single-select behavior: only one filter active at a time
-        // 'all' shows everything (unknown + mastered + green + yellow + red)
+        // 'all' shows everything (unknown + platinum + gold + silver + bronze)
         if (difficulty === 'all') {
-            setSelectedDifficultyFilters(new Set(['unknown', 'mastered', 'green', 'yellow', 'red']));
+            setSelectedDifficultyFilters(new Set(['unknown', 'platinum', 'gold', 'silver', 'bronze']));
         } else {
             setSelectedDifficultyFilters(new Set([difficulty]));
         }
@@ -1069,49 +1079,52 @@ export default function ImageVault() {
                                                 All
                                             </button>
                                             <button
-                                                onClick={() => setQuizConfig(c => ({ ...c, cardDifficulty: 'mastered' }))}
-                                                className={`btn ${quizConfig.cardDifficulty === 'mastered' ? 'btn-primary' : ''}`}
+                                                onClick={() => setQuizConfig(c => ({ ...c, cardDifficulty: 'platinum' }))}
+                                                className={`btn ${quizConfig.cardDifficulty === 'platinum' ? 'btn-primary' : ''}`}
                                                 style={{
                                                     padding: '0.5rem',
-                                                    opacity: quizConfig.cardDifficulty === 'mastered' ? 1 : 0.6,
-                                                    background: quizConfig.cardDifficulty === 'mastered' ? 'linear-gradient(135deg, rgba(251, 191, 36, 0.4) 0%, rgba(245, 158, 11, 0.4) 100%)' : undefined,
-                                                    boxShadow: quizConfig.cardDifficulty === 'mastered' ? '0 0 10px rgba(251, 191, 36, 0.3)' : undefined
+                                                    opacity: quizConfig.cardDifficulty === 'platinum' ? 1 : 0.6,
+                                                    background: quizConfig.cardDifficulty === 'platinum' ? 'linear-gradient(135deg, rgba(229, 228, 226, 0.5) 0%, rgba(156, 163, 175, 0.5) 50%, rgba(229, 228, 226, 0.5) 100%)' : undefined,
+                                                    boxShadow: quizConfig.cardDifficulty === 'platinum' ? '0 0 20px rgba(229, 228, 226, 0.6), 0 0 40px rgba(156, 163, 175, 0.3)' : undefined
                                                 }}
                                             >
-                                                ⭐ Mastered
+                                                💎 Platinum
                                             </button>
                                             <button
-                                                onClick={() => setQuizConfig(c => ({ ...c, cardDifficulty: 'green' }))}
-                                                className={`btn ${quizConfig.cardDifficulty === 'green' ? 'btn-primary' : ''}`}
+                                                onClick={() => setQuizConfig(c => ({ ...c, cardDifficulty: 'gold' }))}
+                                                className={`btn ${quizConfig.cardDifficulty === 'gold' ? 'btn-primary' : ''}`}
                                                 style={{
                                                     padding: '0.5rem',
-                                                    opacity: quizConfig.cardDifficulty === 'green' ? 1 : 0.6,
-                                                    background: quizConfig.cardDifficulty === 'green' ? 'rgba(34, 197, 94, 0.3)' : undefined
+                                                    opacity: quizConfig.cardDifficulty === 'gold' ? 1 : 0.6,
+                                                    background: quizConfig.cardDifficulty === 'gold' ? 'linear-gradient(135deg, rgba(251, 191, 36, 0.45) 0%, rgba(245, 158, 11, 0.45) 100%)' : undefined,
+                                                    boxShadow: quizConfig.cardDifficulty === 'gold' ? '0 0 15px rgba(251, 191, 36, 0.5)' : undefined
                                                 }}
                                             >
-                                                Green
+                                                🥇 Gold
                                             </button>
                                             <button
-                                                onClick={() => setQuizConfig(c => ({ ...c, cardDifficulty: 'yellow' }))}
-                                                className={`btn ${quizConfig.cardDifficulty === 'yellow' ? 'btn-primary' : ''}`}
+                                                onClick={() => setQuizConfig(c => ({ ...c, cardDifficulty: 'silver' }))}
+                                                className={`btn ${quizConfig.cardDifficulty === 'silver' ? 'btn-primary' : ''}`}
                                                 style={{
                                                     padding: '0.5rem',
-                                                    opacity: quizConfig.cardDifficulty === 'yellow' ? 1 : 0.6,
-                                                    background: quizConfig.cardDifficulty === 'yellow' ? 'rgba(234, 179, 8, 0.3)' : undefined
+                                                    opacity: quizConfig.cardDifficulty === 'silver' ? 1 : 0.6,
+                                                    background: quizConfig.cardDifficulty === 'silver' ? 'linear-gradient(135deg, rgba(203, 213, 225, 0.4) 0%, rgba(148, 163, 184, 0.4) 100%)' : undefined,
+                                                    boxShadow: quizConfig.cardDifficulty === 'silver' ? '0 0 12px rgba(203, 213, 225, 0.4)' : undefined
                                                 }}
                                             >
-                                                Yellow
+                                                🥈 Silver
                                             </button>
                                             <button
-                                                onClick={() => setQuizConfig(c => ({ ...c, cardDifficulty: 'red' }))}
-                                                className={`btn ${quizConfig.cardDifficulty === 'red' ? 'btn-primary' : ''}`}
+                                                onClick={() => setQuizConfig(c => ({ ...c, cardDifficulty: 'bronze' }))}
+                                                className={`btn ${quizConfig.cardDifficulty === 'bronze' ? 'btn-primary' : ''}`}
                                                 style={{
                                                     padding: '0.5rem',
-                                                    opacity: quizConfig.cardDifficulty === 'red' ? 1 : 0.6,
-                                                    background: quizConfig.cardDifficulty === 'red' ? 'rgba(239, 68, 68, 0.3)' : undefined
+                                                    opacity: quizConfig.cardDifficulty === 'bronze' ? 1 : 0.6,
+                                                    background: quizConfig.cardDifficulty === 'bronze' ? 'linear-gradient(135deg, rgba(205, 127, 50, 0.35) 0%, rgba(180, 83, 9, 0.35) 100%)' : undefined,
+                                                    boxShadow: quizConfig.cardDifficulty === 'bronze' ? '0 0 10px rgba(205, 127, 50, 0.3)' : undefined
                                                 }}
                                             >
-                                                Red
+                                                🥉 Bronze
                                             </button>
                                         </div>
                                     </div>
@@ -1383,9 +1396,9 @@ export default function ImageVault() {
                                     <>
                                         {/* Difficulty Filters */}
                                         <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
-                                            {(['all', 'mastered', 'green', 'yellow', 'red'] as const).map(diff => {
+                                            {(['all', 'platinum', 'gold', 'silver', 'bronze'] as const).map(diff => {
                                                 const isActive = diff === 'all'
-                                                    ? selectedDifficultyFilters.has('unknown') && selectedDifficultyFilters.has('mastered') && selectedDifficultyFilters.has('green') && selectedDifficultyFilters.has('yellow') && selectedDifficultyFilters.has('red')
+                                                    ? selectedDifficultyFilters.has('unknown') && selectedDifficultyFilters.has('platinum') && selectedDifficultyFilters.has('gold') && selectedDifficultyFilters.has('silver') && selectedDifficultyFilters.has('bronze')
                                                     : selectedDifficultyFilters.has(diff);
 
                                                 // Calculate card count for this difficulty
@@ -1416,11 +1429,11 @@ export default function ImageVault() {
                                                             border: '1px solid',
                                                             borderColor: isActive ? 'transparent' : 'rgba(255,255,255,0.1)',
                                                             background: isActive
-                                                                ? (diff === 'mastered' ? 'linear-gradient(135deg, rgba(251, 191, 36, 0.5) 0%, rgba(245, 158, 11, 0.5) 100%)' :
-                                                                    diff === 'green' ? 'rgba(34, 197, 94, 0.35)' :
-                                                                    diff === 'yellow' ? 'rgba(234, 179, 8, 0.35)' :
-                                                                        diff === 'red' ? 'rgba(239, 68, 68, 0.35)' :
-                                                                            'rgba(100, 116, 139, 0.35)')
+                                                                ? (diff === 'platinum' ? 'linear-gradient(135deg, rgba(229, 228, 226, 0.55) 0%, rgba(156, 163, 175, 0.55) 50%, rgba(229, 228, 226, 0.55) 100%)' :
+                                                                    diff === 'gold' ? 'linear-gradient(135deg, rgba(251, 191, 36, 0.5) 0%, rgba(245, 158, 11, 0.5) 50%, rgba(251, 191, 36, 0.5) 100%)' :
+                                                                    diff === 'silver' ? 'linear-gradient(135deg, rgba(203, 213, 225, 0.45) 0%, rgba(148, 163, 184, 0.45) 50%, rgba(203, 213, 225, 0.45) 100%)' :
+                                                                        diff === 'bronze' ? 'linear-gradient(135deg, rgba(205, 127, 50, 0.4) 0%, rgba(180, 83, 9, 0.4) 50%, rgba(205, 127, 50, 0.4) 100%)' :
+                                                                            'rgba(99, 102, 241, 0.35)')
                                                                 : 'rgba(255,255,255,0.03)',
                                                             color: isActive ? 'white' : 'rgba(255,255,255,0.5)',
                                                             fontSize: '0.85rem',
@@ -1429,25 +1442,31 @@ export default function ImageVault() {
                                                             display: 'flex',
                                                             alignItems: 'center',
                                                             gap: '0.4rem',
-                                                            boxShadow: diff === 'mastered' && isActive ? '0 0 15px rgba(251, 191, 36, 0.4)' : 'none'
+                                                            boxShadow: diff === 'platinum' && isActive ? '0 0 20px rgba(229, 228, 226, 0.5), 0 0 40px rgba(156, 163, 175, 0.25)' :
+                                                                diff === 'gold' && isActive ? '0 0 15px rgba(251, 191, 36, 0.4)' :
+                                                                diff === 'silver' && isActive ? '0 0 12px rgba(203, 213, 225, 0.35)' :
+                                                                diff === 'bronze' && isActive ? '0 0 10px rgba(205, 127, 50, 0.3)' : 'none'
                                                         }}
                                                     >
                                                         <span style={{
                                                             width: '8px',
                                                             height: '8px',
                                                             borderRadius: '50%',
-                                                            background: diff === 'mastered' ? 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)' :
-                                                                diff === 'green' ? '#22c55e' :
-                                                                diff === 'yellow' ? '#eab308' :
-                                                                    diff === 'red' ? '#ef4444' :
-                                                                        '#64748b',
-                                                            boxShadow: diff === 'mastered' ? '0 0 8px rgba(251, 191, 36, 0.6)' : 'none'
+                                                            background: diff === 'platinum' ? 'linear-gradient(135deg, #e5e4e2 0%, #9ca3af 50%, #e5e4e2 100%)' :
+                                                                diff === 'gold' ? 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 50%, #fbbf24 100%)' :
+                                                                diff === 'silver' ? 'linear-gradient(135deg, #cbd5e1 0%, #94a3b8 50%, #cbd5e1 100%)' :
+                                                                    diff === 'bronze' ? 'linear-gradient(135deg, #cd7f32 0%, #b45309 50%, #cd7f32 100%)' :
+                                                                        '#6366f1',
+                                                            boxShadow: diff === 'platinum' ? '0 0 10px rgba(229, 228, 226, 0.7)' :
+                                                                diff === 'gold' ? '0 0 8px rgba(251, 191, 36, 0.6)' :
+                                                                diff === 'silver' ? '0 0 6px rgba(203, 213, 225, 0.5)' :
+                                                                    diff === 'bronze' ? '0 0 5px rgba(205, 127, 50, 0.4)' : 'none'
                                                         }} />
                                                         {diff === 'all' ? 'All' :
-                                                            diff === 'mastered' ? 'Mastered' :
-                                                            diff === 'green' ? 'Good' :
-                                                                diff === 'yellow' ? 'Okay' :
-                                                                    'Bad'}
+                                                            diff === 'platinum' ? 'Platinum' :
+                                                            diff === 'gold' ? 'Gold' :
+                                                                diff === 'silver' ? 'Silver' :
+                                                                    'Bronze'}
                                                         <span style={{ opacity: 0.7, fontSize: '0.8rem' }}>({cardCount})</span>
                                                     </button>
                                                 );
@@ -1586,7 +1605,92 @@ export default function ImageVault() {
                                         )}
                                     </>
                                 ) : (
-                                    <div className="glass-panel" style={{ padding: '1.5rem' }}>
+                                    <>
+                                        {/* Global Analytics - Error Rate by Day */}
+                                        <div className="glass-panel" style={{ padding: '1.5rem', marginBottom: '2rem' }}>
+                                            <h4 style={{ fontSize: '1rem', marginBottom: '1rem', opacity: 0.9 }}>Error Rate by Day</h4>
+                                            {globalStats.length > 0 ? (
+                                                <div style={{ height: '300px', width: '100%' }}>
+                                                    <ResponsiveContainer width="100%" height="100%">
+                                                        <LineChart data={globalStats}>
+                                                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+                                                            <XAxis
+                                                                dataKey="date"
+                                                                stroke="rgba(255,255,255,0.5)"
+                                                                label={{ value: 'Date', position: 'insideBottom', offset: -5, fill: 'rgba(255,255,255,0.5)' }}
+                                                            />
+                                                            <YAxis
+                                                                stroke="rgba(255,255,255,0.5)"
+                                                                label={{ value: 'Error Rate (%)', angle: -90, position: 'insideLeft', fill: 'rgba(255,255,255,0.5)' }}
+                                                                domain={[0, 100]}
+                                                            />
+                                                            <Tooltip
+                                                                contentStyle={{ backgroundColor: '#1e293b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '0.5rem' }}
+                                                                itemStyle={{ color: '#fff' }}
+                                                                formatter={(value: number) => [`${value.toFixed(1)}%`, 'Error Rate']}
+                                                                labelFormatter={(label) => `Date: ${label}`}
+                                                            />
+                                                            <Line
+                                                                type="monotone"
+                                                                dataKey="errorRate"
+                                                                stroke="#ef4444"
+                                                                strokeWidth={3}
+                                                                dot={{ fill: '#ef4444', r: 4 }}
+                                                                activeDot={{ r: 6 }}
+                                                            />
+                                                        </LineChart>
+                                                    </ResponsiveContainer>
+                                                </div>
+                                            ) : (
+                                                <div style={{ height: '200px', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0.5 }}>
+                                                    No data available for the selected time range.
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Global Analytics - Average Time by Day */}
+                                        <div className="glass-panel" style={{ padding: '1.5rem', marginBottom: '2rem' }}>
+                                            <h4 style={{ fontSize: '1rem', marginBottom: '1rem', opacity: 0.9 }}>Average Response Time by Day</h4>
+                                            {globalStats.length > 0 ? (
+                                                <div style={{ height: '300px', width: '100%' }}>
+                                                    <ResponsiveContainer width="100%" height="100%">
+                                                        <LineChart data={globalStats}>
+                                                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+                                                            <XAxis
+                                                                dataKey="date"
+                                                                stroke="rgba(255,255,255,0.5)"
+                                                                label={{ value: 'Date', position: 'insideBottom', offset: -5, fill: 'rgba(255,255,255,0.5)' }}
+                                                            />
+                                                            <YAxis
+                                                                stroke="rgba(255,255,255,0.5)"
+                                                                label={{ value: 'Time (seconds)', angle: -90, position: 'insideLeft', fill: 'rgba(255,255,255,0.5)' }}
+                                                            />
+                                                            <Tooltip
+                                                                contentStyle={{ backgroundColor: '#1e293b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '0.5rem' }}
+                                                                itemStyle={{ color: '#fff' }}
+                                                                formatter={(value: number) => [`${value.toFixed(2)}s`, 'Avg Time']}
+                                                                labelFormatter={(label) => `Date: ${label}`}
+                                                            />
+                                                            <Line
+                                                                type="monotone"
+                                                                dataKey="averageTime"
+                                                                stroke="#10b981"
+                                                                strokeWidth={3}
+                                                                dot={{ fill: '#10b981', r: 4 }}
+                                                                activeDot={{ r: 6 }}
+                                                            />
+                                                        </LineChart>
+                                                    </ResponsiveContainer>
+                                                </div>
+                                            ) : (
+                                                <div style={{ height: '200px', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0.5 }}>
+                                                    No data available for the selected time range.
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Individual Card Performance History */}
+                                        <div className="glass-panel" style={{ padding: '1.5rem' }}>
                                         <div style={{ marginBottom: '2rem', display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
                                             <label style={{ opacity: 0.8 }}>Select Card:</label>
                                             <select
@@ -1663,7 +1767,8 @@ export default function ImageVault() {
                                                 No history found for this card in the selected time range.
                                             </div>
                                         )}
-                                    </div>
+                                        </div>
+                                    </>
                                 )}
                             </>
                         )}

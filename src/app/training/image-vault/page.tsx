@@ -2733,24 +2733,39 @@ export default function ImageVault() {
                                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                                                     {palace.locations.map((location, idx) => {
                                                         const isEditing = editingLocation?.palaceId === palace.id && editingLocation?.index === idx;
+                                                        const isDragging = draggedItem?.palaceId === palace.id && draggedItem?.index === idx;
+                                                        const isDragOver = dragOverItem?.palaceId === palace.id && dragOverItem?.index === idx;
 
                                                         return (
                                                             <div
                                                                 key={idx}
+                                                                draggable={!isEditing}
+                                                                onDragStart={() => !isEditing && handleDragStart(palace.id, idx)}
+                                                                onDragEnter={() => handleDragEnter(palace.id, idx)}
+                                                                onDragEnd={handleDragEnd}
+                                                                onDragOver={(e) => e.preventDefault()}
                                                                 style={{
                                                                     padding: '0.75rem',
-                                                                    background: 'rgba(0,0,0,0.2)',
+                                                                    background: isDragOver ? 'rgba(99, 102, 241, 0.3)' : 'rgba(0,0,0,0.2)',
                                                                     borderRadius: '0.5rem',
                                                                     display: 'flex',
                                                                     justifyContent: 'space-between',
                                                                     alignItems: 'center',
-                                                                    transition: 'all 0.2s'
+                                                                    cursor: isEditing ? 'default' : 'grab',
+                                                                    opacity: isDragging ? 0.5 : 1,
+                                                                    border: isDragOver ? '2px solid var(--primary)' : '2px solid transparent',
+                                                                    transition: 'all 0.2s',
+                                                                    transform: isDragging ? 'scale(0.98)' : 'scale(1)'
                                                                 }}
                                                                 onMouseEnter={(e) => {
-                                                                    e.currentTarget.style.background = 'rgba(99, 102, 241, 0.1)';
+                                                                    if (!isDragging && !isEditing) {
+                                                                        e.currentTarget.style.background = 'rgba(99, 102, 241, 0.1)';
+                                                                    }
                                                                 }}
                                                                 onMouseLeave={(e) => {
-                                                                    e.currentTarget.style.background = 'rgba(0,0,0,0.2)';
+                                                                    if (!isDragOver && !isEditing) {
+                                                                        e.currentTarget.style.background = 'rgba(0,0,0,0.2)';
+                                                                    }
                                                                 }}
                                                             >
                                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flex: 1 }}>

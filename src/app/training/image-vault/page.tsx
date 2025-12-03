@@ -1522,10 +1522,10 @@ export default function ImageVault() {
                                                     
                                                     if (stats.mistakes === 0 && avgTimeInSeconds < 2) {
                                                         tier = 'diamond';
-                                                        // Diamond: Icy blue/white gradient, cyan glow, bright border
-                                                        solidBgColor = 'linear-gradient(135deg, #3b82f6 0%, #cffafe 50%, #3b82f6 100%)';
-                                                        boxShadow = '0 0 15px rgba(6, 182, 212, 0.8)';
-                                                        border = '1px solid rgba(165, 243, 252, 0.8)';
+                                                        // Diamond: Reference "Diamond Sparkle" colors - Icy blue/white
+                                                        solidBgColor = 'linear-gradient(135deg, #B9F2FF 0%, #F3FBFF 50%, #B9F2FF 100%)';
+                                                        boxShadow = '0 0 15px rgba(0, 215, 255, 0.6)'; // Vivid Sky Blue glow
+                                                        border = '1px solid rgba(233, 254, 255, 0.8)'; // Bubbles border
                                                     } else if (score >= 75) {
                                                         tier = 'gold';
                                                         // Gold: Darker gold gradient, soft glow, no border
@@ -1579,28 +1579,15 @@ export default function ImageVault() {
                                                                 flexDirection: 'column',
                                                                 alignItems: 'center',
                                                                 justifyContent: 'center',
-                                                                color: '#ffffff',
+                                                                color: tier === 'diamond' ? '#0f172a' : '#ffffff', // Dark text for light diamond background
                                                                 background: solidBgColor,
                                                                 borderRadius: '0.5rem',
                                                                 border: border,
                                                                 boxShadow: boxShadow,
                                                                 padding: '0.5rem',
-                                                                textShadow: '0 2px 4px rgba(0,0,0,0.5)',
+                                                                textShadow: tier === 'diamond' ? 'none' : '0 2px 4px rgba(0,0,0,0.5)', // Remove shadow for diamond
                                                                 overflow: 'hidden'
                                                             }}>
-                                                                {/* Diamond shimmer overlay */}
-                                                                {tier === 'diamond' && (
-                                                                    <div style={{
-                                                                        position: 'absolute',
-                                                                        top: 0,
-                                                                        left: '-100%',
-                                                                        width: '100%',
-                                                                        height: '100%',
-                                                                        background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.8) 50%, transparent 100%)',
-                                                                        animation: 'shine 2s ease-in-out infinite',
-                                                                        pointerEvents: 'none'
-                                                                    }} />
-                                                                )}
                                                                 {/* Angled solid shimmer for Gold only */}
                                                                 {tier === 'gold' && (
                                                                     <div style={{
@@ -1635,29 +1622,16 @@ export default function ImageVault() {
                                                                 justifyContent: 'center',
                                                                 fontSize: '0.9rem',
                                                                 fontWeight: '500',
-                                                                color: '#ffffff',
+                                                                color: tier === 'diamond' ? '#0f172a' : '#ffffff', // Dark text for light diamond background
                                                                 background: solidBgColor,
                                                                 borderRadius: '0.5rem',
                                                                 border: border,
                                                                 boxShadow: boxShadow,
                                                                 padding: '0.5rem',
                                                                 textAlign: 'center',
-                                                                textShadow: '0 2px 4px rgba(0,0,0,0.5)',
+                                                                textShadow: tier === 'diamond' ? 'none' : '0 2px 4px rgba(0,0,0,0.5)', // Remove shadow for diamond
                                                                 overflow: 'hidden'
                                                             }}>
-                                                                {/* Diamond shimmer overlay */}
-                                                                {tier === 'diamond' && (
-                                                                    <div style={{
-                                                                        position: 'absolute',
-                                                                        top: 0,
-                                                                        left: '-100%',
-                                                                        width: '100%',
-                                                                        height: '100%',
-                                                                        background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.8) 50%, transparent 100%)',
-                                                                        animation: 'shine 2s ease-in-out infinite',
-                                                                        pointerEvents: 'none'
-                                                                    }} />
-                                                                )}
                                                                 {/* Angled solid shimmer for Gold only */}
                                                                 {tier === 'gold' && (
                                                                     <div style={{

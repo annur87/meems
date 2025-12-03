@@ -1522,15 +1522,15 @@ export default function ImageVault() {
                                                     
                                                     if (stats.mistakes === 0 && avgTimeInSeconds < 2) {
                                                         tier = 'platinum';
-                                                        // Platinum: Lighter middle gradient, strong glow, no shimmer
-                                                        solidBgColor = 'linear-gradient(135deg, #e5e4e2 0%, #f3f4f6 50%, #e5e4e2 100%)';
-                                                        boxShadow = '0 0 20px rgba(229, 228, 226, 0.8)';
+                                                        // Platinum: Darker metallic gradient, strong glow, no shimmer
+                                                        solidBgColor = 'linear-gradient(135deg, #475569 0%, #94a3b8 50%, #475569 100%)';
+                                                        boxShadow = '0 0 20px rgba(229, 228, 226, 0.6)';
                                                         border = 'none';
                                                     } else if (score >= 75) {
                                                         tier = 'gold';
-                                                        // Gold: Lighter middle gradient, soft glow, no border
-                                                        solidBgColor = 'linear-gradient(135deg, #FCD34D 0%, #FEF3C7 50%, #FCD34D 100%)';
-                                                        boxShadow = '0 0 15px rgba(251, 191, 36, 0.5)';
+                                                        // Gold: Darker gold gradient, soft glow, no border
+                                                        solidBgColor = 'linear-gradient(135deg, #b45309 0%, #fbbf24 50%, #b45309 100%)';
+                                                        boxShadow = '0 0 15px rgba(251, 191, 36, 0.4)';
                                                         border = 'none';
                                                     } else if (score >= 50) {
                                                         tier = 'silver';

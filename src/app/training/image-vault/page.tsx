@@ -1511,7 +1511,7 @@ export default function ImageVault() {
                                                 const bgColor = getCardPerformanceColor(stats);
                                                 
                                                 // Determine tier for styling
-                                                let tier: 'platinum' | 'gold' | 'silver' | 'bronze' | 'none' = 'none';
+                                                let tier: 'diamond' | 'gold' | 'silver' | 'bronze' | 'none' = 'none';
                                                 let boxShadow = 'none';
                                                 let border = '2px solid rgba(255,255,255,0.1)';
                                                 let solidBgColor = bgColor;
@@ -1521,11 +1521,11 @@ export default function ImageVault() {
                                                     const score = stats.performanceScore;
                                                     
                                                     if (stats.mistakes === 0 && avgTimeInSeconds < 2) {
-                                                        tier = 'platinum';
-                                                        // Platinum: Darker edges, bright center, tighter strong glow, bright border
-                                                        solidBgColor = 'linear-gradient(135deg, #334155 0%, #e2e8f0 50%, #334155 100%)';
-                                                        boxShadow = '0 0 12px rgba(229, 228, 226, 0.9)';
-                                                        border = '1px solid rgba(255, 255, 255, 0.6)';
+                                                        tier = 'diamond';
+                                                        // Diamond: Icy blue/white gradient, cyan glow, bright border
+                                                        solidBgColor = 'linear-gradient(135deg, #3b82f6 0%, #cffafe 50%, #3b82f6 100%)';
+                                                        boxShadow = '0 0 15px rgba(6, 182, 212, 0.8)';
+                                                        border = '1px solid rgba(165, 243, 252, 0.8)';
                                                     } else if (score >= 75) {
                                                         tier = 'gold';
                                                         // Gold: Darker gold gradient, soft glow, no border
@@ -1588,6 +1588,19 @@ export default function ImageVault() {
                                                                 textShadow: '0 2px 4px rgba(0,0,0,0.5)',
                                                                 overflow: 'hidden'
                                                             }}>
+                                                                {/* Diamond shimmer overlay */}
+                                                                {tier === 'diamond' && (
+                                                                    <div style={{
+                                                                        position: 'absolute',
+                                                                        top: 0,
+                                                                        left: '-100%',
+                                                                        width: '100%',
+                                                                        height: '100%',
+                                                                        background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.8) 50%, transparent 100%)',
+                                                                        animation: 'shine 2s ease-in-out infinite',
+                                                                        pointerEvents: 'none'
+                                                                    }} />
+                                                                )}
                                                                 {/* Angled solid shimmer for Gold only */}
                                                                 {tier === 'gold' && (
                                                                     <div style={{
@@ -1632,6 +1645,19 @@ export default function ImageVault() {
                                                                 textShadow: '0 2px 4px rgba(0,0,0,0.5)',
                                                                 overflow: 'hidden'
                                                             }}>
+                                                                {/* Diamond shimmer overlay */}
+                                                                {tier === 'diamond' && (
+                                                                    <div style={{
+                                                                        position: 'absolute',
+                                                                        top: 0,
+                                                                        left: '-100%',
+                                                                        width: '100%',
+                                                                        height: '100%',
+                                                                        background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.8) 50%, transparent 100%)',
+                                                                        animation: 'shine 2s ease-in-out infinite',
+                                                                        pointerEvents: 'none'
+                                                                    }} />
+                                                                )}
                                                                 {/* Angled solid shimmer for Gold only */}
                                                                 {tier === 'gold' && (
                                                                     <div style={{

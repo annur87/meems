@@ -14,6 +14,7 @@ import {
     getCardPerformanceColor,
     getCardHistory,
     getGlobalDailyStats,
+    getCardDailyStats,
     type DailyGlobalStats,
     savePalaceAttempt,
     getPalaceStats,
@@ -33,7 +34,7 @@ import { majorSystemList } from '@/data/major-system';
 import { cardPaoList } from '@/data/card-pao';
 import { digitPaoList } from '@/data/digit-pao';
 import wordList from '@/data/words.json';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { SAMPLE_MAJOR_SYSTEM, SAMPLE_PAO_SYSTEM, SAMPLE_PALACES } from '@/data/sampleImageVault';
 
 type SystemType = 'analytics' | 'major' | 'card-pao' | 'digit-pao' | 'palace';
@@ -170,6 +171,7 @@ export default function ImageVault() {
     }, []);
     
     const [globalStats, setGlobalStats] = useState<DailyGlobalStats[]>([]);
+    const [cardDailyStats, setCardDailyStats] = useState<DailyGlobalStats[]>([]);
 
     // Load stats when mode changes or time filter changes
     useEffect(() => {
@@ -193,6 +195,10 @@ export default function ImageVault() {
                 const loadHistory = async () => {
                     const history = await getCardHistory(selectedCardForStats, 'default_user', timeFilter);
                     setCardHistory(history);
+                    
+                    // Also load daily stats for this card
+                    const dailyStats = await getCardDailyStats(selectedCardForStats, userId, timeFilter);
+                    setCardDailyStats(dailyStats);
                 };
                 loadHistory();
             } else if (majorSystem.length > 0) {
@@ -1503,6 +1509,38 @@ export default function ImageVault() {
                                             {filteredMajor.map((entry) => {
                                                 const stats = cardPerformanceStats.get(entry.number);
                                                 const bgColor = getCardPerformanceColor(stats);
+                                                
+                                                // Determine tier for styling
+                                                let tier: 'platinum' | 'gold' | 'silver' | 'bronze' | 'none' = 'none';
+                                                let boxShadow = 'none';
+                                                let border = '2px solid rgba(255,255,255,0.1)';
+                                                
+                                                if (stats && stats.totalAttempts > 0) {
+                                                    const avgTimeInSeconds = stats.averageTime / 1000;
+                                                    const score = stats.performanceScore;
+                                                    
+                                                    if (stats.mistakes === 0 && avgTimeInSeconds < 2) {
+                                                        tier = 'platinum';
+                                                        // Platinum: Radiant white/silver glow, no border
+                                                        boxShadow = '0 0 20px rgba(229, 228, 226, 0.8), 0 0 40px rgba(229, 228, 226, 0.5), 0 0 60px rgba(156, 163, 175, 0.3)';
+                                                        border = 'none';
+                                                    } else if (score >= 75) {
+                                                        tier = 'gold';
+                                                        // Gold: Yellow glow + yellow border
+                                                        boxShadow = '0 0 15px rgba(251, 191, 36, 0.6), 0 0 30px rgba(251, 191, 36, 0.3)';
+                                                        border = '2px solid rgba(251, 191, 36, 0.7)';
+                                                    } else if (score >= 50) {
+                                                        tier = 'silver';
+                                                        // Silver: White glow + white border
+                                                        boxShadow = '0 0 12px rgba(203, 213, 225, 0.6), 0 0 24px rgba(203, 213, 225, 0.3)';
+                                                        border = '2px solid rgba(203, 213, 225, 0.7)';
+                                                    } else {
+                                                        tier = 'bronze';
+                                                        // Bronze: Red glow + red border
+                                                        boxShadow = '0 0 10px rgba(239, 68, 68, 0.6), 0 0 20px rgba(239, 68, 68, 0.3)';
+                                                        border = '2px solid rgba(239, 68, 68, 0.7)';
+                                                    }
+                                                }
 
                                                 return (
                                                     <div
@@ -1536,12 +1574,13 @@ export default function ImageVault() {
                                                                 flexDirection: 'column',
                                                                 alignItems: 'center',
                                                                 justifyContent: 'center',
-                                                                color: '#ffffff', // Pure white
+                                                                color: '#ffffff',
                                                                 background: bgColor,
                                                                 borderRadius: '0.5rem',
-                                                                border: `2px solid ${bgColor !== 'rgba(100, 116, 139, 0.15)' ? bgColor.replace('0.35)', '0.8)') : 'rgba(255,255,255,0.1)'}`,
+                                                                border: border,
+                                                                boxShadow: boxShadow,
                                                                 padding: '0.5rem',
-                                                                textShadow: '0 2px 4px rgba(0,0,0,0.5)' // Add shadow for better readability
+                                                                textShadow: '0 2px 4px rgba(0,0,0,0.5)'
                                                             }}>
                                                                 <div style={{ fontSize: '2rem', fontWeight: 'bold', lineHeight: 1 }}>{entry.number}</div>
                                                                 {wordsVisible && (
@@ -1566,7 +1605,8 @@ export default function ImageVault() {
                                                                 color: '#ffffff',
                                                                 background: bgColor,
                                                                 borderRadius: '0.5rem',
-                                                                border: `2px solid ${bgColor !== 'rgba(100, 116, 139, 0.15)' ? bgColor.replace('0.35)', '0.8)') : 'rgba(255,255,255,0.1)'}`,
+                                                                border: border,
+                                                                boxShadow: boxShadow,
                                                                 padding: '0.5rem',
                                                                 textAlign: 'center',
                                                                 textShadow: '0 2px 4px rgba(0,0,0,0.5)'
@@ -1606,13 +1646,53 @@ export default function ImageVault() {
                                     </>
                                 ) : (
                                     <>
-                                        {/* Global Analytics - Error Rate by Day */}
+                                        {/* Combined Analytics Chart */}
                                         <div className="glass-panel" style={{ padding: '1.5rem', marginBottom: '2rem' }}>
-                                            <h4 style={{ fontSize: '1rem', marginBottom: '1rem', opacity: 0.9 }}>Error Rate by Day</h4>
+                                            <div style={{ marginBottom: '1.5rem', display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'space-between' }}>
+                                                <h4 style={{ fontSize: '1rem', opacity: 0.9, margin: 0 }}>Performance Analytics by Day</h4>
+                                                <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                                                    <label style={{ opacity: 0.8, fontSize: '0.9rem' }}>Card:</label>
+                                                    <select
+                                                        value={selectedCardForStats}
+                                                        onChange={(e) => setSelectedCardForStats(e.target.value)}
+                                                        className="input-field"
+                                                        style={{ width: 'auto', minWidth: '200px', padding: '0.4rem 0.8rem', fontSize: '0.9rem' }}
+                                                    >
+                                                        {majorSystem.map(card => (
+                                                            <option key={card.id} value={card.number}>
+                                                                {card.number} - {card.images[0]}
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                            </div>
+                                            
                                             {globalStats.length > 0 ? (
-                                                <div style={{ height: '300px', width: '100%' }}>
+                                                <div style={{ height: '400px', width: '100%' }}>
                                                     <ResponsiveContainer width="100%" height="100%">
-                                                        <LineChart data={globalStats}>
+                                                        <LineChart data={(() => {
+                                                            // Merge global and card stats by date
+                                                            const dateMap = new Map<string, any>();
+                                                            
+                                                            // Add global stats
+                                                            globalStats.forEach(stat => {
+                                                                dateMap.set(stat.date, {
+                                                                    date: stat.date,
+                                                                    globalErrorRate: stat.errorRate,
+                                                                    globalAvgTime: stat.averageTime,
+                                                                });
+                                                            });
+                                                            
+                                                            // Add card-specific stats
+                                                            cardDailyStats.forEach(stat => {
+                                                                const existing = dateMap.get(stat.date) || { date: stat.date };
+                                                                existing.cardErrorRate = stat.errorRate;
+                                                                existing.cardAvgTime = stat.averageTime;
+                                                                dateMap.set(stat.date, existing);
+                                                            });
+                                                            
+                                                            return Array.from(dateMap.values()).sort((a, b) => a.date.localeCompare(b.date));
+                                                        })()}>
                                                             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
                                                             <XAxis
                                                                 dataKey="date"
@@ -1620,95 +1700,98 @@ export default function ImageVault() {
                                                                 label={{ value: 'Date', position: 'insideBottom', offset: -5, fill: 'rgba(255,255,255,0.5)' }}
                                                             />
                                                             <YAxis
+                                                                yAxisId="left"
                                                                 stroke="rgba(255,255,255,0.5)"
                                                                 label={{ value: 'Error Rate (%)', angle: -90, position: 'insideLeft', fill: 'rgba(255,255,255,0.5)' }}
                                                                 domain={[0, 100]}
                                                             />
-                                                            <Tooltip
-                                                                contentStyle={{ backgroundColor: '#1e293b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '0.5rem' }}
-                                                                itemStyle={{ color: '#fff' }}
-                                                                formatter={(value: number) => [`${value.toFixed(1)}%`, 'Error Rate']}
-                                                                labelFormatter={(label) => `Date: ${label}`}
-                                                            />
-                                                            <Line
-                                                                type="monotone"
-                                                                dataKey="errorRate"
-                                                                stroke="#ef4444"
-                                                                strokeWidth={3}
-                                                                dot={{ fill: '#ef4444', r: 4 }}
-                                                                activeDot={{ r: 6 }}
-                                                            />
-                                                        </LineChart>
-                                                    </ResponsiveContainer>
-                                                </div>
-                                            ) : (
-                                                <div style={{ height: '200px', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0.5 }}>
-                                                    No data available for the selected time range.
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        {/* Global Analytics - Average Time by Day */}
-                                        <div className="glass-panel" style={{ padding: '1.5rem', marginBottom: '2rem' }}>
-                                            <h4 style={{ fontSize: '1rem', marginBottom: '1rem', opacity: 0.9 }}>Average Response Time by Day</h4>
-                                            {globalStats.length > 0 ? (
-                                                <div style={{ height: '300px', width: '100%' }}>
-                                                    <ResponsiveContainer width="100%" height="100%">
-                                                        <LineChart data={globalStats}>
-                                                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-                                                            <XAxis
-                                                                dataKey="date"
-                                                                stroke="rgba(255,255,255,0.5)"
-                                                                label={{ value: 'Date', position: 'insideBottom', offset: -5, fill: 'rgba(255,255,255,0.5)' }}
-                                                            />
                                                             <YAxis
+                                                                yAxisId="right"
+                                                                orientation="right"
                                                                 stroke="rgba(255,255,255,0.5)"
-                                                                label={{ value: 'Time (seconds)', angle: -90, position: 'insideLeft', fill: 'rgba(255,255,255,0.5)' }}
+                                                                label={{ value: 'Time (seconds)', angle: 90, position: 'insideRight', fill: 'rgba(255,255,255,0.5)' }}
                                                             />
                                                             <Tooltip
                                                                 contentStyle={{ backgroundColor: '#1e293b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '0.5rem' }}
                                                                 itemStyle={{ color: '#fff' }}
-                                                                formatter={(value: number) => [`${value.toFixed(2)}s`, 'Avg Time']}
+                                                                formatter={(value: number, name: string) => {
+                                                                    if (name.includes('ErrorRate')) {
+                                                                        return [`${value.toFixed(1)}%`, name.replace('globalErrorRate', 'Global Error Rate').replace('cardErrorRate', 'Card Error Rate')];
+                                                                    }
+                                                                    return [`${value.toFixed(2)}s`, name.replace('globalAvgTime', 'Global Avg Time').replace('cardAvgTime', 'Card Avg Time')];
+                                                                }}
                                                                 labelFormatter={(label) => `Date: ${label}`}
                                                             />
+                                                            <Legend 
+                                                                wrapperStyle={{ paddingTop: '20px' }}
+                                                                formatter={(value: string) => {
+                                                                    const labels: Record<string, string> = {
+                                                                        'globalErrorRate': 'Global Error Rate',
+                                                                        'cardErrorRate': `Card ${selectedCardForStats} Error Rate`,
+                                                                        'globalAvgTime': 'Global Avg Time',
+                                                                        'cardAvgTime': `Card ${selectedCardForStats} Avg Time`
+                                                                    };
+                                                                    return labels[value] || value;
+                                                                }}
+                                                            />
+                                                            {/* Global Error Rate */}
                                                             <Line
+                                                                yAxisId="left"
                                                                 type="monotone"
-                                                                dataKey="averageTime"
-                                                                stroke="#10b981"
+                                                                dataKey="globalErrorRate"
+                                                                stroke="#ef4444"
+                                                                strokeWidth={2}
+                                                                dot={{ fill: '#ef4444', r: 3 }}
+                                                                activeDot={{ r: 5 }}
+                                                                strokeDasharray="5 5"
+                                                            />
+                                                            {/* Card-Specific Error Rate */}
+                                                            <Line
+                                                                yAxisId="left"
+                                                                type="monotone"
+                                                                dataKey="cardErrorRate"
+                                                                stroke="#f97316"
                                                                 strokeWidth={3}
-                                                                dot={{ fill: '#10b981', r: 4 }}
+                                                                dot={{ fill: '#f97316', r: 4 }}
+                                                                activeDot={{ r: 6 }}
+                                                            />
+                                                            {/* Global Avg Time */}
+                                                            <Line
+                                                                yAxisId="right"
+                                                                type="monotone"
+                                                                dataKey="globalAvgTime"
+                                                                stroke="#10b981"
+                                                                strokeWidth={2}
+                                                                dot={{ fill: '#10b981', r: 3 }}
+                                                                activeDot={{ r: 5 }}
+                                                                strokeDasharray="5 5"
+                                                            />
+                                                            {/* Card-Specific Avg Time */}
+                                                            <Line
+                                                                yAxisId="right"
+                                                                type="monotone"
+                                                                dataKey="cardAvgTime"
+                                                                stroke="#14b8a6"
+                                                                strokeWidth={3}
+                                                                dot={{ fill: '#14b8a6', r: 4 }}
                                                                 activeDot={{ r: 6 }}
                                                             />
                                                         </LineChart>
                                                     </ResponsiveContainer>
                                                 </div>
                                             ) : (
-                                                <div style={{ height: '200px', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0.5 }}>
+                                                <div style={{ height: '300px', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0.5 }}>
                                                     No data available for the selected time range.
                                                 </div>
                                             )}
                                         </div>
 
-                                        {/* Individual Card Performance History */}
+                                        {/* Individual Card Attempt History */}
                                         <div className="glass-panel" style={{ padding: '1.5rem' }}>
-                                        <div style={{ marginBottom: '2rem', display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                                            <label style={{ opacity: 0.8 }}>Select Card:</label>
-                                            <select
-                                                value={selectedCardForStats}
-                                                onChange={(e) => setSelectedCardForStats(e.target.value)}
-                                                className="input-field"
-                                                style={{ width: 'auto', minWidth: '200px' }}
-                                            >
-                                                {majorSystem.map(card => (
-                                                    <option key={card.id} value={card.number}>
-                                                        {card.number} - {card.images[0]}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                            <div style={{ marginLeft: 'auto', opacity: 0.6, fontSize: '0.9rem' }}>
+                                            <h4 style={{ fontSize: '1rem', marginBottom: '1.5rem', opacity: 0.9 }}>Individual Attempt History</h4>
+                                            <div style={{ marginBottom: '1rem', opacity: 0.6, fontSize: '0.9rem' }}>
                                                 Total Attempts: {cardHistory.length}
                                             </div>
-                                        </div>
 
                                         {cardHistory.length > 0 ? (
                                             <div style={{ height: '400px', width: '100%' }}>

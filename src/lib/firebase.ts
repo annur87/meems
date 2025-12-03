@@ -588,6 +588,64 @@ export const getGlobalDailyStats = async (
     }
 };
 
+export const getCardDailyStats = async (
+    cardNumber: string,
+    userId: string = USER_ID,
+    timeFilter?: '1h' | '2h' | '12h' | '1d' | '1w' | '1m' | '1y' | 'all'
+): Promise<DailyGlobalStats[]> => {
+    try {
+        if (!firebaseConfig.apiKey) {
+            return [];
+        }
+
+        const attemptsRef = collection(db, 'major_system_attempts', userId, 'attempts');
+        const q = query(attemptsRef, orderBy('timestamp', 'desc'));
+        const snapshot = await getDocs(q);
+        const attempts: CardAttempt[] = snapshot.docs.map(doc => doc.data() as CardAttempt);
+
+        // Filter by card number and time
+        const filteredAttempts = attempts.filter(a => {
+            if (a.cardNumber !== cardNumber) return false;
+            if (timeFilter && timeFilter !== 'all') {
+                const cutoff = getCalendarCutoff(timeFilter);
+                return a.timestamp >= cutoff;
+            }
+            return true;
+        });
+
+        // Group by day
+        const dayMap = new Map<string, { totalTime: number; totalAttempts: number; mistakes: number }>();
+
+        filteredAttempts.forEach(attempt => {
+            const date = new Date(attempt.timestamp).toLocaleDateString('en-CA');
+            const current = dayMap.get(date) || { totalTime: 0, totalAttempts: 0, mistakes: 0 };
+
+            current.totalTime += attempt.responseTime;
+            current.totalAttempts += 1;
+            if (!attempt.isCorrect) {
+                current.mistakes += 1;
+            }
+
+            dayMap.set(date, current);
+        });
+
+        // Convert to array and sort
+        const stats: DailyGlobalStats[] = Array.from(dayMap.entries()).map(([date, data]) => ({
+            date,
+            totalAttempts: data.totalAttempts,
+            mistakes: data.mistakes,
+            errorRate: (data.mistakes / data.totalAttempts) * 100,
+            averageTime: (data.totalTime / data.totalAttempts) / 1000
+        }));
+
+        return stats.sort((a, b) => a.date.localeCompare(b.date));
+
+    } catch (error) {
+        console.error('Error getting card daily stats:', error);
+        return [];
+    }
+};
+
 // ===== MEMORY PALACE STATISTICS =====
 
 export interface PalaceItemStat {

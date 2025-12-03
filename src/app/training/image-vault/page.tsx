@@ -1522,14 +1522,14 @@ export default function ImageVault() {
                                                     
                                                     if (stats.mistakes === 0 && avgTimeInSeconds < 2) {
                                                         tier = 'platinum';
-                                                        // Platinum: Solid platinum color with subtle glow, no border
-                                                        solidBgColor = 'linear-gradient(135deg, #e5e4e2 0%, #9ca3af 50%, #e5e4e2 100%)';
-                                                        boxShadow = '0 0 8px rgba(229, 228, 226, 0.4)';
+                                                        // Platinum: Lighter middle gradient, strong glow, no shimmer
+                                                        solidBgColor = 'linear-gradient(135deg, #e5e4e2 0%, #f3f4f6 50%, #e5e4e2 100%)';
+                                                        boxShadow = '0 0 20px rgba(229, 228, 226, 0.8)';
                                                         border = 'none';
                                                     } else if (score >= 75) {
                                                         tier = 'gold';
-                                                        // Gold: Refined gold gradient, soft glow, no border
-                                                        solidBgColor = 'linear-gradient(135deg, #FCD34D 0%, #D97706 50%, #FCD34D 100%)';
+                                                        // Gold: Lighter middle gradient, soft glow, no border
+                                                        solidBgColor = 'linear-gradient(135deg, #FCD34D 0%, #FEF3C7 50%, #FCD34D 100%)';
                                                         boxShadow = '0 0 15px rgba(251, 191, 36, 0.5)';
                                                         border = 'none';
                                                     } else if (score >= 50) {
@@ -1588,19 +1588,6 @@ export default function ImageVault() {
                                                                 textShadow: '0 2px 4px rgba(0,0,0,0.5)',
                                                                 overflow: 'hidden'
                                                             }}>
-                                                                {/* Solid shimmer overlay for platinum only */}
-                                                                {tier === 'platinum' && (
-                                                                    <div style={{
-                                                                        position: 'absolute',
-                                                                        top: 0,
-                                                                        left: '-100%',
-                                                                        width: '100%',
-                                                                        height: '100%',
-                                                                        background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.6) 50%, transparent 100%)',
-                                                                        animation: 'shine 2s ease-in-out infinite',
-                                                                        pointerEvents: 'none'
-                                                                    }} />
-                                                                )}
                                                                 {/* Angled solid shimmer for Gold only */}
                                                                 {tier === 'gold' && (
                                                                     <div style={{
@@ -1645,19 +1632,6 @@ export default function ImageVault() {
                                                                 textShadow: '0 2px 4px rgba(0,0,0,0.5)',
                                                                 overflow: 'hidden'
                                                             }}>
-                                                                {/* Solid shimmer overlay for platinum only */}
-                                                                {tier === 'platinum' && (
-                                                                    <div style={{
-                                                                        position: 'absolute',
-                                                                        top: 0,
-                                                                        left: '-100%',
-                                                                        width: '100%',
-                                                                        height: '100%',
-                                                                        background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.6) 50%, transparent 100%)',
-                                                                        animation: 'shine 2s ease-in-out infinite',
-                                                                        pointerEvents: 'none'
-                                                                    }} />
-                                                                )}
                                                                 {/* Angled solid shimmer for Gold only */}
                                                                 {tier === 'gold' && (
                                                                     <div style={{

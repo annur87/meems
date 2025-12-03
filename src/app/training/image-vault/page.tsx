@@ -104,7 +104,7 @@ export default function ImageVault() {
     const [editingPalace, setEditingPalace] = useState<string | null>(null);
     const [activeLocationInput, setActiveLocationInput] = useState<string | null>(null);
     const [newPalaceName, setNewPalaceName] = useState('');
-    const [newLocation, setNewLocation] = useState('');
+    const [newLocationMap, setNewLocationMap] = useState<Map<string, string>>(new Map());
 
     // Drag and Drop State
     const [draggedItem, setDraggedItem] = useState<{ palaceId: string, index: number } | null>(null);
@@ -541,15 +541,21 @@ export default function ImageVault() {
     };
 
     const addLocation = (palaceId: string) => {
-        if (!newLocation) return;
+        const locationText = newLocationMap.get(palaceId) || '';
+        if (!locationText.trim()) return;
 
         setPalaces(palaces.map(p =>
             p.id === palaceId
-                ? { ...p, locations: [...p.locations, newLocation] }
+                ? { ...p, locations: [...p.locations, locationText.trim()] }
                 : p
         ));
 
-        setNewLocation('');
+        // Clear this palace's input
+        setNewLocationMap(prev => {
+            const next = new Map(prev);
+            next.delete(palaceId);
+            return next;
+        });
     };
 
     const deleteLocation = (palaceId: string, location: string) => {
@@ -2647,6 +2653,13 @@ export default function ImageVault() {
                                                                 className="input-field"
                                                                 value={palace.name}
                                                                 onChange={(e) => updatePalaceName(palace.id, e.target.value)}
+                                                                onKeyDown={(e) => {
+                                                                    if (e.key === 'Enter') {
+                                                                        setEditingPalace(null);
+                                                                    } else if (e.key === 'Escape') {
+                                                                        setEditingPalace(null);
+                                                                    }
+                                                                }}
                                                                 onBlur={() => setEditingPalace(null)}
                                                                 autoFocus
                                                                 style={{ fontSize: '1.1rem', fontWeight: 'bold', maxWidth: '300px' }}
@@ -2682,8 +2695,14 @@ export default function ImageVault() {
                                                         type="text"
                                                         className="input-field"
                                                         placeholder="Add new location..."
-                                                        value={activeLocationInput === palace.id ? newLocation : ''}
-                                                        onChange={(e) => setNewLocation(e.target.value)}
+                                                        value={newLocationMap.get(palace.id) || ''}
+                                                        onChange={(e) => {
+                                                            setNewLocationMap(prev => {
+                                                                const next = new Map(prev);
+                                                                next.set(palace.id, e.target.value);
+                                                                return next;
+                                                            });
+                                                        }}
                                                         onKeyPress={(e) => e.key === 'Enter' && addLocation(palace.id)}
                                                         onFocus={() => setActiveLocationInput(palace.id)}
                                                         onBlur={() => setActiveLocationInput(null)}

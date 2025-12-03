@@ -1514,6 +1514,7 @@ export default function ImageVault() {
                                                 let tier: 'platinum' | 'gold' | 'silver' | 'bronze' | 'none' = 'none';
                                                 let boxShadow = 'none';
                                                 let border = '2px solid rgba(255,255,255,0.1)';
+                                                let solidBgColor = bgColor;
                                                 
                                                 if (stats && stats.totalAttempts > 0) {
                                                     const avgTimeInSeconds = stats.averageTime / 1000;
@@ -1521,24 +1522,28 @@ export default function ImageVault() {
                                                     
                                                     if (stats.mistakes === 0 && avgTimeInSeconds < 2) {
                                                         tier = 'platinum';
-                                                        // Platinum: Subtle radiant white/silver glow, no border
-                                                        boxShadow = '0 0 12px rgba(229, 228, 226, 0.5), 0 0 24px rgba(229, 228, 226, 0.25)';
+                                                        // Platinum: Solid platinum color with subtle glow, no border
+                                                        solidBgColor = 'linear-gradient(135deg, #e5e4e2 0%, #9ca3af 50%, #e5e4e2 100%)';
+                                                        boxShadow = '0 0 8px rgba(229, 228, 226, 0.4)';
                                                         border = 'none';
                                                     } else if (score >= 75) {
                                                         tier = 'gold';
-                                                        // Gold: Subtle yellow glow + yellow border
-                                                        boxShadow = '0 0 8px rgba(251, 191, 36, 0.4), 0 0 16px rgba(251, 191, 36, 0.2)';
-                                                        border = '2px solid rgba(251, 191, 36, 0.6)';
+                                                        // Gold: Solid yellow/gold color, no border
+                                                        solidBgColor = 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 50%, #fbbf24 100%)';
+                                                        boxShadow = 'none';
+                                                        border = 'none';
                                                     } else if (score >= 50) {
                                                         tier = 'silver';
-                                                        // Silver: Subtle white glow + white border
-                                                        boxShadow = '0 0 6px rgba(203, 213, 225, 0.4), 0 0 12px rgba(203, 213, 225, 0.2)';
-                                                        border = '2px solid rgba(203, 213, 225, 0.6)';
+                                                        // Silver: Solid silver color, no border
+                                                        solidBgColor = 'linear-gradient(135deg, #cbd5e1 0%, #94a3b8 50%, #cbd5e1 100%)';
+                                                        boxShadow = 'none';
+                                                        border = 'none';
                                                     } else {
                                                         tier = 'bronze';
-                                                        // Bronze: Subtle red glow + red border
-                                                        boxShadow = '0 0 6px rgba(239, 68, 68, 0.4), 0 0 12px rgba(239, 68, 68, 0.2)';
-                                                        border = '2px solid rgba(239, 68, 68, 0.6)';
+                                                        // Bronze: Solid bronze color with subtle border
+                                                        solidBgColor = 'linear-gradient(135deg, #cd7f32 0%, #b45309 50%, #cd7f32 100%)';
+                                                        boxShadow = 'none';
+                                                        border = '1px solid rgba(205, 127, 50, 0.3)';
                                                     }
                                                 }
 
@@ -1575,11 +1580,7 @@ export default function ImageVault() {
                                                                 alignItems: 'center',
                                                                 justifyContent: 'center',
                                                                 color: '#ffffff',
-                                                                background: tier === 'platinum' 
-                                                                    ? `linear-gradient(135deg, ${bgColor}, ${bgColor}), linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.3) 50%, transparent 100%)`
-                                                                    : bgColor,
-                                                                backgroundSize: tier === 'platinum' ? '100% 100%, 200% 100%' : 'auto',
-                                                                animation: tier === 'platinum' ? 'shimmer 3s ease-in-out infinite' : 'none',
+                                                                background: solidBgColor,
                                                                 borderRadius: '0.5rem',
                                                                 border: border,
                                                                 boxShadow: boxShadow,
@@ -1587,18 +1588,19 @@ export default function ImageVault() {
                                                                 textShadow: '0 2px 4px rgba(0,0,0,0.5)',
                                                                 overflow: 'hidden'
                                                             }}>
-                                                                {/* Shine overlay for all cards */}
-                                                                <div style={{
-                                                                    position: 'absolute',
-                                                                    top: 0,
-                                                                    left: '-100%',
-                                                                    width: '50%',
-                                                                    height: '100%',
-                                                                    background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent)',
-                                                                    transform: 'skewX(-20deg)',
-                                                                    animation: 'shine 3s ease-in-out infinite',
-                                                                    pointerEvents: 'none'
-                                                                }} />
+                                                                {/* Solid shimmer overlay for platinum only */}
+                                                                {tier === 'platinum' && (
+                                                                    <div style={{
+                                                                        position: 'absolute',
+                                                                        top: 0,
+                                                                        left: '-100%',
+                                                                        width: '100%',
+                                                                        height: '100%',
+                                                                        background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.6) 50%, transparent 100%)',
+                                                                        animation: 'shine 2s ease-in-out infinite',
+                                                                        pointerEvents: 'none'
+                                                                    }} />
+                                                                )}
                                                                 <div style={{ fontSize: '2rem', fontWeight: 'bold', lineHeight: 1, position: 'relative', zIndex: 1 }}>{entry.number}</div>
                                                                 {wordsVisible && (
                                                                     <div style={{ fontSize: '1rem', opacity: 1, marginTop: '0.25rem', textAlign: 'center', wordBreak: 'break-word', lineHeight: 1.2, position: 'relative', zIndex: 1 }}>
@@ -1620,11 +1622,7 @@ export default function ImageVault() {
                                                                 fontSize: '0.9rem',
                                                                 fontWeight: '500',
                                                                 color: '#ffffff',
-                                                                background: tier === 'platinum' 
-                                                                    ? `linear-gradient(135deg, ${bgColor}, ${bgColor}), linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.3) 50%, transparent 100%)`
-                                                                    : bgColor,
-                                                                backgroundSize: tier === 'platinum' ? '100% 100%, 200% 100%' : 'auto',
-                                                                animation: tier === 'platinum' ? 'shimmer 3s ease-in-out infinite' : 'none',
+                                                                background: solidBgColor,
                                                                 borderRadius: '0.5rem',
                                                                 border: border,
                                                                 boxShadow: boxShadow,
@@ -1633,18 +1631,19 @@ export default function ImageVault() {
                                                                 textShadow: '0 2px 4px rgba(0,0,0,0.5)',
                                                                 overflow: 'hidden'
                                                             }}>
-                                                                {/* Shine overlay for all cards */}
-                                                                <div style={{
-                                                                    position: 'absolute',
-                                                                    top: 0,
-                                                                    left: '-100%',
-                                                                    width: '50%',
-                                                                    height: '100%',
-                                                                    background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent)',
-                                                                    transform: 'skewX(-20deg)',
-                                                                    animation: 'shine 3s ease-in-out infinite',
-                                                                    pointerEvents: 'none'
-                                                                }} />
+                                                                {/* Solid shimmer overlay for platinum only */}
+                                                                {tier === 'platinum' && (
+                                                                    <div style={{
+                                                                        position: 'absolute',
+                                                                        top: 0,
+                                                                        left: '-100%',
+                                                                        width: '100%',
+                                                                        height: '100%',
+                                                                        background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.6) 50%, transparent 100%)',
+                                                                        animation: 'shine 2s ease-in-out infinite',
+                                                                        pointerEvents: 'none'
+                                                                    }} />
+                                                                )}
                                                                 {stats && stats.totalAttempts > 0 ? (
                                                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', width: '100%', position: 'relative', zIndex: 1 }}>
                                                                         <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', fontSize: '0.8rem' }}>

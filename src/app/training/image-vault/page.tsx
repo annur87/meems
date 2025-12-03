@@ -2732,7 +2732,7 @@ export default function ImageVault() {
                                                 {/* Locations List */}
                                                 <div style={{ 
                                                     display: 'grid', 
-                                                    gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', 
+                                                    gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', 
                                                     gap: '0.5rem' 
                                                 }}>
                                                     {palace.locations.map((location, idx) => {
@@ -2749,18 +2749,18 @@ export default function ImageVault() {
                                                                 onDragEnd={handleDragEnd}
                                                                 onDragOver={(e) => e.preventDefault()}
                                                                 style={{
-                                                                    padding: '0.75rem',
+                                                                    padding: '0.5rem',
                                                                     background: isDragOver ? 'rgba(99, 102, 241, 0.3)' : 'rgba(0,0,0,0.2)',
                                                                     borderRadius: '0.5rem',
                                                                     display: 'flex',
                                                                     flexDirection: 'column',
-                                                                    gap: '0.5rem',
+                                                                    gap: '0.25rem',
                                                                     cursor: isEditing ? 'default' : 'grab',
                                                                     opacity: isDragging ? 0.5 : 1,
                                                                     border: isDragOver ? '2px solid var(--primary)' : '2px solid transparent',
                                                                     transition: 'all 0.2s',
                                                                     transform: isDragging ? 'scale(0.98)' : 'scale(1)',
-                                                                    minHeight: '80px',
+                                                                    minHeight: '60px',
                                                                     position: 'relative'
                                                                 }}
                                                                 onMouseEnter={(e) => {
@@ -2777,7 +2777,7 @@ export default function ImageVault() {
                                                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                                                                     <span style={{
                                                                         opacity: 0.5,
-                                                                        fontSize: '0.8rem',
+                                                                        fontSize: '0.7rem',
                                                                         fontWeight: 'bold'
                                                                     }}>
                                                                         {idx + 1}
@@ -2791,10 +2791,10 @@ export default function ImageVault() {
                                                                             background: 'rgba(239, 68, 68, 0.2)',
                                                                             border: 'none',
                                                                             borderRadius: '0.25rem',
-                                                                            padding: '0.125rem 0.375rem',
+                                                                            padding: '0.1rem 0.3rem',
                                                                             color: 'var(--error)',
                                                                             cursor: 'pointer',
-                                                                            fontSize: '0.9rem',
+                                                                            fontSize: '0.75rem',
                                                                             transition: 'all 0.2s',
                                                                             lineHeight: 1
                                                                         }}
@@ -2823,18 +2823,18 @@ export default function ImageVault() {
                                                                         }}
                                                                         onBlur={() => setEditingLocation(null)}
                                                                         autoFocus
-                                                                        style={{ fontSize: '0.95rem', padding: '0.5rem' }}
+                                                                        style={{ fontSize: '0.8rem', padding: '0.4rem' }}
                                                                     />
                                                                 ) : (
                                                                     <div 
                                                                         style={{ 
-                                                                            fontSize: '0.95rem',
+                                                                            fontSize: '0.8rem',
                                                                             cursor: 'pointer',
                                                                             flex: 1,
                                                                             display: 'flex',
                                                                             alignItems: 'center',
                                                                             wordBreak: 'break-word',
-                                                                            lineHeight: 1.3
+                                                                            lineHeight: 1.2
                                                                         }}
                                                                         onClick={() => setEditingLocation({ palaceId: palace.id, index: idx })}
                                                                     >

@@ -103,6 +103,7 @@ export default function ImageVault() {
     const [palaces, setPalaces] = useState<Palace[]>([]);
     const [editingPalace, setEditingPalace] = useState<string | null>(null);
     const [activeLocationInput, setActiveLocationInput] = useState<string | null>(null);
+    const [editingLocation, setEditingLocation] = useState<{ palaceId: string, index: number } | null>(null);
     const [newPalaceName, setNewPalaceName] = useState('');
     const [newLocationMap, setNewLocationMap] = useState<Map<string, string>>(new Map());
 
@@ -564,6 +565,17 @@ export default function ImageVault() {
                 ? { ...p, locations: p.locations.filter(l => l !== location) }
                 : p
         ));
+    };
+
+    const updateLocation = (palaceId: string, index: number, newName: string) => {
+        setPalaces(palaces.map(p => {
+            if (p.id === palaceId) {
+                const newLocations = [...p.locations];
+                newLocations[index] = newName;
+                return { ...p, locations: newLocations };
+            }
+            return p;
+        }));
     };
 
     const moveLocation = (palaceId: string, index: number, direction: 'up' | 'down') => {
@@ -2720,39 +2732,25 @@ export default function ImageVault() {
                                                 {/* Locations List */}
                                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                                                     {palace.locations.map((location, idx) => {
-                                                        const isDragging = draggedItem?.palaceId === palace.id && draggedItem?.index === idx;
-                                                        const isDragOver = dragOverItem?.palaceId === palace.id && dragOverItem?.index === idx;
+                                                        const isEditing = editingLocation?.palaceId === palace.id && editingLocation?.index === idx;
 
                                                         return (
                                                             <div
                                                                 key={idx}
-                                                                draggable
-                                                                onDragStart={() => handleDragStart(palace.id, idx)}
-                                                                onDragEnter={() => handleDragEnter(palace.id, idx)}
-                                                                onDragEnd={handleDragEnd}
-                                                                onDragOver={(e) => e.preventDefault()}
                                                                 style={{
                                                                     padding: '0.75rem',
-                                                                    background: isDragOver ? 'rgba(99, 102, 241, 0.2)' : 'rgba(0,0,0,0.2)',
+                                                                    background: 'rgba(0,0,0,0.2)',
                                                                     borderRadius: '0.5rem',
                                                                     display: 'flex',
                                                                     justifyContent: 'space-between',
                                                                     alignItems: 'center',
-                                                                    cursor: 'grab',
-                                                                    opacity: isDragging ? 0.5 : 1,
-                                                                    border: isDragOver ? '2px solid var(--primary)' : '2px solid transparent',
-                                                                    transition: 'all 0.2s',
-                                                                    transform: isDragging ? 'scale(0.95)' : 'scale(1)'
+                                                                    transition: 'all 0.2s'
                                                                 }}
                                                                 onMouseEnter={(e) => {
-                                                                    if (!isDragging) {
-                                                                        e.currentTarget.style.background = 'rgba(99, 102, 241, 0.1)';
-                                                                    }
+                                                                    e.currentTarget.style.background = 'rgba(99, 102, 241, 0.1)';
                                                                 }}
                                                                 onMouseLeave={(e) => {
-                                                                    if (!isDragOver) {
-                                                                        e.currentTarget.style.background = 'rgba(0,0,0,0.2)';
-                                                                    }
+                                                                    e.currentTarget.style.background = 'rgba(0,0,0,0.2)';
                                                                 }}
                                                             >
                                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flex: 1 }}>
@@ -2764,97 +2762,57 @@ export default function ImageVault() {
                                                                     }}>
                                                                         {idx + 1}.
                                                                     </span>
-                                                                    <span style={{
-                                                                        fontSize: '1.6rem',
-                                                                        opacity: 0.3,
-                                                                        cursor: 'grab',
-                                                                        userSelect: 'none'
-                                                                    }}>
-                                                                        ⋮⋮
-                                                                    </span>
-                                                                    <span style={{ flex: 1, fontSize: '1rem' }}>{location}</span>
+                                                                    {isEditing ? (
+                                                                        <input
+                                                                            type="text"
+                                                                            className="input-field"
+                                                                            value={location}
+                                                                            onChange={(e) => updateLocation(palace.id, idx, e.target.value)}
+                                                                            onKeyDown={(e) => {
+                                                                                if (e.key === 'Enter' || e.key === 'Escape') {
+                                                                                    setEditingLocation(null);
+                                                                                }
+                                                                            }}
+                                                                            onBlur={() => setEditingLocation(null)}
+                                                                            autoFocus
+                                                                            style={{ flex: 1, fontSize: '1rem' }}
+                                                                        />
+                                                                    ) : (
+                                                                        <span 
+                                                                            style={{ 
+                                                                                flex: 1, 
+                                                                                fontSize: '1rem',
+                                                                                cursor: 'pointer'
+                                                                            }}
+                                                                            onClick={() => setEditingLocation({ palaceId: palace.id, index: idx })}
+                                                                        >
+                                                                            {location}
+                                                                        </span>
+                                                                    )}
                                                                 </div>
-                                                                <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                                                    <button
-                                                                        onClick={() => moveLocation(palace.id, idx, 'up')}
-                                                                        disabled={idx === 0}
-                                                                        style={{
-                                                                            background: idx === 0 ? 'rgba(255,255,255,0.05)' : 'rgba(99, 102, 241, 0.2)',
-                                                                            border: 'none',
-                                                                            borderRadius: '0.25rem',
-                                                                            padding: '0.25rem 0.5rem',
-                                                                            color: idx === 0 ? 'rgba(255,255,255,0.2)' : 'var(--primary)',
-                                                                            cursor: idx === 0 ? 'not-allowed' : 'pointer',
-                                                                            fontSize: '1.2rem',
-                                                                            transition: 'all 0.2s'
-                                                                        }}
-                                                                        onMouseEnter={(e) => {
-                                                                            if (idx !== 0) {
-                                                                                e.currentTarget.style.background = 'var(--primary)';
-                                                                                e.currentTarget.style.color = 'white';
-                                                                            }
-                                                                        }}
-                                                                        onMouseLeave={(e) => {
-                                                                            if (idx !== 0) {
-                                                                                e.currentTarget.style.background = 'rgba(99, 102, 241, 0.2)';
-                                                                                e.currentTarget.style.color = 'var(--primary)';
-                                                                            }
-                                                                        }}
-                                                                    >
-                                                                        ↑
-                                                                    </button>
-                                                                    <button
-                                                                        onClick={() => moveLocation(palace.id, idx, 'down')}
-                                                                        disabled={idx === palace.locations.length - 1}
-                                                                        style={{
-                                                                            background: idx === palace.locations.length - 1 ? 'rgba(255,255,255,0.05)' : 'rgba(99, 102, 241, 0.2)',
-                                                                            border: 'none',
-                                                                            borderRadius: '0.25rem',
-                                                                            padding: '0.25rem 0.5rem',
-                                                                            color: idx === palace.locations.length - 1 ? 'rgba(255,255,255,0.2)' : 'var(--primary)',
-                                                                            cursor: idx === palace.locations.length - 1 ? 'not-allowed' : 'pointer',
-                                                                            fontSize: '1.2rem',
-                                                                            transition: 'all 0.2s'
-                                                                        }}
-                                                                        onMouseEnter={(e) => {
-                                                                            if (idx !== palace.locations.length - 1) {
-                                                                                e.currentTarget.style.background = 'var(--primary)';
-                                                                                e.currentTarget.style.color = 'white';
-                                                                            }
-                                                                        }}
-                                                                        onMouseLeave={(e) => {
-                                                                            if (idx !== palace.locations.length - 1) {
-                                                                                e.currentTarget.style.background = 'rgba(99, 102, 241, 0.2)';
-                                                                                e.currentTarget.style.color = 'var(--primary)';
-                                                                            }
-                                                                        }}
-                                                                    >
-                                                                        ↓
-                                                                    </button>
-                                                                    <button
-                                                                        onClick={() => deleteLocation(palace.id, location)}
-                                                                        style={{
-                                                                            background: 'rgba(239, 68, 68, 0.2)',
-                                                                            border: 'none',
-                                                                            borderRadius: '0.25rem',
-                                                                            padding: '0.25rem 0.5rem',
-                                                                            color: 'var(--error)',
-                                                                            cursor: 'pointer',
-                                                                            fontSize: '1.2rem',
-                                                                            transition: 'all 0.2s'
-                                                                        }}
-                                                                        onMouseEnter={(e) => {
-                                                                            e.currentTarget.style.background = 'var(--error)';
-                                                                            e.currentTarget.style.color = 'white';
-                                                                        }}
-                                                                        onMouseLeave={(e) => {
-                                                                            e.currentTarget.style.background = 'rgba(239, 68, 68, 0.2)';
-                                                                            e.currentTarget.style.color = 'var(--error)';
-                                                                        }}
-                                                                    >
-                                                                        ×
-                                                                    </button>
-                                                                </div>
+                                                                <button
+                                                                    onClick={() => deleteLocation(palace.id, location)}
+                                                                    style={{
+                                                                        background: 'rgba(239, 68, 68, 0.2)',
+                                                                        border: 'none',
+                                                                        borderRadius: '0.25rem',
+                                                                        padding: '0.25rem 0.5rem',
+                                                                        color: 'var(--error)',
+                                                                        cursor: 'pointer',
+                                                                        fontSize: '1.2rem',
+                                                                        transition: 'all 0.2s'
+                                                                    }}
+                                                                    onMouseEnter={(e) => {
+                                                                        e.currentTarget.style.background = 'var(--error)';
+                                                                        e.currentTarget.style.color = 'white';
+                                                                    }}
+                                                                    onMouseLeave={(e) => {
+                                                                        e.currentTarget.style.background = 'rgba(239, 68, 68, 0.2)';
+                                                                        e.currentTarget.style.color = 'var(--error)';
+                                                                    }}
+                                                                >
+                                                                    ✕
+                                                                </button>
                                                             </div>
                                                         );
                                                     })}

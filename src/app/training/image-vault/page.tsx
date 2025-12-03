@@ -1522,10 +1522,10 @@ export default function ImageVault() {
                                                     
                                                     if (stats.mistakes === 0 && avgTimeInSeconds < 2) {
                                                         tier = 'platinum';
-                                                        // Platinum: Darker metallic gradient, strong glow, no shimmer
-                                                        solidBgColor = 'linear-gradient(135deg, #475569 0%, #94a3b8 50%, #475569 100%)';
-                                                        boxShadow = '0 0 20px rgba(229, 228, 226, 0.6)';
-                                                        border = 'none';
+                                                        // Platinum: Darker edges, bright center, tighter strong glow, bright border
+                                                        solidBgColor = 'linear-gradient(135deg, #334155 0%, #e2e8f0 50%, #334155 100%)';
+                                                        boxShadow = '0 0 12px rgba(229, 228, 226, 0.9)';
+                                                        border = '1px solid rgba(255, 255, 255, 0.6)';
                                                     } else if (score >= 75) {
                                                         tier = 'gold';
                                                         // Gold: Darker gold gradient, soft glow, no border

@@ -90,7 +90,7 @@ export default function SystemComponentChecker() {
     const [poolType, setPoolType] = useState<PoolType>('major-mastery'); // Default to major-mastery as per recent context
     const [majorSubMode, setMajorSubMode] = useState<'mixed' | 'num-to-word' | 'word-to-num'>('mixed');
     const [isTimed, setIsTimed] = useState(false);
-    const [questionCount, setQuestionCount] = useState(25);
+    const [questionCount, setQuestionCount] = useState(50);
     const [timeLimit, setTimeLimit] = useState(60);
 
     const [questions, setQuestions] = useState<DrillQuestion[]>([]);
@@ -280,6 +280,12 @@ export default function SystemComponentChecker() {
     };
 
     const startSession = () => {
+        // Validate minimum question count
+        if (questionCount < 5) {
+            alert('Please set at least 5 questions to start the session.');
+            return;
+        }
+        
         const generated = generateQuestions();
         if (!generated.length) {
             alert('Need more data in Image Vault before running this drill.');
@@ -417,11 +423,11 @@ export default function SystemComponentChecker() {
                                     <label style={{ display: 'block', marginBottom: '0.5rem', color: '#cbd5e1' }}>Questions</label>
                                     <input
                                         type="number"
-                                        min={10}
+                                        min={0}
                                         max={200}
                                         className="input-field"
                                         value={questionCount}
-                                        onChange={(e) => setQuestionCount(Math.max(10, Math.min(200, parseInt(e.target.value, 10) || 10)))}
+                                        onChange={(e) => setQuestionCount(Math.max(0, Math.min(200, parseInt(e.target.value, 10) || 0)))}
                                     />
                                 </div>
 
@@ -448,11 +454,26 @@ export default function SystemComponentChecker() {
                                 )}
                             </div>
 
-                            <div style={{ background: 'rgba(15,23,42,0.6)', padding: '1rem', borderRadius: '0.75rem' }}>
-                                <h3 style={{ margin: 0, color: '#cbd5e1' }}>Challenge Goal</h3>
-                                <p style={{ margin: '0.5rem 0 0', color: '#94a3b8' }}>
-                                    Hit 50 mixed queries in 60 seconds with ≥95% accuracy.
-                                </p>
+                            <div style={{ background: 'rgba(15,23,42,0.6)', padding: '1rem', borderRadius: '0.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem' }}>
+                                <div>
+                                    <h3 style={{ margin: 0, color: '#cbd5e1' }}>Challenge Goal</h3>
+                                    <p style={{ margin: '0.5rem 0 0', color: '#94a3b8' }}>
+                                        Hit 50 mixed queries in 60 seconds with ≥95% accuracy.
+                                    </p>
+                                </div>
+                                <button 
+                                    className="btn btn-secondary"
+                                    onClick={() => {
+                                        setQuestionCount(50);
+                                        setIsTimed(true);
+                                        setTimeLimit(60);
+                                        setPoolType('major-mastery');
+                                        setMajorSubMode('mixed');
+                                    }}
+                                    style={{ minWidth: '120px', whiteSpace: 'nowrap' }}
+                                >
+                                    Load Challenge
+                                </button>
                             </div>
 
                             <button className="btn btn-primary" onClick={startSession} style={{ alignSelf: 'center', minWidth: '240px' }}>

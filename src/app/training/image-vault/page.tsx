@@ -1902,7 +1902,7 @@ export default function ImageVault() {
                                             </div>
 
                                         {cardHistory.length > 0 ? (
-                                            <div style={{ height: '400px', width: '100%' }}>
+                                            <div style={{ height: '400px', width: '100%', minHeight: '400px' }}>
                                                 <ResponsiveContainer width="100%" height="100%">
                                                     <LineChart data={cardHistory.map((h, i) => ({
                                                         attempt: i + 1,
@@ -1923,7 +1923,13 @@ export default function ImageVault() {
                                                         <Tooltip
                                                             contentStyle={{ backgroundColor: '#1e293b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '0.5rem' }}
                                                             itemStyle={{ color: '#fff' }}
-                                                            formatter={(value: number) => [`${value}s`, 'Time']}
+                                                            formatter={(value: any, name: any) => {
+                                                                // Handle null/undefined values
+                                                                if (value === null || value === undefined || typeof value !== 'number') {
+                                                                    return ['N/A', name || 'Value'];
+                                                                }
+                                                                return [`${value}s`, name || 'Time'];
+                                                            }}
                                                             labelFormatter={(label, payload) => {
                                                                 if (payload && payload.length > 0) {
                                                                     return `Attempt #${label} (${payload[0].payload.timestamp})`;

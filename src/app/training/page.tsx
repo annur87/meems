@@ -336,7 +336,10 @@ export default function TrainingHub() {
             const majorEntries = majorSystemList.map(m => ({
                 id: m.number,
                 number: m.number,
-                images: [m.word]
+                images: [m.word],
+                persons: [],
+                actions: [],
+                objects: []
             }));
             await bootstrapMajorSystem(majorEntries);
         };

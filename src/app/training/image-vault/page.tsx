@@ -56,7 +56,7 @@ export default function ImageVault() {
     // Major System
     const [majorSystem, setMajorSystem] = useState<MajorEntry[]>([]);
     const [editingMajor, setEditingMajor] = useState<string | null>(null);
-    const [newMajorNumber, setNewMajorNumber] = useState('');
+
     // New PAO-style inputs
     const [newMajorPerson, setNewMajorPerson] = useState('');
     const [newMajorAction, setNewMajorAction] = useState('');

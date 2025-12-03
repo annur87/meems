@@ -36,20 +36,22 @@ const questionLabels: Record<QuestionCategory, string> = {
 const normalize = (value: string) => value.trim().toLowerCase();
 
 const buildQuestionFromMajor = (entry: MajorEntry, reverse: boolean = false): DrillQuestion | null => {
-    if (!entry.images || entry.images.length === 0) return null;
+    const word = entry.images?.[0] || entry.persons?.[0] || entry.actions?.[0] || entry.objects?.[0];
+    if (!word) return null;
+
     if (reverse) {
         return {
             id: `major-rev-${entry.id}`,
-            prompt: `What is the number for "${entry.images[0]}"?`,
+            prompt: `What is the number for "${word}"?`,
             answer: entry.number,
             category: 'major-reverse',
-            source: entry.images[0],
+            source: word,
         };
     }
     return {
         id: `major-${entry.id}`,
         prompt: `What is the word for ${entry.number}?`,
-        answer: entry.images[0],
+        answer: word,
         category: 'major-image',
         source: entry.number,
     };

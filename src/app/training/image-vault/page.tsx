@@ -34,7 +34,7 @@ import { majorSystemList } from '@/data/major-system';
 import { cardPaoList } from '@/data/card-pao';
 import { digitPaoList } from '@/data/digit-pao';
 import wordList from '@/data/words.json';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Scatter, ScatterChart, ZAxis, ComposedChart } from 'recharts';
 import { SAMPLE_MAJOR_SYSTEM, SAMPLE_PAO_SYSTEM, SAMPLE_PALACES } from '@/data/sampleImageVault';
 
 type SystemType = 'analytics' | 'major' | 'card-pao' | 'digit-pao' | 'palace';
@@ -1528,9 +1528,9 @@ export default function ImageVault() {
                                                         border = 'none';
                                                     } else if (score >= 75) {
                                                         tier = 'gold';
-                                                        // Gold: Solid yellow/gold color, no border
-                                                        solidBgColor = 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 50%, #fbbf24 100%)';
-                                                        boxShadow = 'none';
+                                                        // Gold: Refined gold gradient, soft glow, no border
+                                                        solidBgColor = 'linear-gradient(135deg, #FCD34D 0%, #D97706 50%, #FCD34D 100%)';
+                                                        boxShadow = '0 0 15px rgba(251, 191, 36, 0.5)';
                                                         border = 'none';
                                                     } else if (score >= 50) {
                                                         tier = 'silver';
@@ -1601,6 +1601,20 @@ export default function ImageVault() {
                                                                         pointerEvents: 'none'
                                                                     }} />
                                                                 )}
+                                                                {/* Angled solid shimmer for Gold only */}
+                                                                {tier === 'gold' && (
+                                                                    <div style={{
+                                                                        position: 'absolute',
+                                                                        top: '-50%',
+                                                                        left: '-50%',
+                                                                        width: '200%',
+                                                                        height: '200%',
+                                                                        background: 'linear-gradient(to right, transparent 45%, rgba(255, 255, 255, 0.7) 50%, transparent 55%)',
+                                                                        transform: 'rotate(45deg)',
+                                                                        animation: 'shine 3s ease-in-out infinite',
+                                                                        pointerEvents: 'none'
+                                                                    }} />
+                                                                )}
                                                                 <div style={{ fontSize: '2rem', fontWeight: 'bold', lineHeight: 1, position: 'relative', zIndex: 1 }}>{entry.number}</div>
                                                                 {wordsVisible && (
                                                                     <div style={{ fontSize: '1rem', opacity: 1, marginTop: '0.25rem', textAlign: 'center', wordBreak: 'break-word', lineHeight: 1.2, position: 'relative', zIndex: 1 }}>
@@ -1641,6 +1655,20 @@ export default function ImageVault() {
                                                                         height: '100%',
                                                                         background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.6) 50%, transparent 100%)',
                                                                         animation: 'shine 2s ease-in-out infinite',
+                                                                        pointerEvents: 'none'
+                                                                    }} />
+                                                                )}
+                                                                {/* Angled solid shimmer for Gold only */}
+                                                                {tier === 'gold' && (
+                                                                    <div style={{
+                                                                        position: 'absolute',
+                                                                        top: '-50%',
+                                                                        left: '-50%',
+                                                                        width: '200%',
+                                                                        height: '200%',
+                                                                        background: 'linear-gradient(to right, transparent 45%, rgba(255, 255, 255, 0.7) 50%, transparent 55%)',
+                                                                        transform: 'rotate(45deg)',
+                                                                        animation: 'shine 3s ease-in-out infinite',
                                                                         pointerEvents: 'none'
                                                                     }} />
                                                                 )}
@@ -1703,7 +1731,7 @@ export default function ImageVault() {
                                             {globalStats.length > 0 ? (
                                                 <div style={{ height: '400px', width: '100%' }}>
                                                     <ResponsiveContainer width="100%" height="100%">
-                                                        <LineChart data={(() => {
+                                                        <ComposedChart data={(() => {
                                                             // Merge global and card stats by date
                                                             const dateMap = new Map<string, any>();
                                                             
@@ -1716,7 +1744,7 @@ export default function ImageVault() {
                                                                 });
                                                             });
                                                             
-                                                            // Add card-specific stats
+                                                            // Add card-specific stats only for days that have data
                                                             cardDailyStats.forEach(stat => {
                                                                 const existing = dateMap.get(stat.date) || { date: stat.date };
                                                                 existing.cardErrorRate = stat.errorRate;
@@ -1749,9 +1777,9 @@ export default function ImageVault() {
                                                                 itemStyle={{ color: '#fff' }}
                                                                 formatter={(value: number, name: string) => {
                                                                     if (name.includes('ErrorRate')) {
-                                                                        return [`${value.toFixed(1)}%`, name.replace('globalErrorRate', 'Global Error Rate').replace('cardErrorRate', 'Card Error Rate')];
+                                                                        return [`${value.toFixed(1)}%`, name.replace('globalErrorRate', 'Global Error Rate').replace('cardErrorRate', `Card ${selectedCardForStats} Error Rate`)];
                                                                     }
-                                                                    return [`${value.toFixed(2)}s`, name.replace('globalAvgTime', 'Global Avg Time').replace('cardAvgTime', 'Card Avg Time')];
+                                                                    return [`${value.toFixed(2)}s`, name.replace('globalAvgTime', 'Global Avg Time').replace('cardAvgTime', `Card ${selectedCardForStats} Avg Time`)];
                                                                 }}
                                                                 labelFormatter={(label) => `Date: ${label}`}
                                                             />
@@ -1767,49 +1795,41 @@ export default function ImageVault() {
                                                                     return labels[value] || value;
                                                                 }}
                                                             />
-                                                            {/* Global Error Rate */}
+                                                            {/* Global Error Rate - Solid Line */}
                                                             <Line
                                                                 yAxisId="left"
                                                                 type="monotone"
                                                                 dataKey="globalErrorRate"
                                                                 stroke="#ef4444"
                                                                 strokeWidth={2}
-                                                                dot={{ fill: '#ef4444', r: 3 }}
+                                                                dot={false}
                                                                 activeDot={{ r: 5 }}
-                                                                strokeDasharray="5 5"
                                                             />
-                                                            {/* Card-Specific Error Rate */}
-                                                            <Line
-                                                                yAxisId="left"
-                                                                type="monotone"
-                                                                dataKey="cardErrorRate"
-                                                                stroke="#f97316"
-                                                                strokeWidth={3}
-                                                                dot={{ fill: '#f97316', r: 4 }}
-                                                                activeDot={{ r: 6 }}
-                                                            />
-                                                            {/* Global Avg Time */}
+                                                            {/* Global Avg Time - Solid Line */}
                                                             <Line
                                                                 yAxisId="right"
                                                                 type="monotone"
                                                                 dataKey="globalAvgTime"
                                                                 stroke="#10b981"
                                                                 strokeWidth={2}
-                                                                dot={{ fill: '#10b981', r: 3 }}
+                                                                dot={false}
                                                                 activeDot={{ r: 5 }}
-                                                                strokeDasharray="5 5"
                                                             />
-                                                            {/* Card-Specific Avg Time */}
-                                                            <Line
+                                                            {/* Card-Specific Error Rate - Scatter */}
+                                                            <Scatter
+                                                                yAxisId="left"
+                                                                dataKey="cardErrorRate"
+                                                                fill="#f97316"
+                                                                shape="circle"
+                                                            />
+                                                            {/* Card-Specific Avg Time - Scatter */}
+                                                            <Scatter
                                                                 yAxisId="right"
-                                                                type="monotone"
                                                                 dataKey="cardAvgTime"
-                                                                stroke="#14b8a6"
-                                                                strokeWidth={3}
-                                                                dot={{ fill: '#14b8a6', r: 4 }}
-                                                                activeDot={{ r: 6 }}
+                                                                fill="#14b8a6"
+                                                                shape="circle"
                                                             />
-                                                        </LineChart>
+                                                        </ComposedChart>
                                                     </ResponsiveContainer>
                                                 </div>
                                             ) : (

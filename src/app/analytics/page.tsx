@@ -73,10 +73,10 @@ export default function Analytics() {
         const avgCount = Math.round(filteredResults.reduce((acc, r) => acc + r.count, 0) / totalGames * 10) / 10;
         const maxCount = Math.max(...filteredResults.map(r => r.count));
 
-        // Number Wall Specifics
+        // Number Wall & Word Memory Specifics
         let avgCorrect = 0;
         let avgRecall = 0;
-        if (selectedGame === 'number-wall') {
+        if (selectedGame === 'number-wall' || selectedGame === 'word') {
             avgCorrect = Math.round(filteredResults.reduce((acc, r) => acc + (r.correct || 0), 0) / totalGames);
             avgRecall = Math.round(filteredResults.reduce((acc, r) => acc + (r.recallPercentage || 0), 0) / totalGames);
         }
@@ -177,10 +177,10 @@ export default function Analytics() {
                                     <div style={{ fontSize: '2rem', fontWeight: 'bold' }}>{stats.totalGames}</div>
                                 </div>
 
-                                {selectedGame === 'number-wall' ? (
+                                {selectedGame === 'number-wall' || selectedGame === 'word' ? (
                                     <>
                                         <div className="glass-panel" style={{ padding: '1.5rem', textAlign: 'center' }}>
-                                            <div style={{ fontSize: '0.9rem', opacity: 0.7, marginBottom: '0.5rem' }}>Avg. Correct Digits</div>
+                                            <div style={{ fontSize: '0.9rem', opacity: 0.7, marginBottom: '0.5rem' }}>Avg. Correct {selectedGame === 'word' ? 'Words' : 'Digits'}</div>
                                             <div style={{ fontSize: '2rem', fontWeight: 'bold', color: 'var(--primary)' }}>
                                                 {stats.avgCorrect}
                                             </div>
@@ -353,7 +353,7 @@ export default function Analytics() {
                                                     </span>
                                                 </td>
                                                 <td style={{ padding: '0.75rem', textAlign: 'center', fontWeight: 'bold', color: r.percentage >= 80 ? 'var(--success)' : 'inherit' }}>
-                                                    {r.type === 'number-wall' && r.accuracy !== undefined ? (
+                                                    {(r.type === 'number-wall' || r.type === 'word') && r.accuracy !== undefined ? (
                                                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', lineHeight: 1.2 }}>
                                                             <span>{r.correct}/{r.total}</span>
                                                             <span style={{ fontSize: '0.75rem', opacity: 0.7 }}>{r.accuracy}% Acc</span>

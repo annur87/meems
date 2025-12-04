@@ -48,6 +48,7 @@ export default function WordMemorization() {
 
         let correct = 0;
         const total = targetWords.length;
+        const attemptedCount = inputWords.length;
         const comparison = [];
 
         for (let i = 0; i < total; i++) {
@@ -63,7 +64,13 @@ export default function WordMemorization() {
             comparison.push({ target: '', input: inputWords[i], isCorrect: false });
         }
 
-        return { correct, total, percentage: (correct / total) * 100, comparison };
+        // Accuracy: Correct / Attempted
+        const accuracy = attemptedCount > 0 ? (correct / attemptedCount) * 100 : 0;
+
+        // Recall Percentage: Attempted / Total
+        const recallPercentage = total > 0 ? (attemptedCount / total) * 100 : 0;
+
+        return { correct, total, attemptedCount, percentage: accuracy, accuracy, recallPercentage, comparison };
     };
 
     const finishGame = async () => {
@@ -72,14 +79,16 @@ export default function WordMemorization() {
         setRecallDuration(duration);
         setGameState('result');
 
-        const { correct, total, percentage } = calculateScore();
+        const { correct, total, accuracy, recallPercentage } = calculateScore();
         try {
             await saveGameResult({
                 type: 'word',
                 count: total,
                 correct,
                 total,
-                percentage,
+                percentage: accuracy,
+                accuracy,
+                recallPercentage,
                 memorizeTime: memorizeDuration,
                 recallTime: duration
             });
@@ -218,16 +227,23 @@ export default function WordMemorization() {
                     {gameState === 'result' && (
                         <div className="animate-fade-in" style={{ width: '100%' }}>
                             {(() => {
-                                const { correct, total, percentage, comparison } = calculateScore();
+                                const { correct, total, attemptedCount, accuracy, recallPercentage, comparison } = calculateScore();
                                 return (
                                     <>
                                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
                                             <div className="glass" style={{ padding: '1rem', borderRadius: '0.5rem', textAlign: 'center' }}>
                                                 <div style={{ fontSize: '0.9rem', color: '#cbd5e1' }}>Accuracy</div>
-                                                <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: percentage === 100 ? 'var(--success)' : 'var(--primary)' }}>
-                                                    {percentage.toFixed(1)}%
+                                                <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: accuracy === 100 ? 'var(--success)' : 'var(--primary)' }}>
+                                                    {accuracy.toFixed(1)}%
                                                 </div>
-                                                <div style={{ fontSize: '0.8rem', opacity: 0.7 }}>{correct} / {total}</div>
+                                                <div style={{ fontSize: '0.8rem', opacity: 0.7 }}>{correct} / {attemptedCount} Correct</div>
+                                            </div>
+                                            <div className="glass" style={{ padding: '1rem', borderRadius: '0.5rem', textAlign: 'center' }}>
+                                                <div style={{ fontSize: '0.9rem', color: '#cbd5e1' }}>Recall %</div>
+                                                <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--accent)' }}>
+                                                    {recallPercentage.toFixed(1)}%
+                                                </div>
+                                                <div style={{ fontSize: '0.8rem', opacity: 0.7 }}>{attemptedCount} / {total} Attempted</div>
                                             </div>
                                             <div className="glass" style={{ padding: '1rem', borderRadius: '0.5rem', textAlign: 'center' }}>
                                                 <div style={{ fontSize: '0.9rem', color: '#cbd5e1' }}>Memorize Time</div>

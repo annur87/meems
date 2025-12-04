@@ -2066,12 +2066,15 @@ export default function ImageVault() {
                                                                 formatter={(value: any, name: string) => {
                                                                     // Handle null/undefined values
                                                                     if (value === null || value === undefined || typeof value !== 'number') {
-                                                                        return ['N/A', name];
+                                                                        return ['N/A', name || ''];
                                                                     }
-                                                                    if (name.includes('ErrorRate')) {
-                                                                        return [`${value.toFixed(1)}%`, name.replace('globalErrorRate', 'Global Error Rate').replace('cardErrorRate', `Card ${selectedCardForStats} Error Rate`)];
+                                                                    if (name && name.includes('ErrorRate')) {
+                                                                        return [`${value.toFixed(1)}%`, name.replace('globalErrorRate', 'Global Error Rate').replace('cardErrorRate', `Card ${selectedCardForStats || ''} Error Rate`)];
                                                                     }
-                                                                    return [`${value.toFixed(2)}s`, name.replace('globalAvgTime', 'Global Avg Time').replace('cardAvgTime', `Card ${selectedCardForStats} Avg Time`)];
+                                                                    if (name) {
+                                                                        return [`${value.toFixed(2)}s`, name.replace('globalAvgTime', 'Global Avg Time').replace('cardAvgTime', `Card ${selectedCardForStats || ''} Avg Time`)];
+                                                                    }
+                                                                    return [`${value.toFixed(2)}s`, 'Time'];
                                                                 }}
                                                                 labelFormatter={(label) => `Date: ${label}`}
                                                             />
@@ -2097,6 +2100,7 @@ export default function ImageVault() {
                                                                 strokeWidth={2}
                                                                 dot={false}
                                                                 activeDot={{ r: 5 }}
+                                                                connectNulls
                                                             />
                                                             {/* Global Avg Time - Solid Line */}
                                                             <Line
@@ -2107,6 +2111,7 @@ export default function ImageVault() {
                                                                 strokeWidth={2}
                                                                 dot={false}
                                                                 activeDot={{ r: 5 }}
+                                                                connectNulls
                                                             />
                                                             {/* Card-Specific Error Rate - Scatter */}
                                                             <Scatter

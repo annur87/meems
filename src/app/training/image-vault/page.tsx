@@ -30,7 +30,8 @@ import {
     getTimeStats,
     type TimeStats,
     getSessionHistory,
-    type TrainingSession
+    type TrainingSession,
+    bootstrapDigitPaoSystem
 } from '@/lib/firebase';
 import { majorSystemList } from '@/data/major-system';
 import { cardPaoList } from '@/data/card-pao';
@@ -162,6 +163,10 @@ export default function ImageVault() {
     // Load from Firestore on mount
     useEffect(() => {
         const loadData = async () => {
+            // Bootstrap digit PAO system if needed
+            const digitEntries = digitPaoList.map(p => ({ id: p.number, ...p }));
+            await bootstrapDigitPaoSystem(digitEntries);
+
             const data = await getImageVaultData();
             if (data) {
                 setMajorSystem(data.majorSystem || []);
@@ -179,7 +184,7 @@ export default function ImageVault() {
 
         loadData();
     }, []);
-    
+
     const [globalStats, setGlobalStats] = useState<DailyGlobalStats[]>([]);
     const [cardDailyStats, setCardDailyStats] = useState<DailyGlobalStats[]>([]);
 
@@ -212,7 +217,7 @@ export default function ImageVault() {
                 const loadHistory = async () => {
                     const history = await getCardHistory(selectedCardForStats, 'default_user', timeFilter);
                     setCardHistory(history);
-                    
+
                     // Also load daily stats for this card
                     const dailyStats = await getCardDailyStats(selectedCardForStats, userId, timeFilter);
                     setCardDailyStats(dailyStats);
@@ -367,7 +372,7 @@ export default function ImageVault() {
     // Major System Functions - PAO Style
     const addMajorPerson = (number: string, person: string) => {
         if (!person.trim()) return;
-        
+
         const existing = majorSystem.find(e => e.number === number);
         if (existing) {
             setMajorSystem(majorSystem.map(e =>
@@ -389,7 +394,7 @@ export default function ImageVault() {
 
     const addMajorAction = (number: string, action: string) => {
         if (!action.trim()) return;
-        
+
         const existing = majorSystem.find(e => e.number === number);
         if (existing) {
             setMajorSystem(majorSystem.map(e =>
@@ -411,7 +416,7 @@ export default function ImageVault() {
 
     const addMajorObject = (number: string, object: string) => {
         if (!object.trim()) return;
-        
+
         const existing = majorSystem.find(e => e.number === number);
         if (existing) {
             setMajorSystem(majorSystem.map(e =>
@@ -642,7 +647,7 @@ export default function ImageVault() {
         if (!stats || stats.totalAttempts === 0) return 'unknown';
 
         const avgTimeInSeconds = stats.averageTime / 1000;
-        
+
         // Diamond: 0 mistakes AND average time < 2 seconds
         if (stats.mistakes === 0 && avgTimeInSeconds < 2) return 'diamond';
 
@@ -790,8 +795,8 @@ export default function ImageVault() {
                 ...(nextCard.objects || []),
                 ...(nextCard.images || [])
             ];
-            const randomWord = allWords.length > 0 
-                ? allWords[Math.floor(Math.random() * allWords.length)] 
+            const randomWord = allWords.length > 0
+                ? allWords[Math.floor(Math.random() * allWords.length)]
                 : '???';
             setQuizPromptWord(randomWord);
         } else {
@@ -808,7 +813,7 @@ export default function ImageVault() {
 
         let isCorrect = false;
         const targetNumber = currentQuizCard.number;
-        
+
         // Collect all valid words for this card
         const allValidWords = [
             ...(currentQuizCard.persons || []),
@@ -1574,9 +1579,9 @@ export default function ImageVault() {
                                                             background: isActive
                                                                 ? (diff === 'platinum' ? 'linear-gradient(135deg, rgba(229, 228, 226, 0.55) 0%, rgba(156, 163, 175, 0.55) 50%, rgba(229, 228, 226, 0.55) 100%)' :
                                                                     diff === 'gold' ? 'linear-gradient(135deg, rgba(251, 191, 36, 0.5) 0%, rgba(245, 158, 11, 0.5) 50%, rgba(251, 191, 36, 0.5) 100%)' :
-                                                                    diff === 'silver' ? 'linear-gradient(135deg, rgba(203, 213, 225, 0.45) 0%, rgba(148, 163, 184, 0.45) 50%, rgba(203, 213, 225, 0.45) 100%)' :
-                                                                        diff === 'bronze' ? 'linear-gradient(135deg, rgba(205, 127, 50, 0.4) 0%, rgba(180, 83, 9, 0.4) 50%, rgba(205, 127, 50, 0.4) 100%)' :
-                                                                            'rgba(99, 102, 241, 0.35)')
+                                                                        diff === 'silver' ? 'linear-gradient(135deg, rgba(203, 213, 225, 0.45) 0%, rgba(148, 163, 184, 0.45) 50%, rgba(203, 213, 225, 0.45) 100%)' :
+                                                                            diff === 'bronze' ? 'linear-gradient(135deg, rgba(205, 127, 50, 0.4) 0%, rgba(180, 83, 9, 0.4) 50%, rgba(205, 127, 50, 0.4) 100%)' :
+                                                                                'rgba(99, 102, 241, 0.35)')
                                                                 : 'rgba(255,255,255,0.03)',
                                                             color: isActive ? 'white' : 'rgba(255,255,255,0.5)',
                                                             fontSize: '0.85rem',
@@ -1587,8 +1592,8 @@ export default function ImageVault() {
                                                             gap: '0.4rem',
                                                             boxShadow: diff === 'platinum' && isActive ? '0 0 20px rgba(229, 228, 226, 0.5), 0 0 40px rgba(156, 163, 175, 0.25)' :
                                                                 diff === 'gold' && isActive ? '0 0 15px rgba(251, 191, 36, 0.4)' :
-                                                                diff === 'silver' && isActive ? '0 0 12px rgba(203, 213, 225, 0.35)' :
-                                                                diff === 'bronze' && isActive ? '0 0 10px rgba(205, 127, 50, 0.3)' : 'none'
+                                                                    diff === 'silver' && isActive ? '0 0 12px rgba(203, 213, 225, 0.35)' :
+                                                                        diff === 'bronze' && isActive ? '0 0 10px rgba(205, 127, 50, 0.3)' : 'none'
                                                         }}
                                                     >
                                                         <span style={{
@@ -1597,19 +1602,19 @@ export default function ImageVault() {
                                                             borderRadius: '50%',
                                                             background: diff === 'platinum' ? 'linear-gradient(135deg, #e5e4e2 0%, #9ca3af 50%, #e5e4e2 100%)' :
                                                                 diff === 'gold' ? 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 50%, #fbbf24 100%)' :
-                                                                diff === 'silver' ? 'linear-gradient(135deg, #cbd5e1 0%, #94a3b8 50%, #cbd5e1 100%)' :
-                                                                    diff === 'bronze' ? 'linear-gradient(135deg, #cd7f32 0%, #b45309 50%, #cd7f32 100%)' :
-                                                                        '#6366f1',
+                                                                    diff === 'silver' ? 'linear-gradient(135deg, #cbd5e1 0%, #94a3b8 50%, #cbd5e1 100%)' :
+                                                                        diff === 'bronze' ? 'linear-gradient(135deg, #cd7f32 0%, #b45309 50%, #cd7f32 100%)' :
+                                                                            '#6366f1',
                                                             boxShadow: diff === 'platinum' ? '0 0 10px rgba(229, 228, 226, 0.7)' :
                                                                 diff === 'gold' ? '0 0 8px rgba(251, 191, 36, 0.6)' :
-                                                                diff === 'silver' ? '0 0 6px rgba(203, 213, 225, 0.5)' :
-                                                                    diff === 'bronze' ? '0 0 5px rgba(205, 127, 50, 0.4)' : 'none'
+                                                                    diff === 'silver' ? '0 0 6px rgba(203, 213, 225, 0.5)' :
+                                                                        diff === 'bronze' ? '0 0 5px rgba(205, 127, 50, 0.4)' : 'none'
                                                         }} />
                                                         {diff === 'all' ? 'All' :
                                                             diff === 'platinum' ? 'Platinum' :
-                                                            diff === 'gold' ? 'Gold' :
-                                                                diff === 'silver' ? 'Silver' :
-                                                                    'Bronze'}
+                                                                diff === 'gold' ? 'Gold' :
+                                                                    diff === 'silver' ? 'Silver' :
+                                                                        'Bronze'}
                                                         <span style={{ opacity: 0.7, fontSize: '0.8rem' }}>({cardCount})</span>
                                                     </button>
                                                 );
@@ -1646,17 +1651,17 @@ export default function ImageVault() {
                                             {filteredMajor.map((entry) => {
                                                 const stats = cardPerformanceStats.get(entry.number);
                                                 const bgColor = getCardPerformanceColor(stats);
-                                                
+
                                                 // Determine tier for styling
                                                 let tier: 'diamond' | 'gold' | 'silver' | 'bronze' | 'none' = 'none';
                                                 let boxShadow = 'none';
                                                 let border = '2px solid rgba(255,255,255,0.1)';
                                                 let solidBgColor = bgColor;
-                                                
+
                                                 if (stats && stats.totalAttempts > 0) {
                                                     const avgTimeInSeconds = stats.averageTime / 1000;
                                                     const score = stats.performanceScore;
-                                                    
+
                                                     if (stats.mistakes === 0 && avgTimeInSeconds < 2) {
                                                         tier = 'diamond';
                                                         // Diamond: Soft glowing silver (not too bright)
@@ -1742,9 +1747,9 @@ export default function ImageVault() {
                                                                 <div style={{ fontSize: '2rem', fontWeight: 'bold', lineHeight: 1, position: 'relative', zIndex: 1 }}>{entry.number}</div>
                                                                 {wordsVisible && (
                                                                     <div style={{ fontSize: '0.75rem', opacity: 1, marginTop: '0.5rem', textAlign: 'center', wordBreak: 'break-word', lineHeight: 1.2, position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                                                                        {entry.persons && entry.persons.length > 0 && <div style={{whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%'}}>👤 {entry.persons[0]}</div>}
-                                                                        {entry.actions && entry.actions.length > 0 && <div style={{whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%'}}>🎬 {entry.actions[0]}</div>}
-                                                                        {entry.objects && entry.objects.length > 0 && <div style={{whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%'}}>📦 {entry.objects[0]}</div>}
+                                                                        {entry.persons && entry.persons.length > 0 && <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>👤 {entry.persons[0]}</div>}
+                                                                        {entry.actions && entry.actions.length > 0 && <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>🎬 {entry.actions[0]}</div>}
+                                                                        {entry.objects && entry.objects.length > 0 && <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>📦 {entry.objects[0]}</div>}
                                                                         {(!entry.persons?.length && !entry.actions?.length && !entry.objects?.length) && (
                                                                             <div>{entry.images?.[0] || '???'}</div>
                                                                         )}
@@ -1808,7 +1813,7 @@ export default function ImageVault() {
                                                                         No data yet
                                                                     </div>
                                                                 )}
-                                                                
+
                                                                 <button
                                                                     onClick={(e) => {
                                                                         e.stopPropagation();
@@ -1843,14 +1848,30 @@ export default function ImageVault() {
                                         {/* Edit Modal */}
                                         {editingMajor && (
                                             <div style={{
-                                                position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-                                                background: 'rgba(0,0,0,0.8)', zIndex: 100,
-                                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                                backdropFilter: 'blur(5px)'
+                                                position: 'fixed',
+                                                top: 0,
+                                                left: 0,
+                                                right: 0,
+                                                bottom: 0,
+                                                background: 'rgba(0,0,0,0.8)',
+                                                zIndex: 100,
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                backdropFilter: 'blur(5px)',
+                                                overflow: 'auto',
+                                                padding: '1rem'
                                             }} onClick={() => setEditingMajor(null)}>
-                                                <div 
-                                                    className="glass-panel" 
-                                                    style={{ width: '90%', maxWidth: '500px', padding: '2rem', maxHeight: '90vh', overflowY: 'auto' }}
+                                                <div
+                                                    className="glass-panel"
+                                                    style={{
+                                                        width: '90%',
+                                                        maxWidth: '500px',
+                                                        padding: '2rem',
+                                                        maxHeight: '90vh',
+                                                        overflowY: 'auto',
+                                                        margin: 'auto'
+                                                    }}
                                                     onClick={e => e.stopPropagation()}
                                                 >
                                                     <h3 style={{ fontSize: '1.5rem', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -1884,7 +1905,7 @@ export default function ImageVault() {
                                                         {(() => {
                                                             const entry = majorSystem.find(e => e.number === editingMajor);
                                                             const items = entry ? (entry[majorEditCategory] || []) : [];
-                                                            
+
                                                             return (
                                                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                                                                     {/* Add New */}
@@ -1895,8 +1916,8 @@ export default function ImageVault() {
                                                                             placeholder={`Add new ${majorEditCategory.slice(0, -1)}...`}
                                                                             value={
                                                                                 majorEditCategory === 'persons' ? newMajorPerson :
-                                                                                majorEditCategory === 'actions' ? newMajorAction :
-                                                                                newMajorObject
+                                                                                    majorEditCategory === 'actions' ? newMajorAction :
+                                                                                        newMajorObject
                                                                             }
                                                                             onChange={e => {
                                                                                 const val = e.target.value;
@@ -1912,7 +1933,7 @@ export default function ImageVault() {
                                                                                 }
                                                                             }}
                                                                         />
-                                                                        <button 
+                                                                        <button
                                                                             className="btn btn-primary"
                                                                             onClick={() => {
                                                                                 if (majorEditCategory === 'persons') { addMajorPerson(editingMajor, newMajorPerson); setNewMajorPerson(''); }
@@ -1953,8 +1974,8 @@ export default function ImageVault() {
                                                     </div>
 
                                                     <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                                                        <button 
-                                                            className="btn" 
+                                                        <button
+                                                            className="btn"
                                                             onClick={() => setEditingMajor(null)}
                                                             style={{ background: 'rgba(255,255,255,0.1)' }}
                                                         >
@@ -1987,20 +2008,21 @@ export default function ImageVault() {
                                                     >
                                                         {majorSystem.map(card => (
                                                             <option key={card.id} value={card.number}>
+                                                                ```
                                                                 {card.number} - {card.persons?.[0] || card.actions?.[0] || card.objects?.[0] || card.images?.[0] || 'Empty'}
                                                             </option>
                                                         ))}
                                                     </select>
                                                 </div>
                                             </div>
-                                            
+
                                             {globalStats.length > 0 ? (
-                                                <div style={{ height: '400px', width: '100%', minHeight: '400px' }}>
+                                                <div style={{ height: '400px', width: '100%', minHeight: '400px', minWidth: '300px' }}>
                                                     <ResponsiveContainer width="100%" height="100%">
                                                         <ComposedChart data={(() => {
                                                             // Merge global and card stats by date
                                                             const dateMap = new Map<string, any>();
-                                                            
+
                                                             // Add global stats
                                                             globalStats.forEach(stat => {
                                                                 dateMap.set(stat.date, {
@@ -2009,7 +2031,7 @@ export default function ImageVault() {
                                                                     globalAvgTime: stat.averageTime,
                                                                 });
                                                             });
-                                                            
+
                                                             // Add card-specific stats only for days that have data
                                                             cardDailyStats.forEach(stat => {
                                                                 const existing = dateMap.get(stat.date) || { date: stat.date };
@@ -2017,7 +2039,7 @@ export default function ImageVault() {
                                                                 existing.cardAvgTime = stat.averageTime;
                                                                 dateMap.set(stat.date, existing);
                                                             });
-                                                            
+
                                                             return Array.from(dateMap.values()).sort((a, b) => a.date.localeCompare(b.date));
                                                         })()}>
                                                             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
@@ -2053,14 +2075,15 @@ export default function ImageVault() {
                                                                 }}
                                                                 labelFormatter={(label) => `Date: ${label}`}
                                                             />
-                                                            <Legend 
+                                                            <Legend
                                                                 wrapperStyle={{ paddingTop: '20px' }}
                                                                 formatter={(value: string) => {
+                                                                    if (!value) return '';
                                                                     const labels: Record<string, string> = {
                                                                         'globalErrorRate': 'Global Error Rate',
-                                                                        'cardErrorRate': `Card ${selectedCardForStats} Error Rate`,
+                                                                        'cardErrorRate': `Card ${selectedCardForStats || ''} Error Rate`,
                                                                         'globalAvgTime': 'Global Avg Time',
-                                                                        'cardAvgTime': `Card ${selectedCardForStats} Avg Time`
+                                                                        'cardAvgTime': `Card ${selectedCardForStats || ''} Avg Time`
                                                                     };
                                                                     return labels[value] || value;
                                                                 }}
@@ -2112,7 +2135,7 @@ export default function ImageVault() {
                                         {/* Session History List */}
                                         <div className="glass-panel" style={{ padding: '1.5rem', marginBottom: '1.5rem' }}>
                                             <h4 style={{ fontSize: '1rem', marginBottom: '1.5rem', opacity: 0.9 }}>Session History</h4>
-                                            
+
                                             {sessionHistory.length > 0 ? (
                                                 <div className="space-y-6">
                                                     {Object.entries(sessionHistory.reduce((acc, session) => {
@@ -2125,9 +2148,9 @@ export default function ImageVault() {
                                                             <h5 style={{ fontSize: '0.9rem', opacity: 0.7, marginBottom: '0.75rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '0.5rem' }}>{date}</h5>
                                                             <div className="space-y-3">
                                                                 {sessions.map(session => (
-                                                                    <div key={session.sessionId} style={{ 
-                                                                        background: 'rgba(255,255,255,0.03)', 
-                                                                        borderRadius: '0.5rem', 
+                                                                    <div key={session.sessionId} style={{
+                                                                        background: 'rgba(255,255,255,0.03)',
+                                                                        borderRadius: '0.5rem',
                                                                         padding: '1rem',
                                                                         display: 'flex',
                                                                         justifyContent: 'space-between',
@@ -2135,9 +2158,9 @@ export default function ImageVault() {
                                                                     }}>
                                                                         <div>
                                                                             <div style={{ fontWeight: 500, marginBottom: '0.25rem' }}>
-                                                                                {session.exerciseType === 'major-drill' ? 'Major System Drill' : 
-                                                                                 session.exerciseType === 'palace-drill' ? 'Memory Palace Drill' : 
-                                                                                 session.exerciseType}
+                                                                                {session.exerciseType === 'major-drill' ? 'Major System Drill' :
+                                                                                    session.exerciseType === 'palace-drill' ? 'Memory Palace Drill' :
+                                                                                        session.exerciseType}
                                                                             </div>
                                                                             <div style={{ fontSize: '0.8rem', opacity: 0.6 }}>
                                                                                 {new Date(session.startTime).toLocaleTimeString()} • {formatDuration(session.duration || 0)}
@@ -2146,7 +2169,7 @@ export default function ImageVault() {
                                                                             </div>
                                                                         </div>
                                                                         <div style={{ textAlign: 'right' }}>
-                                                                            <div style={{ 
+                                                                            <div style={{
                                                                                 color: session.metadata?.stats?.wrong === 0 ? '#10b981' : '#ef4444',
                                                                                 fontWeight: 600
                                                                             }}>
@@ -2178,69 +2201,69 @@ export default function ImageVault() {
                                                 Total Attempts: {cardHistory.length}
                                             </div>
 
-                                        {cardHistory.length > 0 ? (
-                                            <div style={{ height: '400px', width: '100%', minHeight: '400px' }}>
-                                                <ResponsiveContainer width="100%" height="100%">
-                                                    <LineChart data={cardHistory.map((h, i) => ({
-                                                        attempt: i + 1,
-                                                        time: h.responseTime / 1000,
-                                                        isCorrect: h.isCorrect,
-                                                        timestamp: new Date(h.timestamp).toLocaleDateString()
-                                                    }))}>
-                                                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-                                                        <XAxis
-                                                            dataKey="attempt"
-                                                            stroke="rgba(255,255,255,0.5)"
-                                                            label={{ value: 'Attempt #', position: 'insideBottom', offset: -5, fill: 'rgba(255,255,255,0.5)' }}
-                                                        />
-                                                        <YAxis
-                                                            stroke="rgba(255,255,255,0.5)"
-                                                            label={{ value: 'Recall Time (s)', angle: -90, position: 'insideLeft', fill: 'rgba(255,255,255,0.5)' }}
-                                                        />
-                                                        <Tooltip
-                                                            contentStyle={{ backgroundColor: '#1e293b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '0.5rem' }}
-                                                            itemStyle={{ color: '#fff' }}
-                                                            formatter={(value: any, name: any) => {
-                                                                // Handle null/undefined values
-                                                                if (value === null || value === undefined || typeof value !== 'number') {
-                                                                    return ['N/A', name || 'Value'];
-                                                                }
-                                                                return [`${value}s`, name || 'Time'];
-                                                            }}
-                                                            labelFormatter={(label, payload) => {
-                                                                if (payload && payload.length > 0) {
-                                                                    return `Attempt #${label} (${payload[0].payload.timestamp})`;
-                                                                }
-                                                                return `Attempt #${label}`;
-                                                            }}
-                                                        />
-                                                        <Line
-                                                            type="monotone"
-                                                            dataKey="time"
-                                                            stroke="#8884d8"
-                                                            strokeWidth={2}
-                                                            dot={(props: any) => {
-                                                                const { cx, cy, payload } = props;
-                                                                return (
-                                                                    <circle
-                                                                        cx={cx}
-                                                                        cy={cy}
-                                                                        r={5}
-                                                                        fill={payload.isCorrect ? '#10b981' : '#ef4444'}
-                                                                        stroke="white"
-                                                                        strokeWidth={1}
-                                                                    />
-                                                                );
-                                                            }}
-                                                        />
-                                                    </LineChart>
-                                                </ResponsiveContainer>
-                                            </div>
-                                        ) : (
-                                            <div style={{ height: '300px', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0.5 }}>
-                                                No history found for this card in the selected time range.
-                                            </div>
-                                        )}
+                                            {cardHistory.length > 0 ? (
+                                                <div style={{ height: '400px', width: '100%', minHeight: '400px' }}>
+                                                    <ResponsiveContainer width="100%" height="100%">
+                                                        <LineChart data={cardHistory.map((h, i) => ({
+                                                            attempt: i + 1,
+                                                            time: h.responseTime / 1000,
+                                                            isCorrect: h.isCorrect,
+                                                            timestamp: new Date(h.timestamp).toLocaleDateString()
+                                                        }))}>
+                                                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+                                                            <XAxis
+                                                                dataKey="attempt"
+                                                                stroke="rgba(255,255,255,0.5)"
+                                                                label={{ value: 'Attempt #', position: 'insideBottom', offset: -5, fill: 'rgba(255,255,255,0.5)' }}
+                                                            />
+                                                            <YAxis
+                                                                stroke="rgba(255,255,255,0.5)"
+                                                                label={{ value: 'Recall Time (s)', angle: -90, position: 'insideLeft', fill: 'rgba(255,255,255,0.5)' }}
+                                                            />
+                                                            <Tooltip
+                                                                contentStyle={{ backgroundColor: '#1e293b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '0.5rem' }}
+                                                                itemStyle={{ color: '#fff' }}
+                                                                formatter={(value: any, name: any) => {
+                                                                    // Handle null/undefined values
+                                                                    if (value === null || value === undefined || typeof value !== 'number') {
+                                                                        return ['N/A', name || 'Value'];
+                                                                    }
+                                                                    return [`${value}s`, name || 'Time'];
+                                                                }}
+                                                                labelFormatter={(label, payload) => {
+                                                                    if (payload && payload.length > 0) {
+                                                                        return `Attempt #${label} (${payload[0].payload.timestamp})`;
+                                                                    }
+                                                                    return `Attempt #${label}`;
+                                                                }}
+                                                            />
+                                                            <Line
+                                                                type="monotone"
+                                                                dataKey="time"
+                                                                stroke="#8884d8"
+                                                                strokeWidth={2}
+                                                                dot={(props: any) => {
+                                                                    const { cx, cy, payload } = props;
+                                                                    return (
+                                                                        <circle
+                                                                            cx={cx}
+                                                                            cy={cy}
+                                                                            r={5}
+                                                                            fill={payload.isCorrect ? '#10b981' : '#ef4444'}
+                                                                            stroke="white"
+                                                                            strokeWidth={1}
+                                                                        />
+                                                                    );
+                                                                }}
+                                                            />
+                                                        </LineChart>
+                                                    </ResponsiveContainer>
+                                                </div>
+                                            ) : (
+                                                <div style={{ height: '300px', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0.5 }}>
+                                                    No history found for this card in the selected time range.
+                                                </div>
+                                            )}
                                         </div>
                                     </>
                                 )}
@@ -2730,10 +2753,10 @@ export default function ImageVault() {
                                                 </div>
 
                                                 {/* Locations List */}
-                                                <div style={{ 
-                                                    display: 'grid', 
-                                                    gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', 
-                                                    gap: '0.5rem' 
+                                                <div style={{
+                                                    display: 'grid',
+                                                    gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
+                                                    gap: '0.5rem'
                                                 }}>
                                                     {palace.locations.map((location, idx) => {
                                                         const isEditing = editingLocation?.palaceId === palace.id && editingLocation?.index === idx;
@@ -2826,8 +2849,8 @@ export default function ImageVault() {
                                                                         style={{ fontSize: '0.8rem', padding: '0.4rem' }}
                                                                     />
                                                                 ) : (
-                                                                    <div 
-                                                                        style={{ 
+                                                                    <div
+                                                                        style={{
                                                                             fontSize: '0.8rem',
                                                                             cursor: 'pointer',
                                                                             flex: 1,

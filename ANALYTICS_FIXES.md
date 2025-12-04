@@ -13,10 +13,15 @@
 - `saveGameResult` now stores these granular metrics for Number Wall sessions.
 
 ### 3. UI Updates
-- **Results Screen**: Now displays two distinct cards:
+- **Results Screen (Game End)**: Now displays two distinct cards:
   - **Accuracy**: Shows percentage of correct digits relative to attempts.
   - **Recall %**: Shows percentage of total digits attempted.
-- **Benefit**: Provides clearer feedback to the user about their performance style (e.g., cautious/accurate vs. fast/complete).
+- **Main Analytics Page**:
+  - **Stats Cards**: When "Number Wall" is selected, custom cards now appear:
+    - **Avg. Correct Digits**: The raw number of digits correctly recalled.
+    - **Avg. Accuracy**: The precision of the recall (Correct / Attempted).
+    - **Avg. Recall %**: The completeness of the recall (Attempted / Total).
+  - **Recent Activity Table**: Displays "Correct/Total" and "Accuracy %" for Number Wall entries, providing a more detailed breakdown than the standard percentage view.
 
 ## Major System UI Fixes (Recap)
 - **Edit PAO Button**: Enhanced event handling with `e.preventDefault()` and `onMouseDown` stop propagation, plus increased z-index (100) to ensure reliable clicking within the 3D flipping card context.

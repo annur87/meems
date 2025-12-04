@@ -73,8 +73,16 @@ export default function Analytics() {
         const avgCount = Math.round(filteredResults.reduce((acc, r) => acc + r.count, 0) / totalGames * 10) / 10;
         const maxCount = Math.max(...filteredResults.map(r => r.count));
 
-        return { totalGames, avgScore, bestScore, avgCount, maxCount };
-    }, [filteredResults]);
+        // Number Wall Specifics
+        let avgCorrect = 0;
+        let avgRecall = 0;
+        if (selectedGame === 'number-wall') {
+            avgCorrect = Math.round(filteredResults.reduce((acc, r) => acc + (r.correct || 0), 0) / totalGames);
+            avgRecall = Math.round(filteredResults.reduce((acc, r) => acc + (r.recallPercentage || 0), 0) / totalGames);
+        }
+
+        return { totalGames, avgScore, bestScore, avgCount, maxCount, avgCorrect, avgRecall };
+    }, [filteredResults, selectedGame]);
 
     // Prepare chart data
     const chartData = useMemo(() => {
@@ -87,7 +95,11 @@ export default function Analytics() {
             percentage: r.percentage,
             count: r.count,
             type: r.type,
-            config: getGameConfig(r.type)
+            config: getGameConfig(r.type),
+            accuracy: r.accuracy || r.percentage,
+            recall: r.recallPercentage || 0,
+            correct: r.correct || 0,
+            total: r.total || r.count
         }));
     }, [filteredResults]);
 
@@ -164,26 +176,52 @@ export default function Analytics() {
                                     <div style={{ fontSize: '0.9rem', opacity: 0.7, marginBottom: '0.5rem' }}>Total Games</div>
                                     <div style={{ fontSize: '2rem', fontWeight: 'bold' }}>{stats.totalGames}</div>
                                 </div>
-                                <div className="glass-panel" style={{ padding: '1.5rem', textAlign: 'center' }}>
-                                    <div style={{ fontSize: '0.9rem', opacity: 0.7, marginBottom: '0.5rem' }}>Avg. Accuracy</div>
-                                    <div style={{ fontSize: '2rem', fontWeight: 'bold', color: stats.avgScore >= 80 ? 'var(--success)' : stats.avgScore >= 50 ? 'orange' : 'var(--error)' }}>
-                                        {stats.avgScore}%
-                                    </div>
-                                </div>
-                                {selectedGame !== 'all' && (
+
+                                {selectedGame === 'number-wall' ? (
                                     <>
                                         <div className="glass-panel" style={{ padding: '1.5rem', textAlign: 'center' }}>
-                                            <div style={{ fontSize: '0.9rem', opacity: 0.7, marginBottom: '0.5rem' }}>Best Accuracy</div>
-                                            <div style={{ fontSize: '2rem', fontWeight: 'bold', color: 'var(--success)' }}>
-                                                {stats.bestScore}%
+                                            <div style={{ fontSize: '0.9rem', opacity: 0.7, marginBottom: '0.5rem' }}>Avg. Correct Digits</div>
+                                            <div style={{ fontSize: '2rem', fontWeight: 'bold', color: 'var(--primary)' }}>
+                                                {stats.avgCorrect}
                                             </div>
                                         </div>
                                         <div className="glass-panel" style={{ padding: '1.5rem', textAlign: 'center' }}>
-                                            <div style={{ fontSize: '0.9rem', opacity: 0.7, marginBottom: '0.5rem' }}>Avg. {getGameConfig(selectedGame).unit}</div>
-                                            <div style={{ fontSize: '2rem', fontWeight: 'bold', color: 'var(--accent)' }}>
-                                                {stats.avgCount}
+                                            <div style={{ fontSize: '0.9rem', opacity: 0.7, marginBottom: '0.5rem' }}>Avg. Accuracy</div>
+                                            <div style={{ fontSize: '2rem', fontWeight: 'bold', color: stats.avgScore >= 90 ? 'var(--success)' : stats.avgScore >= 70 ? 'orange' : 'var(--error)' }}>
+                                                {stats.avgScore}%
                                             </div>
                                         </div>
+                                        <div className="glass-panel" style={{ padding: '1.5rem', textAlign: 'center' }}>
+                                            <div style={{ fontSize: '0.9rem', opacity: 0.7, marginBottom: '0.5rem' }}>Avg. Recall %</div>
+                                            <div style={{ fontSize: '2rem', fontWeight: 'bold', color: 'var(--accent)' }}>
+                                                {stats.avgRecall}%
+                                            </div>
+                                        </div>
+                                    </>
+                                ) : (
+                                    <>
+                                        <div className="glass-panel" style={{ padding: '1.5rem', textAlign: 'center' }}>
+                                            <div style={{ fontSize: '0.9rem', opacity: 0.7, marginBottom: '0.5rem' }}>Avg. Accuracy</div>
+                                            <div style={{ fontSize: '2rem', fontWeight: 'bold', color: stats.avgScore >= 80 ? 'var(--success)' : stats.avgScore >= 50 ? 'orange' : 'var(--error)' }}>
+                                                {stats.avgScore}%
+                                            </div>
+                                        </div>
+                                        {selectedGame !== 'all' && (
+                                            <>
+                                                <div className="glass-panel" style={{ padding: '1.5rem', textAlign: 'center' }}>
+                                                    <div style={{ fontSize: '0.9rem', opacity: 0.7, marginBottom: '0.5rem' }}>Best Accuracy</div>
+                                                    <div style={{ fontSize: '2rem', fontWeight: 'bold', color: 'var(--success)' }}>
+                                                        {stats.bestScore}%
+                                                    </div>
+                                                </div>
+                                                <div className="glass-panel" style={{ padding: '1.5rem', textAlign: 'center' }}>
+                                                    <div style={{ fontSize: '0.9rem', opacity: 0.7, marginBottom: '0.5rem' }}>Avg. {getGameConfig(selectedGame).unit}</div>
+                                                    <div style={{ fontSize: '2rem', fontWeight: 'bold', color: 'var(--accent)' }}>
+                                                        {stats.avgCount}
+                                                    </div>
+                                                </div>
+                                            </>
+                                        )}
                                     </>
                                 )}
                             </div>
@@ -315,7 +353,14 @@ export default function Analytics() {
                                                     </span>
                                                 </td>
                                                 <td style={{ padding: '0.75rem', textAlign: 'center', fontWeight: 'bold', color: r.percentage >= 80 ? 'var(--success)' : 'inherit' }}>
-                                                    {r.percentage}%
+                                                    {r.type === 'number-wall' && r.accuracy !== undefined ? (
+                                                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', lineHeight: 1.2 }}>
+                                                            <span>{r.correct}/{r.total}</span>
+                                                            <span style={{ fontSize: '0.75rem', opacity: 0.7 }}>{r.accuracy}% Acc</span>
+                                                        </div>
+                                                    ) : (
+                                                        `${r.percentage}%`
+                                                    )}
                                                 </td>
                                                 <td style={{ padding: '0.75rem', textAlign: 'right' }}>
                                                     {r.count} {getGameConfig(r.type).unit}

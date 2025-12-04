@@ -84,7 +84,15 @@ export default function NumberWall() {
         const memorizeEnd = endTime || Date.now();
         const memorizeStart = startTime || memorizeEnd;
         const memorizeTimeSeconds = Math.max(0, Math.floor((memorizeEnd - memorizeStart) / 1000));
-        const percentage = digits.length ? Math.round((correctCount / digits.length) * 100) : 0;
+
+        const cleanInput = userInput.replace(/\s/g, '');
+        const attemptedCount = cleanInput.length;
+
+        // Accuracy: Correct / Attempted
+        const accuracy = attemptedCount > 0 ? Math.round((correctCount / attemptedCount) * 100) : 0;
+
+        // Recall Percentage: Attempted / Total Target
+        const recallPercentage = digits.length ? Math.round((attemptedCount / digits.length) * 100) : 0;
 
         setEndTime(memorizeEnd);
         setIsSavingResult(true);
@@ -96,9 +104,11 @@ export default function NumberWall() {
                 count: digitCount,
                 correct: correctCount,
                 total: digits.length,
-                percentage,
+                percentage: accuracy, // Use accuracy as the main percentage for consistency with other games? Or maybe recall? User wants accuracy to be 100% if 50/50.
+                accuracy,
+                recallPercentage,
                 memorizeTime: memorizeTimeSeconds,
-                recallTime: 0, // We aren't tracking recall time strictly yet, or we could add it
+                recallTime: 0,
             });
         } catch (error) {
             console.error('Failed to save Number Wall result:', error);
@@ -309,14 +319,30 @@ export default function NumberWall() {
 
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '2rem' }}>
                             <div style={{ background: 'rgba(0,0,0,0.2)', padding: '1rem', borderRadius: '0.5rem', textAlign: 'center' }}>
-                                <div style={{ fontSize: '0.9rem', opacity: 0.7 }}>Score</div>
+                                <div style={{ fontSize: '0.9rem', opacity: 0.7 }}>Accuracy</div>
                                 <div style={{ fontSize: '2rem', fontWeight: 'bold', color: 'var(--success)' }}>
-                                    {calculateScore()} / {digits.length}
+                                    {userInput.replace(/\s/g, '').length > 0
+                                        ? Math.round((calculateScore() / userInput.replace(/\s/g, '').length) * 100)
+                                        : 0}%
                                 </div>
-                                <div style={{ fontSize: '0.8rem', opacity: 0.6 }}>Correct digits before first error</div>
+                                <div style={{ fontSize: '0.8rem', opacity: 0.6 }}>
+                                    {calculateScore()} / {userInput.replace(/\s/g, '').length} Correct
+                                </div>
                             </div>
 
                             <div style={{ background: 'rgba(0,0,0,0.2)', padding: '1rem', borderRadius: '0.5rem', textAlign: 'center' }}>
+                                <div style={{ fontSize: '0.9rem', opacity: 0.7 }}>Recall %</div>
+                                <div style={{ fontSize: '2rem', fontWeight: 'bold' }}>
+                                    {digits.length > 0
+                                        ? Math.round((userInput.replace(/\s/g, '').length / digits.length) * 100)
+                                        : 0}%
+                                </div>
+                                <div style={{ fontSize: '0.8rem', opacity: 0.6 }}>
+                                    {userInput.replace(/\s/g, '').length} / {digits.length} Attempted
+                                </div>
+                            </div>
+
+                            <div style={{ background: 'rgba(0,0,0,0.2)', padding: '1rem', borderRadius: '0.5rem', textAlign: 'center', gridColumn: 'span 2' }}>
                                 <div style={{ fontSize: '0.9rem', opacity: 0.7 }}>Memorization Time</div>
                                 <div style={{ fontSize: '2rem', fontWeight: 'bold' }}>
                                     {formatTime(Math.floor((endTime - startTime) / 1000))}

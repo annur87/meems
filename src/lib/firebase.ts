@@ -85,6 +85,8 @@ export interface GameResult {
     recallTime: number;
     timestamp: number;
     date: string;
+    accuracy?: number;
+    recallPercentage?: number;
 }
 
 // Image Vault Data Structures

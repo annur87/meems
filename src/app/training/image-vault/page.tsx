@@ -1822,10 +1822,11 @@ export default function ImageVault() {
 
                                                                 <button
                                                                     onClick={(e) => {
+                                                                        e.preventDefault();
                                                                         e.stopPropagation();
                                                                         setEditingMajor(entry.number);
-                                                                        // Initialize inputs if needed, but we'll handle that in the modal
                                                                     }}
+                                                                    onMouseDown={(e) => e.stopPropagation()}
                                                                     style={{
                                                                         marginTop: '0.5rem',
                                                                         background: 'rgba(255,255,255,0.2)',
@@ -1836,7 +1837,8 @@ export default function ImageVault() {
                                                                         color: 'white',
                                                                         cursor: 'pointer',
                                                                         position: 'relative',
-                                                                        zIndex: 2,
+                                                                        zIndex: 100,
+                                                                        pointerEvents: 'auto',
                                                                         transition: 'background 0.2s'
                                                                     }}
                                                                     onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.3)'}

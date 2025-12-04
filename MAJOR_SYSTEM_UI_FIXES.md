@@ -3,7 +3,7 @@
 ## Changes Implemented
 
 ### 1. Card Display Enhancements
-- **Increased Size**: Updated grid layout to `minmax(120px, 1fr)` (was 100px) to provide more width for names.
+- **Increased Size**: Updated grid layout to `minmax(120px, 1fr)` (was 100px) to better fit names.
 - **Simpler Icons**: Replaced emoji icons with text labels:
   - `👤` -> `P:` (Person)
   - `🎬` -> `A:` (Action)
@@ -20,10 +20,12 @@
 
 ### 3. Technical Implementation
 - Added `createPortal` from `react-dom`.
-- Added `typeof window !== 'undefined'` check to prevent SSR issues with `document.body`.
+- Added `mounted` state check to ensure safe client-side rendering and avoid hydration mismatches.
+- Refactored modal rendering to be inline for better reliability.
+- Increased modal z-index to `2147483647` to ensure it appears above all other elements.
 - Maintained all existing functionality (add, delete, edit) within the new layout.
 
 ## Verification
 - **Build Status**: ✅ Passed
-- **Linting**: ✅ No errors
+- **Linting**: ✅ No errors related to changes
 - **Functionality**: Preserved all data handling logic while improving the UI layer.

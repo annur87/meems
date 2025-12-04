@@ -47,6 +47,12 @@ type TimeFilter = '1h' | '2h' | '12h' | '1d' | '1w' | '1m' | '1y' | 'all';
 const STORAGE_KEY = 'image_vault_data';
 
 export default function ImageVault() {
+    const [mounted, setMounted] = useState(false);
+
+    useEffect(() => {
+        setMounted(true);
+    }, []);
+
     const [activeTab, setActiveTab] = useState<SystemType>('analytics');
     const [userId, setUserId] = useState('default_user');
     const [drillStartTime, setDrillStartTime] = useState(0);
@@ -63,7 +69,6 @@ export default function ImageVault() {
     const [newMajorPerson, setNewMajorPerson] = useState('');
     const [newMajorAction, setNewMajorAction] = useState('');
     const [newMajorObject, setNewMajorObject] = useState('');
-    const [majorEditCategory, setMajorEditCategory] = useState<'persons' | 'actions' | 'objects'>('persons');
 
     // Analytics State
     const [majorViewMode, setMajorViewMode] = useState<'cards' | 'analytics'>('cards');
@@ -1847,7 +1852,8 @@ export default function ImageVault() {
                                         </div>
 
                                         {/* Edit Modal */}
-                                        {editingMajor && typeof window !== 'undefined' && createPortal(
+                                        {/* Edit Modal */}
+                                        {editingMajor && mounted && createPortal(
                                             <div style={{
                                                 position: 'fixed',
                                                 top: 0,
@@ -1855,7 +1861,7 @@ export default function ImageVault() {
                                                 right: 0,
                                                 bottom: 0,
                                                 background: 'rgba(0,0,0,0.8)',
-                                                zIndex: 9999,
+                                                zIndex: 2147483647,
                                                 display: 'flex',
                                                 alignItems: 'center',
                                                 justifyContent: 'center',
@@ -1884,32 +1890,24 @@ export default function ImageVault() {
                                                         const entry = majorSystem.find(e => e.number === editingMajor);
                                                         if (!entry) return null;
 
-                                                        const renderCategory = (category: 'persons' | 'actions' | 'objects', label: string, icon: string) => {
-                                                            const items = entry[category] || [];
-                                                            const newValue = category === 'persons' ? newMajorPerson : category === 'actions' ? newMajorAction : newMajorObject;
-                                                            const setValue = category === 'persons' ? setNewMajorPerson : category === 'actions' ? setNewMajorAction : setNewMajorObject;
-                                                            const addItem = category === 'persons' ? addMajorPerson : category === 'actions' ? addMajorAction : addMajorObject;
-                                                            const deleteItem = category === 'persons' ? deleteMajorPerson : category === 'actions' ? deleteMajorAction : deleteMajorObject;
-
-                                                            return (
-                                                                <div key={category} style={{ marginBottom: '1.5rem' }}>
+                                                        return (
+                                                            <div>
+                                                                {/* Persons */}
+                                                                <div style={{ marginBottom: '1.5rem' }}>
                                                                     <h4 style={{ fontSize: '1rem', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem', opacity: 0.9 }}>
-                                                                        <span style={{ fontWeight: 'bold' }}>{icon}</span>
-                                                                        {label}
+                                                                        <span style={{ fontWeight: 'bold' }}>P:</span> Persons
                                                                     </h4>
-
-                                                                    {/* Add New */}
                                                                     <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem' }}>
                                                                         <input
                                                                             type="text"
                                                                             className="input-field"
-                                                                            placeholder={`Add ${label.toLowerCase()}...`}
-                                                                            value={newValue}
-                                                                            onChange={e => setValue(e.target.value)}
+                                                                            placeholder="Add person..."
+                                                                            value={newMajorPerson}
+                                                                            onChange={e => setNewMajorPerson(e.target.value)}
                                                                             onKeyDown={e => {
-                                                                                if (e.key === 'Enter' && newValue.trim()) {
-                                                                                    addItem(editingMajor, newValue);
-                                                                                    setValue('');
+                                                                                if (e.key === 'Enter' && newMajorPerson.trim()) {
+                                                                                    addMajorPerson(editingMajor, newMajorPerson);
+                                                                                    setNewMajorPerson('');
                                                                                 }
                                                                             }}
                                                                             style={{ flex: 1 }}
@@ -1917,9 +1915,9 @@ export default function ImageVault() {
                                                                         <button
                                                                             className="btn btn-primary"
                                                                             onClick={() => {
-                                                                                if (newValue.trim()) {
-                                                                                    addItem(editingMajor, newValue);
-                                                                                    setValue('');
+                                                                                if (newMajorPerson.trim()) {
+                                                                                    addMajorPerson(editingMajor, newMajorPerson);
+                                                                                    setNewMajorPerson('');
                                                                                 }
                                                                             }}
                                                                             style={{ padding: '0.5rem 1rem' }}
@@ -1927,19 +1925,17 @@ export default function ImageVault() {
                                                                             +
                                                                         </button>
                                                                     </div>
-
-                                                                    {/* List */}
                                                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                                                                        {items.length === 0 && (
+                                                                        {(!entry.persons || entry.persons.length === 0) && (
                                                                             <div style={{ opacity: 0.5, fontStyle: 'italic', padding: '0.5rem', textAlign: 'left', fontSize: '0.9rem' }}>
-                                                                                No {label.toLowerCase()} yet
+                                                                                No persons yet
                                                                             </div>
                                                                         )}
-                                                                        {items.map((item, i) => (
+                                                                        {(entry.persons || []).map((item, i) => (
                                                                             <div key={i} className="glass" style={{ padding: '0.5rem 0.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                                                                 <span style={{ textAlign: 'left', flex: 1 }}>{item}</span>
                                                                                 <button
-                                                                                    onClick={() => deleteItem(editingMajor, item)}
+                                                                                    onClick={() => deleteMajorPerson(editingMajor, item)}
                                                                                     style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', opacity: 0.7, fontSize: '1.2rem', padding: '0 0.5rem' }}
                                                                                 >
                                                                                     ×
@@ -1948,14 +1944,112 @@ export default function ImageVault() {
                                                                         ))}
                                                                     </div>
                                                                 </div>
-                                                            );
-                                                        };
 
-                                                        return (
-                                                            <div>
-                                                                {renderCategory('persons', 'Persons', 'P:')}
-                                                                {renderCategory('actions', 'Actions', 'A:')}
-                                                                {renderCategory('objects', 'Objects', 'O:')}
+                                                                {/* Actions */}
+                                                                <div style={{ marginBottom: '1.5rem' }}>
+                                                                    <h4 style={{ fontSize: '1rem', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem', opacity: 0.9 }}>
+                                                                        <span style={{ fontWeight: 'bold' }}>A:</span> Actions
+                                                                    </h4>
+                                                                    <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem' }}>
+                                                                        <input
+                                                                            type="text"
+                                                                            className="input-field"
+                                                                            placeholder="Add action..."
+                                                                            value={newMajorAction}
+                                                                            onChange={e => setNewMajorAction(e.target.value)}
+                                                                            onKeyDown={e => {
+                                                                                if (e.key === 'Enter' && newMajorAction.trim()) {
+                                                                                    addMajorAction(editingMajor, newMajorAction);
+                                                                                    setNewMajorAction('');
+                                                                                }
+                                                                            }}
+                                                                            style={{ flex: 1 }}
+                                                                        />
+                                                                        <button
+                                                                            className="btn btn-primary"
+                                                                            onClick={() => {
+                                                                                if (newMajorAction.trim()) {
+                                                                                    addMajorAction(editingMajor, newMajorAction);
+                                                                                    setNewMajorAction('');
+                                                                                }
+                                                                            }}
+                                                                            style={{ padding: '0.5rem 1rem' }}
+                                                                        >
+                                                                            +
+                                                                        </button>
+                                                                    </div>
+                                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                                                        {(!entry.actions || entry.actions.length === 0) && (
+                                                                            <div style={{ opacity: 0.5, fontStyle: 'italic', padding: '0.5rem', textAlign: 'left', fontSize: '0.9rem' }}>
+                                                                                No actions yet
+                                                                            </div>
+                                                                        )}
+                                                                        {(entry.actions || []).map((item, i) => (
+                                                                            <div key={i} className="glass" style={{ padding: '0.5rem 0.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                                                <span style={{ textAlign: 'left', flex: 1 }}>{item}</span>
+                                                                                <button
+                                                                                    onClick={() => deleteMajorAction(editingMajor, item)}
+                                                                                    style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', opacity: 0.7, fontSize: '1.2rem', padding: '0 0.5rem' }}
+                                                                                >
+                                                                                    ×
+                                                                                </button>
+                                                                            </div>
+                                                                        ))}
+                                                                    </div>
+                                                                </div>
+
+                                                                {/* Objects */}
+                                                                <div style={{ marginBottom: '1.5rem' }}>
+                                                                    <h4 style={{ fontSize: '1rem', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem', opacity: 0.9 }}>
+                                                                        <span style={{ fontWeight: 'bold' }}>O:</span> Objects
+                                                                    </h4>
+                                                                    <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem' }}>
+                                                                        <input
+                                                                            type="text"
+                                                                            className="input-field"
+                                                                            placeholder="Add object..."
+                                                                            value={newMajorObject}
+                                                                            onChange={e => setNewMajorObject(e.target.value)}
+                                                                            onKeyDown={e => {
+                                                                                if (e.key === 'Enter' && newMajorObject.trim()) {
+                                                                                    addMajorObject(editingMajor, newMajorObject);
+                                                                                    setNewMajorObject('');
+                                                                                }
+                                                                            }}
+                                                                            style={{ flex: 1 }}
+                                                                        />
+                                                                        <button
+                                                                            className="btn btn-primary"
+                                                                            onClick={() => {
+                                                                                if (newMajorObject.trim()) {
+                                                                                    addMajorObject(editingMajor, newMajorObject);
+                                                                                    setNewMajorObject('');
+                                                                                }
+                                                                            }}
+                                                                            style={{ padding: '0.5rem 1rem' }}
+                                                                        >
+                                                                            +
+                                                                        </button>
+                                                                    </div>
+                                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                                                        {(!entry.objects || entry.objects.length === 0) && (
+                                                                            <div style={{ opacity: 0.5, fontStyle: 'italic', padding: '0.5rem', textAlign: 'left', fontSize: '0.9rem' }}>
+                                                                                No objects yet
+                                                                            </div>
+                                                                        )}
+                                                                        {(entry.objects || []).map((item, i) => (
+                                                                            <div key={i} className="glass" style={{ padding: '0.5rem 0.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                                                <span style={{ textAlign: 'left', flex: 1 }}>{item}</span>
+                                                                                <button
+                                                                                    onClick={() => deleteMajorObject(editingMajor, item)}
+                                                                                    style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', opacity: 0.7, fontSize: '1.2rem', padding: '0 0.5rem' }}
+                                                                                >
+                                                                                    ×
+                                                                                </button>
+                                                                            </div>
+                                                                        ))}
+                                                                    </div>
+                                                                </div>
                                                             </div>
                                                         );
                                                     })()}
